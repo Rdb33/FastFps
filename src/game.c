@@ -6,6 +6,8 @@
 
 static float random01(void) { return (float)rand() / ((float)RAND_MAX + 1.0f); }
 static float enemy_scale(const Enemy *e) { return e->type == ENEMY_BRUTE ? 1.3f : 1; }
+static bool actor_alive(const Game *g,int id);
+static Player *actor_player(Game *g,int id);
 
 static void say(Game *g, const char *text, float duration) {
     snprintf(g->message, sizeof(g->message), "%s", text);
@@ -17,6 +19,7 @@ void game_reset(Game *g, World *world, int limit) {
     g->world = world;
     g->particle_limit = limit;
     g->motion = true;
+    g->difficulty=1;
     g->shot_age = 10;
     g->player.body = (Body){{0, 0, 16}, {0, 0, 0}, true};
     g->player.health = 100;
@@ -26,6 +29,9 @@ void game_reset(Game *g, World *world, int limit) {
     g->pickups[2].position = (Vec3){-23, 0, 18};
     g->pickups[3].position = (Vec3){23, 0, 18};
     g->pickup_count = 4;
+    const Vec3 barrels[MAX_BARRELS]={{-6,0,-15},{-2,0,-15},{-20,0,2},{-20,0,6},{18,0,5},{18,0,9}};
+    g->barrel_count=MAX_BARRELS;
+    for(int i=0;i<MAX_BARRELS;i++)g->barrels[i]=(Barrel){.position=barrels[i],.health=45,.owner=-1};
     say(g, "BOUGE - CLIC DROIT : ESQUIVE - F : FRAPPE", 3);
     g->actors[0].active=true;
     snprintf(g->actors[0].name,sizeof(g->actors[0].name),"VOUS");
@@ -35,12 +41,18 @@ void game_reset(Game *g, World *world, int limit) {
 
 static void start_wave(Game *g) {
     g->wave++;
-    int count = 2 + g->wave * 2;
+    int players=0;for(int i=0;i<MAX_PLAYERS;i++)if(actor_alive(g,i))players++;
+    int count = 2 + g->wave * 2 + (players-1)*2 + (g->difficulty-1)*2;
+    if(count<2)count=2;
     if (count > MAX_ENEMIES) count = MAX_ENEMIES;
     int choices[8], n = 0;
     for (int i = 0; i < 8; i++) {
-        Vec3 delta = vsub(g->world->spawns[i], g->player.body.position);
-        if (hypotf(delta.x, delta.z) > 10) choices[n++] = i;
+        bool safe=true;
+        for(int id=0;id<MAX_PLAYERS;id++)if(actor_alive(g,id)) {
+            Vec3 delta=vsub(g->world->spawns[i],actor_player(g,id)->body.position);
+            if(hypotf(delta.x,delta.z)<9)safe=false;
+        }
+        if(safe)choices[n++]=i;
     }
     if (n == 0) for (int i = 0; i < 8; i++) choices[n++] = i;
     for (int i = n - 1; i > 0; i--) {
@@ -59,16 +71,24 @@ static void start_wave(Game *g) {
         if (g->wave >= 3 && i == count - 1) e->type = ENEMY_BRUTE;
         if (g->wave >= 6 && i == count - 3) e->type = ENEMY_BRUTE;
         e->max_health = e->type == ENEMY_BRUTE ? 260 : (e->type == ENEMY_CASTER ? 120 : 80);
-        e->health = e->max_health;
+        e->max_health*=(1+.15f*(float)(players-1))*(g->difficulty==0?.8f:(g->difficulty==2?1.25f:1));e->health = e->max_health;
         e->shot_timer = 1.5f + random01() * 1.4f;
         e->spawn_time = .5f;
         Vec3 delta = vsub(g->player.body.position, e->body.position);
         e->yaw = atan2f(delta.x, -delta.z);
     }
     char message[80];
-    snprintf(message, sizeof(message), g->wave == 3 ? "VAGUE %02d - ATTENTION AUX BRUTES" : "VAGUE %02d - %d CREATURES", g->wave, count);
+    if(g->wave==1)snprintf(message,sizeof(message),"VAGUE 01 - VISE LA TETE / BARILS ROUGES EXPLOSIFS");
+    else if(g->wave==2)snprintf(message,sizeof(message),"VAGUE 02 - F : FRAPPE FATALE POUR RECUPERER DE LA SANTE");
+    else snprintf(message, sizeof(message), g->wave == 3 ? "VAGUE %02d - ATTENTION AUX BRUTES" : "VAGUE %02d - %d CREATURES", g->wave, count);
     say(g, message, 2.5f);
     g->wave_timer = -1;
+    for(int i=0;i<g->barrel_count;i++)if(g->barrels[i].health<=0) {
+        bool safe=true;
+        for(int id=0;id<MAX_PLAYERS;id++)if(actor_alive(g,id)
+            &&vlength(vsub(actor_player(g,id)->body.position,g->barrels[i].position))<2)safe=false;
+        if(safe){g->barrels[i].health=45;g->barrels[i].explosion_time=0;g->barrels[i].owner=-1;}
+    }
     audio_play(SOUND_WAVE);
 }
 
@@ -96,9 +116,12 @@ static int nearest_actor(Game *g,Vec3 origin) {
     }
     return best;
 }
-static void hurt_actor(Game *g,int id,float damage) {
+static void hurt_actor(Game *g,int id,float damage,Vec3 source) {
     if(id<0||id>=MAX_PLAYERS||!actor_alive(g,id)||g->actors[id].invulnerable>0)return;
+    damage*=g->difficulty==0?.65f:(g->difficulty==2?1.35f:1);
     Player *p=actor_player(g,id);p->health=fmaxf(0,p->health-damage);
+    Vec3 direction=vsub(source,p->body.position);float yaw=atan2f(direction.x,-direction.z);
+    g->actors[id].damage_yaw=yaw;if(id==g->current_actor)g->damage_yaw=yaw;
     if(id==g->current_actor){g->damage_time=.32f;g->dead=p->health==0;}
     else {g->actors[id].damage_time=.32f;g->actors[id].dead=p->health==0;}
     if(p->health==0)g->actors[id].respawn_timer=5;
@@ -135,14 +158,44 @@ static void damage_enemy(Game *g, Enemy *e, float damage, Vec3 dir) {
     if (multiplier > 4) multiplier = 4;
     g->score += (100 + g->wave * 10) * multiplier;
     g->kills++;
+    g->kill_time=.3f;
     add_corpse(g, e);
     game_burst(g, vadd(e->body.position, (Vec3){0, .8f, 0}), (Color){.9f, .26f, .08f}, 8);
     audio_play_at(SOUND_KILL,e->body.position);
 }
 
+static void explode_barrel(Game *g,int index,int owner) {
+    Barrel *barrel=&g->barrels[index];
+    if(barrel->health<=0)return;
+    barrel->health=0;barrel->explosion_time=.65f;barrel->owner=owner;
+    Vec3 origin=vadd(barrel->position,(Vec3){0,.65f,0});
+    game_burst(g,origin,(Color){1,.52f,.08f},12);audio_play_at(SOUND_EXPLOSION,origin);
+    for(int i=0;i<g->enemy_count;i++) {
+        Enemy *e=&g->enemies[i];if(e->health<=0)continue;
+        Vec3 delta=vsub(vadd(e->body.position,(Vec3){0,.8f,0}),origin);
+        float distance=vlength(delta);Vec3 direction=vnormalize(delta);
+        if(distance<6&&world_ray(g->world,origin,direction,distance)>=distance-.05f)
+            damage_enemy(g,e,200*(1-distance/6),direction);
+    }
+    /* Les explosions sont un danger de l'arène pour toute l'équipe. */
+    for(int id=0;id<MAX_PLAYERS;id++)if(actor_alive(g,id)) {
+        Vec3 delta=vsub(player_eye(actor_player(g,id),false),origin);
+        float distance=vlength(delta);
+        if(distance<6&&world_ray(g->world,origin,vnormalize(delta),distance)>=distance-.05f)
+            hurt_actor(g,id,40*(1-distance/6),origin);
+    }
+    for(int i=0;i<g->barrel_count;i++)if(g->barrels[i].health>0) {
+        Vec3 target=vadd(g->barrels[i].position,(Vec3){0,.65f,0}),delta=vsub(target,origin);
+        float distance=vlength(delta);
+        if(distance<5&&world_ray(g->world,origin,vnormalize(delta),distance)>=distance-.05f)
+            explode_barrel(g,i,owner);
+    }
+}
+
 static bool fire_ray(Game *g, Vec3 origin, Vec3 dir, float damage, bool trail) {
     float distance = world_ray(g->world, origin, dir, SHOT_RANGE);
     Enemy *victim = NULL;
+    int barrel=-1;
     for (int i = 0; i < g->enemy_count; i++) {
         Enemy *e = &g->enemies[i];
         if (e->health <= 0) continue;
@@ -152,14 +205,29 @@ static bool fire_ray(Game *g, Vec3 origin, Vec3 dir, float damage, bool trail) {
         float hit = ray_box(origin, dir, bounds, distance);
         if (hit < distance) { distance = hit; victim = e; }
     }
+    for(int i=0;i<g->barrel_count;i++)if(g->barrels[i].health>0) {
+        Vec3 p=g->barrels[i].position;
+        float hit=ray_box(origin,dir,(Box){{p.x-.43f,p.y,p.z-.43f},{p.x+.43f,p.y+1.1f,p.z+.43f}},distance);
+        if(hit<distance){distance=hit;barrel=i;victim=NULL;}
+    }
     Vec3 point = vadd(origin, vscale(dir, distance));
     game_burst(g, point, victim ? (Color){.95f,.15f,.05f} : (Color){1,.7f,.24f}, victim ? 3 : 1);
     if (trail) for (int i=1; i<=4 && g->particle_count<g->particle_limit; i++) {
         Vec3 p = vadd(origin, vscale(dir, distance*(float)i/5));
         g->particles[g->particle_count++] = (Particle){p,{0,0,0},{1,.8f,.4f},.055f,.055f,.022f};
     }
-    if (victim) damage_enemy(g, victim, damage, dir);
-    return victim != NULL;
+    if (victim) {
+        bool headshot=point.y>victim->body.position.y+1.22f*enemy_scale(victim);
+        damage_enemy(g,victim,damage*(headshot?2:1),dir);
+        if(headshot){g->headshot_time=.28f;if(victim->health<=0)g->score+=50;}
+    }
+    if(barrel>=0) {
+        Barrel *b=&g->barrels[barrel];
+        if(b->health<=damage)explode_barrel(g,barrel,g->current_actor);
+        else b->health-=damage;
+        g->hit_time=.14f;
+    }
+    return victim != NULL||barrel>=0;
 }
 
 void game_shoot(Game *g) {
@@ -187,7 +255,7 @@ void game_shoot(Game *g) {
         g->shot_cooldown = .68f;
         audio_play(SOUND_SHOTGUN);
     }
-    if (hit) audio_play(SOUND_HIT);
+    if (hit) audio_play(g->headshot_time==.28f?SOUND_HEADSHOT:SOUND_HIT);
     g->recoil = 1;
     g->shot_age = 0;
 }
@@ -256,7 +324,7 @@ static void attack_update(Game *g, Enemy *e, float dt) {
         float distance = vlength(delta), range = e->type == ENEMY_BRUTE ? 2.7f : 1.9f;
         float dot = dir.x*e->attack_direction.x+dir.y*e->attack_direction.y+dir.z*e->attack_direction.z;
         if (distance < range && dot > .45f && world_ray(g->world,origin,dir,distance) >= distance-.01f)
-            hurt_actor(g,e->target_actor,e->type == ENEMY_BRUTE ? 28 : 15);
+            hurt_actor(g,e->target_actor,e->type == ENEMY_BRUTE ? 28 : 15,origin);
         e->touch_timer = e->type == ENEMY_BRUTE ? 1.0f : .6f;
     }
 }
@@ -293,6 +361,7 @@ static void update_enemies(Game *g, float dt) {
         }
         float speed = e->type == ENEMY_BRUTE ? 2.4f : (e->type == ENEMY_CASTER ? 2.8f : 4.4f);
         speed += fminf(1.4f,(float)(g->wave-1)*.1f);
+        speed*=g->difficulty==0?.9f:(g->difficulty==2?1.12f:1);
         if (e->attack_timer>0 || e->stagger>0 || e->spawn_time>0) speed = 0;
         Vec3 desired = vadd(vscale(vnormalize(move),speed),e->knockback);
         e->knockback = vscale(e->knockback,fmaxf(0,1-dt*14));
@@ -333,7 +402,7 @@ static void update_projectiles(Game *g, float dt) {
             float hit=ray_box(b->position,dir,bounds,length);
             if(hit<=nearest){nearest=hit;victim=id;}
         }
-        if(victim>=0){hurt_actor(g,victim,12);b->life=0;}
+        if(victim>=0){hurt_actor(g,victim,12,b->position);b->life=0;}
         else if(wall<length){game_burst(g,vadd(b->position,vscale(dir,wall)),(Color){1,.4f,.1f},2);b->life=0;}
         else b->position=vadd(b->position,vscale(b->velocity,dt));
         if(b->life<=0)g->projectiles[i]=g->projectiles[--g->projectile_count];else i++;
@@ -343,6 +412,7 @@ static void update_projectiles(Game *g, float dt) {
 static void update_actor(Game *g,Input input,float dt) {
     if(g->dead)return;
     g->hit_time=fmaxf(0,g->hit_time-dt); g->damage_time=fmaxf(0,g->damage_time-dt);
+    g->headshot_time=fmaxf(0,g->headshot_time-dt);g->kill_time=fmaxf(0,g->kill_time-dt);
     g->recoil=fmaxf(0,g->recoil-dt*9);
     g->shot_cooldown=fmaxf(0,g->shot_cooldown-dt);
     g->combo_timer=fmaxf(0,g->combo_timer-dt);
@@ -390,6 +460,7 @@ static void update_world(Game *g,float dt) {
         g->nav_timer=.35f;
     }
     for(int i=0;i<g->pickup_count;i++)g->pickups[i].cooldown=fmaxf(0,g->pickups[i].cooldown-dt);
+    for(int i=0;i<g->barrel_count;i++)g->barrels[i].explosion_time=fmaxf(0,g->barrels[i].explosion_time-dt);
     update_enemies(g,dt);update_projectiles(g,dt);
     for (int i=0;i<g->particle_count;) {
         Particle *particle=&g->particles[i]; particle->life-=dt;
@@ -427,6 +498,7 @@ void game_actor_save(Game *g) {
     a->hit_time=g->hit_time;a->damage_time=g->damage_time;a->shot_age=g->shot_age;
     a->combo_timer=g->combo_timer;a->combo=g->combo;a->dead=g->dead;
     a->dash_pressed=g->dash_pressed;a->melee_pressed=g->melee_pressed;
+    a->headshot_time=g->headshot_time;a->kill_time=g->kill_time;a->damage_yaw=g->damage_yaw;
 }
 void game_actor_select(Game *g,int id) {
     if(id<0||id>=MAX_PLAYERS)return;
@@ -436,10 +508,11 @@ void game_actor_select(Game *g,int id) {
     g->hit_time=a->hit_time;g->damage_time=a->damage_time;g->shot_age=a->shot_age;
     g->combo_timer=a->combo_timer;g->combo=a->combo;g->dead=a->dead;
     g->dash_pressed=a->dash_pressed;g->melee_pressed=a->melee_pressed;
+    g->headshot_time=a->headshot_time;g->kill_time=a->kill_time;g->damage_yaw=a->damage_yaw;
 }
 void game_start_coop(Game *g,const bool active[MAX_PLAYERS],int local) {
-    World *world=g->world;int limit=g->particle_limit;bool motion=g->motion;
-    game_reset(g,world,limit);g->cooperative=true;g->motion=motion;g->local_actor=local;
+    World *world=g->world;int limit=g->particle_limit,difficulty=g->difficulty;bool motion=g->motion;
+    game_reset(g,world,limit);g->cooperative=true;g->motion=motion;g->local_actor=local;g->difficulty=difficulty;
     for(int i=0;i<MAX_PLAYERS;i++) {
         Actor *a=&g->actors[i];a->active=active[i];a->player=g->player;
         a->player.body.position=(Vec3){(float)i*1.7f,0,16+(float)(i%2)*2};

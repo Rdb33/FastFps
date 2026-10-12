@@ -1,10 +1,22 @@
 # FASTFPS — Secteur zéro
 
-**FPS 3D natif, style Doom, pensé pour le Raspberry Pi 4.** Base à améliorer progressivement : déplacement nerveux, deux armes et survie dans une arène industrielle. Version **0.3.0** : salons coopératifs pour quatre joueurs, avec un joueur hôte.
+**FPS 3D natif, style Doom, pensé pour le Raspberry Pi 4.** Base à améliorer progressivement : déplacement nerveux, deux armes et survie dans une arène industrielle. Version **0.4.0** : connexion simplifiée, barils explosifs, tirs à la tête et difficulté réglable.
 
 Application en **C11**, **SDL2** (fenêtre, clavier, souris et son) et **OpenGL ES 2** (rendu 3D). Graphismes, police et sons sont générés localement.
 
 Le mode solo fonctionne hors ligne. Pour jouer ensemble, sélectionne **Multijoueur / salons** ; voir [MULTIJOUEUR.md](MULTIJOUEUR.md) pour la création, la connexion sur Internet et les limites de cette première version.
+
+## Nouveautés 0.4
+
+- Barils rouges explosifs : deux tirs de blaster, dégâts de zone et réactions en chaîne. Les murs arrêtent les explosions. Elles peuvent blesser les joueurs ; reste à distance. Les barils détruits reviennent à la vague suivante si aucun joueur n'est trop proche.
+- Tirs à la tête : dégâts ×2 et +50 points sur une élimination. Confirmation bleue pour la tête, dorée pour une élimination.
+- Flèche indiquant la provenance des dégâts, alerte de santé basse, compte à rebours des vagues et santé des alliés.
+- Difficultés **Détente**, **Normal** et **Brutal**, réglables dans le menu. En coopération, l'hôte choisit ; le nombre et la résistance des ennemis s'adaptent aussi au nombre de joueurs en vie au début de la vague.
+- Repères numérotés, enseignes, éclairages géométriques et indication de recharge des soins dans l'arène.
+- Salons locaux détectés automatiquement, invitation à copier/coller, adresses VPN prioritaires, invités prêts automatiquement et latence affichée.
+- Pseudo, dernière adresse, port et difficulté mémorisés à la fermeture normale.
+
+Pour jouer à distance sur Linux / Raspberry Pi : `./reseau.sh vpn` installe Tailscale si nécessaire et ouvre la connexion au compte. Chaque joueur utilise son compte et rejoint le même réseau privé. Active le VPN **avant** de créer le salon ; copie l'invitation dans le salon et colle-la avec `Ctrl+V` chez l'invité. `H` affiche l'aide réseau dans le jeu. Le script suit l'[installation officielle Tailscale](https://tailscale.com/docs/install/linux) et demande les droits système lors de l'installation.
 
 ## Lancer sur cette machine
 
@@ -25,7 +37,7 @@ Utilise **Raspberry Pi OS avec une session graphique**, un clavier et une souris
 
 ```bash
 sudo apt update
-sudo apt install build-essential pkg-config libsdl2-dev libgles2-mesa-dev
+sudo apt install build-essential pkg-config libsdl2-dev libgles-dev
 ```
 
 Copie le dossier `fastfps` dans `~/Projets` sur le Pi, puis compile **sur le Pi** :
@@ -65,6 +77,7 @@ Les déplacements utilisent les positions physiques du clavier : ZQSD sur AZERTY
 
 - Arène avec piliers, caisses, passages latéraux et plateforme accessible par des marches.
 - Blaster précis à tir continu et fusil à pompe à neuf plombs ; munitions illimitées pour cette base.
+- Barils explosifs et tirs à la tête ; les explosions représentent un danger pour toute l'équipe.
 - Trois types d’ennemis avec silhouettes, couleurs et animations distinctes ; voir le tableau ci-dessous.
 - Vagues progressives : quatre ennemis au départ, douze maximum. Navigation en grille pour contourner les obstacles.
 - Croix vertes : +30 santé, réapparition après 12 secondes. Terminer une vague : +15 santé.
@@ -115,6 +128,9 @@ Cinq appels de dessin par image : décor, objets mobiles, arme, interface, agran
 ./lancer.sh --quality pi --fullscreen
 ./lancer.sh --quality balanced
 ./lancer.sh --mute
+./lancer.sh --difficulty hard
+./lancer.sh --multiplayer
+./lancer.sh --join fastfps://100.101.102.103:27015
 ./build/fastfps --help
 ```
 
@@ -145,6 +161,7 @@ make clean
 | `src/renderer.c` | OpenGL ES, caméra, modèles et résolution |
 | `src/animation.c` | Poses des ennemis, articulations et animations des armes |
 | `src/network.c`, `src/network.h` | Connexions, salon, commandes et prédiction |
+| `src/discovery.c` | Recherche LAN, adresses VPN et invitations |
 | `src/protocol.c` | Encodage portable et validation des messages |
 | `src/lobby.c` | Écrans de création, connexion et attente |
 | `src/mesh.c` | Maillages et police bitmap locale |
@@ -158,7 +175,7 @@ Carte et paramètres sont actuellement dans les sources. Aucune option de compil
 
 Une carte et un mode survie solo ou coopératif. Collisions par boîtes, trajectoires parfois anguleuses. Pas encore de rampes, accroupissement, rechargement, sauvegarde de partie ou manette.
 
-La coopération utilise un joueur hôte qui fait autorité sur le monde, un état d’entrée `Input`, des identifiants d’ennemis stables, une prédiction du déplacement et une interpolation à l’affichage. La connexion se fait par IPv4 et port TCP, sans service central. La validation entre deux machines et sur Internet reste à faire : voir [VALIDATION.md](VALIDATION.md).
+La coopération utilise un joueur hôte qui fait autorité sur le monde, un état d’entrée `Input`, des identifiants d’ennemis stables, une prédiction du déplacement et une interpolation à l’affichage. La connexion se fait par IPv4 et port TCP, sans service central dans le jeu. Tailscale utilise ses propres services de connexion et éventuellement de relais. La validation entre deux machines et sur Internet reste à faire : voir [VALIDATION.md](VALIDATION.md). Tous les joueurs doivent utiliser la version 0.4 ; son protocole est incompatible avec la 0.3.
 
 Voir [ROADMAP.md](ROADMAP.md). Le prototype navigateur est conservé dans `prototype-web/` comme archive ; le lanceur principal utilise **l’application native**.
 

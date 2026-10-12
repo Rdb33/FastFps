@@ -65,3 +65,13 @@ Préférences : style géométrique expressif, ennemis différents, multijoueur 
 - Étudier un mode d’affrontement entre joueurs après la coopération.
 
 Les personnages jouables restent identiques pour cette version ; la variété demandée concerne les ennemis.
+
+## Version 0.4 : combat et connexion simplifiée
+
+- [x] Salons LAN automatiques, invitations à copier/coller et aide VPN.
+- [x] Prêt automatique, latence, préférences réseau et particules répliquées.
+- [x] Barils explosifs, tirs à la tête, direction des dégâts et HUD enrichi.
+- [x] Trois difficultés et vagues adaptées à la coopération.
+- [x] Repères visuels dans l'arène et recharge visible des soins.
+- [ ] Parties réelles entre deux machines, avec et sans VPN.
+- [ ] Ajuster l'équilibrage et mesurer les performances sur Pi.

@@ -13,19 +13,43 @@ static void settings_path(char *out,size_t size) {
 static void settings_read(App *app) {
     char path[2048];settings_path(path,sizeof(path));if(!path[0])return;
     FILE *file=fopen(path,"r");if(!file)return;
-    int quality=0,sound=1,best=0,motion=1;float sensitivity=1;
-    if(fscanf(file,"%d %f %d %d %d",&quality,&sensitivity,&sound,&best,&motion)>=4) {
+    int quality=0,sound=1,best=0,motion=1,difficulty=1;float sensitivity=1;
+    if(fscanf(file,"%d %f %d %d %d %d",&quality,&sensitivity,&sound,&best,&motion,&difficulty)>=4) {
         app->quality=quality>=0&&quality<3?quality:0;
         app->sensitivity=isfinite(sensitivity)?clampf(sensitivity,.3f,3):1;
         app->sound=sound!=0;app->best_score=best>=0?best:0;
         app->motion=motion!=0;
+        app->difficulty=difficulty>=0&&difficulty<=2?difficulty:1;
     }
     fclose(file);
 }
 static void settings_write(const App *app) {
     char path[2048];settings_path(path,sizeof(path));if(!path[0])return;
     FILE *file=fopen(path,"w");if(!file)return;
-    fprintf(file,"%d %.2f %d %d %d\n",app->quality,app->sensitivity,app->sound,app->best_score,app->motion);fclose(file);
+    fprintf(file,"%d %.2f %d %d %d %d\n",app->quality,app->sensitivity,app->sound,app->best_score,app->motion,app->difficulty);fclose(file);
+}
+static void network_preferences(App *app,bool write) {
+    char path[2048];char *directory=SDL_GetPrefPath("fastfps","fastfps");
+    if(!directory)return;
+    snprintf(path,sizeof(path),"%snetwork.txt",directory);SDL_free(directory);
+    FILE *file=fopen(path,write?"w":"r");if(!file)return;
+    Network *n=app->network;
+    if(write)fprintf(file,"%s\n%s\n%s\n",n->name,n->address,n->port_text);
+    else {
+        char name[PLAYER_NAME_LENGTH+2],address[98],port[8];
+        if(fgets(name,sizeof(name),file)&&fgets(address,sizeof(address),file)&&fgets(port,sizeof(port),file)) {
+            name[strcspn(name,"\r\n")]=0;address[strcspn(address,"\r\n")]=0;port[strcspn(port,"\r\n")]=0;
+            bool valid=name[0]&&strlen(name)<=PLAYER_NAME_LENGTH&&strlen(address)<sizeof(n->address);
+            for(const unsigned char *c=(const unsigned char *)name;*c;c++)if(*c<32||*c>126)valid=false;
+            for(const unsigned char *c=(const unsigned char *)address;*c;c++)if(*c<32||*c>126)valid=false;
+            char *end=NULL;long value=strtol(port,&end,10);
+            if(valid&&end&&!*end&&value>=1&&value<=65535) {
+                snprintf(n->name,sizeof(n->name),"%s",name);snprintf(n->address,sizeof(n->address),"%s",address);
+                snprintf(n->port_text,sizeof(n->port_text),"%ld",value);
+            }
+        }
+    }
+    fclose(file);
 }
 static void pause_game(App *app) {
     if(app->state!=STATE_PLAYING)return;
@@ -34,6 +58,7 @@ static void pause_game(App *app) {
 static void start_game(App *app,Game *game,bool restart,bool demo) {
     if(restart||app->state!=STATE_PAUSED)game_reset(game,game->world,PRESETS[app->quality].particles);
     game->motion=app->motion;
+    if(!game->cooperative||app->network->mode==NET_HOST)game->difficulty=app->difficulty;
     if(!demo&&SDL_SetRelativeMouseMode(SDL_TRUE)!=0) {
         app->capture_error=true;SDL_Log("Capture souris : %s",SDL_GetError());return;
     }
@@ -59,7 +84,7 @@ static void menu_action(App *app,Game *game,Renderer *renderer,int direction) {
     switch(app->selected) {
         case 0:start_game(app,game,false,false);break;
         case 1:
-            if(game->cooperative){net_close(app->network);game_reset(game,game->world,game->particle_limit);lobby_open(app);}
+            if(game->cooperative){net_close(app->network);game_reset(game,game->world,game->particle_limit);game->difficulty=app->difficulty;lobby_open(app);}
             else if(app->state==STATE_PAUSED)start_game(app,game,true,false);
             else lobby_open(app);
             break;
@@ -71,7 +96,10 @@ static void menu_action(App *app,Game *game,Renderer *renderer,int direction) {
         case 4:app->sound=!app->sound;audio_enabled(app->sound);break;
         case 5:toggle_fullscreen(app,renderer);break;
         case 6:app->motion=!app->motion;game->motion=app->motion;break;
-        case 7:app->running=false;break;
+        case 7:
+            if(game->cooperative&&app->network->mode==NET_CLIENT)break;
+            app->difficulty=(app->difficulty+direction+3)%3;game->difficulty=app->difficulty;break;
+        case 8:app->running=false;break;
     }
 }
 static int menu_hit(Renderer *r,int x,int y) {
@@ -81,7 +109,7 @@ static int menu_hit(Renderer *r,int x,int y) {
     float px=((float)x-((float)width-draw_width)/2)*640/draw_width;
     float py=((float)y-((float)height-draw_height)/2)*360/draw_height;
     if(px<76||px>564||py<136||py>=280)return -1;
-    return (int)((py-136)/18);
+    return (int)((py-136)/16);
 }
 static Input read_input(void) {
     const Uint8 *keys=SDL_GetKeyboardState(NULL);
@@ -115,8 +143,10 @@ static void help(void) {
     puts("FASTFPS " GAME_VERSION " - FPS 3D natif\n"
         "Usage : fastfps [options]\n"
         "  --quality pi|balanced|desktop  Profil de rendu\n"
+        "  --difficulty easy|normal|hard Niveau de difficulte\n"
         "  --host                        Creer un salon cooperatif\n"
-        "  --join IP                     Rejoindre une adresse IPv4\n"
+        "  --join INVITATION             IPv4, IP:port ou fastfps://IP:port\n"
+        "  --multiplayer                 Ouvrir les salons et rechercher en LAN\n"
         "  --port N                      Port TCP du salon (27015)\n"
         "  --name PSEUDO                 Nom affiche (16 caracteres)\n"
         "  --fullscreen                  Plein ecran\n"
@@ -128,14 +158,15 @@ static void help(void) {
         "  --version                     Afficher la version\n");
 }
 int main(int argc,char **argv) {
-    App app={.state=STATE_MENU,.running=true,.sound=true,.motion=true,.sensitivity=1};
-    bool demo=false,cli_mute=false,cli_fullscreen=false;int cli_quality=-1,frame_limit=0;
-    const char *screenshot=NULL,*join_address=NULL,*player_name="JOUEUR";
-    bool host=false;int room_port=NET_DEFAULT_PORT;
+    App app={.state=STATE_MENU,.running=true,.sound=true,.motion=true,.sensitivity=1,.difficulty=1};
+    bool demo=false,cli_mute=false,cli_fullscreen=false;int cli_quality=-1,cli_difficulty=-1,frame_limit=0;
+    const char *screenshot=NULL,*join_address=NULL,*player_name=NULL;
+    bool host=false,multiplayer=false;int room_port=0;
     for(int i=1;i<argc;i++) {
         if(strcmp(argv[i],"--help")==0){help();return 0;}
         if(strcmp(argv[i],"--version")==0){puts("FASTFPS " GAME_VERSION);return 0;}
         if(strcmp(argv[i],"--host")==0)host=true;
+        else if(strcmp(argv[i],"--multiplayer")==0)multiplayer=true;
         else if(strcmp(argv[i],"--join")==0&&i+1<argc)join_address=argv[++i];
         else if(strcmp(argv[i],"--name")==0&&i+1<argc)player_name=argv[++i];
         else if(strcmp(argv[i],"--port")==0&&i+1<argc) {
@@ -146,6 +177,13 @@ int main(int argc,char **argv) {
         else if(strcmp(argv[i],"--demo")==0)demo=true;
         else if(strcmp(argv[i],"--mute")==0)cli_mute=true;
         else if(strcmp(argv[i],"--fullscreen")==0)cli_fullscreen=true;
+        else if(strcmp(argv[i],"--difficulty")==0&&i+1<argc) {
+            const char *value=argv[++i];
+            if(strcmp(value,"easy")==0)cli_difficulty=0;
+            else if(strcmp(value,"normal")==0)cli_difficulty=1;
+            else if(strcmp(value,"hard")==0)cli_difficulty=2;
+            else {fprintf(stderr,"Difficulte inconnue : %s\n",value);return 1;}
+        }
         else if(strcmp(argv[i],"--quality")==0&&i+1<argc) {
             const char *value=argv[++i];
             if(strcmp(value,"pi")==0)cli_quality=0;
@@ -160,20 +198,22 @@ int main(int argc,char **argv) {
         else {fprintf(stderr,"Option inconnue ou incomplete : %s\n",argv[i]);help();return 1;}
     }
     if((host&&join_address)||(demo&&(host||join_address))) {fprintf(stderr,"Choisis un seul mode : host, join ou demo.\n");return 1;}
-    if(strlen(player_name)>PLAYER_NAME_LENGTH||(join_address&&strlen(join_address)>=64)){fprintf(stderr,"Pseudo ou adresse trop longue.\n");return 1;}
+    if((player_name&&strlen(player_name)>PLAYER_NAME_LENGTH)||(join_address&&strlen(join_address)>=96)){fprintf(stderr,"Pseudo ou adresse trop longue.\n");return 1;}
     Network *network=calloc(1,sizeof(*network));
     if(!network){fprintf(stderr,"Memoire insuffisante.\n");return 1;}
     net_init(network);app.network=network;app.editing=-1;
-    snprintf(network->name,sizeof(network->name),"%s",player_name);
-    snprintf(network->port_text,sizeof(network->port_text),"%d",room_port);
-    if(join_address)snprintf(network->address,sizeof(network->address),"%s",join_address);
     srand(demo?1u:(unsigned)time(NULL));
     SDL_SetHint(SDL_HINT_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR,"0");
     if(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_EVENTS|SDL_INIT_TIMER)!=0) {
         fprintf(stderr,"Initialisation SDL : %s\nLance le jeu depuis une session graphique.\n",SDL_GetError());free(network);return 1;
     }
     settings_read(&app);
+    network_preferences(&app,false);
+    if(player_name)snprintf(network->name,sizeof(network->name),"%s",player_name);
+    if(room_port)snprintf(network->port_text,sizeof(network->port_text),"%d",room_port);
+    if(join_address)snprintf(network->address,sizeof(network->address),"%s",join_address);
     if(cli_quality>=0)app.quality=cli_quality;
+    if(cli_difficulty>=0)app.difficulty=cli_difficulty;
     if(cli_mute)app.sound=false;
     World world;Renderer renderer;Game game;memset(&renderer,0,sizeof(renderer));
     if(!world_init(&world)) {fprintf(stderr,"Memoire insuffisante.\n");SDL_Quit();free(network);return 1;}
@@ -183,11 +223,14 @@ int main(int argc,char **argv) {
     }
     if(!cli_mute){audio_init();audio_enabled(app.sound);}
     game_reset(&game,&world,PRESETS[app.quality].particles);
+    game.difficulty=app.difficulty;
     if(cli_fullscreen)toggle_fullscreen(&app,&renderer);
     if(demo)start_game(&app,&game,true,true);
-    if(host||join_address) {
+    if(host||join_address||multiplayer) {
         lobby_open(&app);
-        if(host?net_host(network):net_join(network))app.state=STATE_LOBBY;
+        if((host||join_address)&&(host?net_host(network):net_join(network))) {
+            app.state=STATE_LOBBY;network->discovery_requested=false;
+        }
     }
     double frequency=(double)SDL_GetPerformanceFrequency();
     double previous=(double)SDL_GetPerformanceCounter()/frequency,last_render=previous-1,fps_start=previous;
@@ -224,17 +267,17 @@ int main(int argc,char **argv) {
                     else if(app.state==STATE_PAUSED)start_game(&app,&game,false,demo);
                     else app.running=false;
                 }else if(app.state!=STATE_PLAYING) {
-                    if(key==SDL_SCANCODE_UP)app.selected=(app.selected+7)%8;
-                    else if(key==SDL_SCANCODE_DOWN)app.selected=(app.selected+1)%8;
+                    if(key==SDL_SCANCODE_UP)app.selected=(app.selected+8)%9;
+                    else if(key==SDL_SCANCODE_DOWN)app.selected=(app.selected+1)%9;
                     else if(key==SDL_SCANCODE_RETURN||key==SDL_SCANCODE_KP_ENTER||key==SDL_SCANCODE_SPACE)menu_action(&app,&game,&renderer,1);
-                    else if((key==SDL_SCANCODE_LEFT||key==SDL_SCANCODE_RIGHT)&&app.selected>=2&&app.selected<=6)
+                    else if((key==SDL_SCANCODE_LEFT||key==SDL_SCANCODE_RIGHT)&&app.selected>=2&&app.selected<=7)
                         menu_action(&app,&game,&renderer,key==SDL_SCANCODE_LEFT?-1:1);
                 }else if(key==SDL_SCANCODE_1||key==SDL_SCANCODE_KP_1)game_request_weapon(&game,0);
                 else if(key==SDL_SCANCODE_2||key==SDL_SCANCODE_KP_2)game_request_weapon(&game,1);
             }
         }
         double now=(double)SDL_GetPerformanceCounter()/frequency;
-        net_poll(network,&game,now);lobby_sync(&app,&game);
+        net_discovery_poll(network,now);net_poll(network,&game,now);lobby_sync(&app,&game);
         double elapsed=fmin(now-previous,.1);previous=now;
         if(app.state==STATE_PLAYING||network->phase==ROOM_PLAYING) {
             accumulator+=elapsed;int steps=0;
@@ -274,7 +317,7 @@ int main(int argc,char **argv) {
         if(renderer_screenshot(&renderer,screenshot))SDL_Log("Capture : %s",screenshot);
         else {SDL_Log("Capture impossible : %s",SDL_GetError());exit_code=1;}
     }
-    if(!demo&&frame_limit==0)settings_write(&app);
+    if(!demo&&frame_limit==0){settings_write(&app);network_preferences(&app,true);}
     if(frame_limit)SDL_Log("%d images / vague %d / score %d / %d creatures / FPS %d",rendered,game.wave,game.score,game.enemy_count,app.fps);
     net_close(network);free(network);audio_shutdown();renderer_shutdown(&renderer);mesh_free(&world.mesh);SDL_Quit();return exit_code;
 }

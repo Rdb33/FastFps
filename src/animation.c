@@ -136,3 +136,40 @@ void animate_teammate(Mesh *m,const Actor *actor,int id) {
         mesh_diamond(m,(Vec3){.26f,.94f,-.83f},.09f,(Color){1,.82f,.4f});
     mesh_pose(m,first,p->body.position,p->yaw,actor->dead?PI_F*.45f:0,actor->dead?.45f:1);
 }
+
+void animate_barrel(Mesh *m,const Barrel *b,float time) {
+    if(b->health<=0) {
+        if(b->explosion_time<=0)return;
+        float age=.65f-b->explosion_time,fade=b->explosion_time/.65f;
+        Color fire={fade,fade*.58f,fade*.12f};
+        Vec3 center=vadd(b->position,(Vec3){0,.08f,0});
+        float radius=age*9+.4f;
+        for(int i=0;i<16;i++) {
+            float a=(float)i*2*PI_F/16,c=(float)(i+1)*2*PI_F/16;
+            Vec3 p={center.x+sinf(a)*radius,center.y,center.z+cosf(a)*radius};
+            Vec3 q={center.x+sinf(c)*radius,center.y,center.z+cosf(c)*radius};
+            Vec3 r={center.x+sinf(c)*(radius-.14f),center.y,center.z+cosf(c)*(radius-.14f)};
+            Vec3 s={center.x+sinf(a)*(radius-.14f),center.y,center.z+cosf(a)*(radius-.14f)};
+            mesh_quad(m,p,q,r,s,fire,(Vec3){0,1,0});
+        }
+        if(age<.24f)mesh_diamond(m,vadd(b->position,(Vec3){0,.65f,0}),(.25f+age*5)*fade,fire);
+        return;
+    }
+    Color red={.65f,.13f,.07f},band={.16f,.17f,.13f};
+    float pulse=b->health<45?.015f*(1+sinf(time*18)):0;
+    float radius=.42f+pulse;
+    for(int i=0;i<8;i++) {
+        float a=(float)i*2*PI_F/8,c=(float)(i+1)*2*PI_F/8;
+        Vec3 p={b->position.x+sinf(a)*radius,b->position.y,b->position.z+cosf(a)*radius};
+        Vec3 q={b->position.x+sinf(c)*radius,b->position.y,b->position.z+cosf(c)*radius};
+        Vec3 normal={sinf((a+c)/2),0,cosf((a+c)/2)};
+        for(int section=0;section<3;section++) {
+            float bottom=section==0?0:(section==1?.14f:.96f),height=section==1?.82f:.14f;
+            Vec3 lo=vadd(p,(Vec3){0,bottom,0}),ro=vadd(q,(Vec3){0,bottom,0});
+            mesh_quad(m,lo,ro,vadd(ro,(Vec3){0,height,0}),vadd(lo,(Vec3){0,height,0}),section==1?red:band,normal);
+        }
+        mesh_triangle(m,vadd(b->position,(Vec3){0,1.1f,0}),vadd(p,(Vec3){0,1.1f,0}),vadd(q,(Vec3){0,1.1f,0}),band,(Vec3){0,1,0});
+    }
+    mesh_diamond(m,vadd(b->position,(Vec3){0,.62f,-.43f}),.16f,(Color){1,.78f,.18f});
+    mesh_diamond(m,vadd(b->position,(Vec3){0,.62f,.43f}),.16f,(Color){1,.78f,.18f});
+}

@@ -45,6 +45,7 @@ static void actor_write(Writer *w,const Actor *a) {
     ws(w,a->name,PLAYER_NAME_LENGTH);player_write(w,&a->player);
     #define F(field) wf(w,a->field)
     F(shot_cooldown);F(recoil);F(hit_time);F(damage_time);F(shot_age);F(combo_timer);F(respawn_timer);F(invulnerable);
+    F(headshot_time);F(kill_time);F(damage_yaw);
     #undef F
     w32(w,(uint32_t)a->combo);w32(w,a->input_ack);w32(w,a->shots);
 }
@@ -54,6 +55,7 @@ static void actor_read(Reader *r,Actor *a) {
     rs(r,a->name,sizeof(a->name));player_read(r,&a->player);
     #define F(field) a->field=rf(r)
     F(shot_cooldown);F(recoil);F(hit_time);F(damage_time);F(shot_age);F(combo_timer);F(respawn_timer);F(invulnerable);
+    F(headshot_time);F(kill_time);F(damage_yaw);
     #undef F
     uint32_t combo=r32(r);if(combo>1000000)r->ok=false;a->combo=(int)combo;
     a->input_ack=r32(r);a->shots=r32(r);
@@ -96,8 +98,9 @@ bool protocol_command_read(Command *c,const uint8_t *data,size_t size) {
 }
 size_t protocol_snapshot_write(uint8_t *data,size_t capacity,const Game *g) {
     if(g->enemy_count<0||g->enemy_count>MAX_ENEMIES||g->corpse_count<0||g->corpse_count>MAX_CORPSES
-        ||g->projectile_count<0||g->projectile_count>MAX_PROJECTILES||g->pickup_count<0||g->pickup_count>MAX_PICKUPS)return 0;
-    Writer w={data,capacity,0,true};w8(&w,NET_PROTOCOL);w32(&w,g->tick);
+        ||g->projectile_count<0||g->projectile_count>MAX_PROJECTILES||g->pickup_count<0||g->pickup_count>MAX_PICKUPS
+        ||g->barrel_count<0||g->barrel_count>MAX_BARRELS||g->particle_count<0||g->particle_count>MAX_PARTICLES)return 0;
+    Writer w={data,capacity,0,true};w8(&w,NET_PROTOCOL);w8(&w,(uint8_t)g->difficulty);w32(&w,g->tick);
     w8(&w,g->round_over);w32(&w,(uint32_t)g->wave);w32(&w,(uint32_t)g->score);w32(&w,(uint32_t)g->kills);
     wf(&w,g->time);wf(&w,g->wave_timer);wf(&w,g->message_time);ws(&w,g->message,95);
     for(int i=0;i<MAX_PLAYERS;i++)actor_write(&w,&g->actors[i]);
@@ -107,11 +110,21 @@ size_t protocol_snapshot_write(uint8_t *data,size_t capacity,const Game *g) {
     for(int i=0;i<g->projectile_count;i++){const Projectile *p=&g->projectiles[i];wv(&w,p->position);wv(&w,p->velocity);wf(&w,p->life);wc(&w,p->color);}
     w8(&w,(uint8_t)g->pickup_count);
     for(int i=0;i<g->pickup_count;i++){wv(&w,g->pickups[i].position);wf(&w,g->pickups[i].cooldown);}
+    w8(&w,(uint8_t)g->barrel_count);
+    for(int i=0;i<g->barrel_count;i++) {
+        const Barrel *b=&g->barrels[i];wv(&w,b->position);wf(&w,b->health);wf(&w,b->explosion_time);w8(&w,(uint8_t)b->owner);
+    }
+    w8(&w,(uint8_t)g->particle_count);
+    for(int i=0;i<g->particle_count;i++) {
+        const Particle *p=&g->particles[i];wv(&w,p->position);wv(&w,p->velocity);wc(&w,p->color);
+        wf(&w,p->life);wf(&w,p->max_life);wf(&w,p->size);
+    }
     return w.ok?w.pos:0;
 }
 bool protocol_snapshot_read(Game *g,const uint8_t *data,size_t size) {
     Reader r={data,size,0,true};Game out=*g;
     if(r8(&r)!=NET_PROTOCOL)return false;
+    out.difficulty=r8(&r);if(out.difficulty>2)return false;
     out.tick=r32(&r);uint8_t ended=r8(&r);if(ended>1)r.ok=false;out.round_over=ended!=0;
     uint32_t wave=r32(&r),score=r32(&r),kills=r32(&r);
     if(wave>1000000||score>2147483647u||kills>2147483647u)r.ok=false;
@@ -126,6 +139,20 @@ bool protocol_snapshot_read(Game *g,const uint8_t *data,size_t size) {
     for(int i=0;i<out.projectile_count;i++){Projectile *p=&out.projectiles[i];p->position=rv(&r);p->velocity=rv(&r);p->life=rf(&r);p->color=rc(&r);}
     out.pickup_count=r8(&r);if(out.pickup_count>MAX_PICKUPS)return false;
     for(int i=0;i<out.pickup_count;i++){out.pickups[i].position=rv(&r);out.pickups[i].cooldown=rf(&r);}
+    out.barrel_count=r8(&r);if(out.barrel_count>MAX_BARRELS)return false;
+    for(int i=0;i<out.barrel_count;i++) {
+        Barrel *b=&out.barrels[i];b->position=rv(&r);b->health=rf(&r);b->explosion_time=rf(&r);
+        unsigned owner=r8(&r);b->owner=owner==255?-1:(int)owner;
+        if((owner>=MAX_PLAYERS&&owner!=255)||b->health<0||b->health>45||b->explosion_time<0||b->explosion_time>.66f)r.ok=false;
+    }
+    unsigned particles=r8(&r);if(particles>MAX_PARTICLES)return false;
+    out.particle_count=0;
+    for(unsigned i=0;i<particles;i++) {
+        Particle p;p.position=rv(&r);p.velocity=rv(&r);p.color=rc(&r);
+        p.life=rf(&r);p.max_life=rf(&r);p.size=rf(&r);
+        if(p.life<0||p.max_life<=0||p.life>p.max_life+.001f||p.size<=0||p.size>2)r.ok=false;
+        if(out.particle_count<out.particle_limit&&out.particle_count<MAX_PARTICLES)out.particles[out.particle_count++]=p;
+    }
     if(!r.ok||r.pos!=size||out.local_actor<0||out.local_actor>=MAX_PLAYERS)return false;
     out.cooperative=true;out.current_actor=-1;game_actor_select(&out,out.local_actor);
     *g=out;return true;

@@ -49,8 +49,14 @@ void ui_build(Mesh *m,const Game *g,const App *app) {
         if(g->cooperative) {
             int row=0;
             for(int i=0;i<MAX_PLAYERS;i++)if(g->actors[i].active&&i!=g->local_actor) {
-                snprintf(text,sizeof(text),"%s : %s",g->actors[i].name,g->actors[i].dead?"AU SOL":"EN JEU");
+                if(g->actors[i].dead)snprintf(text,sizeof(text),"%s : RETOUR %.0f S",g->actors[i].name,ceilf(g->actors[i].respawn_timer));
+                else snprintf(text,sizeof(text),"%s : %.0f PV",g->actors[i].name,g->actors[i].player.health);
                 mesh_text(m,12,45+(float)row*13,1,(Color){.35f,.85f,1},text);row++;
+            }
+            const Network *n=app->network;
+            if(n->mode==NET_CLIENT&&n->latency_ms>=0) {
+                snprintf(text,sizeof(text),"%.0f MS",n->latency_ms);
+                mesh_text(m,640-(float)strlen(text)*6-12,45,1,n->latency_ms>120?orange:muted,text);
             }
             if(g->dead) {
                 snprintf(text,sizeof(text),"RETOUR DANS %.0f S",ceilf(g->actors[g->local_actor].respawn_timer));
@@ -58,6 +64,10 @@ void ui_build(Mesh *m,const Game *g,const App *app) {
             }
         }
         if(g->message_time>0)centered(m,64,1,orange,g->message);
+        if(g->wave_timer>0&&g->enemy_count==0) {
+            snprintf(text,sizeof(text),"PROCHAINE VAGUE DANS %.0f",ceilf(g->wave_timer));
+            centered(m,122,1,ink,text);
+        }
         if(g->combo>1&&g->combo_timer>0) {
             int multiplier=1+(g->combo-1)/3;if(multiplier>4)multiplier=4;
             snprintf(text,sizeof(text),"SERIE %02d / X%d",g->combo,multiplier);
@@ -75,14 +85,26 @@ void ui_build(Mesh *m,const Game *g,const App *app) {
         mesh_rect(m,319,180-gap-7,2,6,ink);mesh_rect(m,319,180+gap+1,2,6,ink);
         mesh_rect(m,320-gap-7,179,6,2,ink);mesh_rect(m,320+gap+1,179,6,2,ink);
         mesh_rect(m,319,179,2,2,ink);
-        if(g->hit_time>0) {
-            mesh_rect(m,309,171,3,3,orange);mesh_rect(m,328,171,3,3,orange);
-            mesh_rect(m,309,186,3,3,orange);mesh_rect(m,328,186,3,3,orange);
+        if(g->hit_time>0||g->kill_time>0) {
+            Color color=g->kill_time>0?(Color){1,.85f,.35f}:(g->headshot_time>0?(Color){.35f,.9f,1}:orange);
+            mesh_rect(m,309,171,3,3,color);mesh_rect(m,328,171,3,3,color);
+            mesh_rect(m,309,186,3,3,color);mesh_rect(m,328,186,3,3,color);
+            if(g->headshot_time>0)centered(m,207,1,color,"TETE / X2");
+            else if(g->kill_time>0)centered(m,207,1,color,"ELIMINATION");
         }
         if(g->damage_time>0) {
             Color red={.65f*g->damage_time/.32f,.07f,.02f};
             mesh_rect(m,0,30,4,277,red);mesh_rect(m,636,30,4,277,red);
             mesh_rect(m,0,30,640,4,red);mesh_rect(m,0,303,640,4,red);
+            float angle=g->damage_yaw-g->player.yaw;
+            float x=320+sinf(angle)*42,y=180-cosf(angle)*42;
+            Vec3 tip={x+sinf(angle)*7,y-cosf(angle)*7,0};
+            Vec3 a={x-cosf(angle)*5,y-sinf(angle)*5,0},b={x+cosf(angle)*5,y+sinf(angle)*5,0};
+            mesh_triangle(m,tip,a,b,(Color){1,.28f,.12f},(Vec3){0,0,1});
+        }
+        if(g->player.health<30&&!g->dead) {
+            float pulse=.6f+.4f*sinf(g->time*6);
+            centered(m,276,1,(Color){pulse,.18f,.08f},"SANTE BASSE - CROIX VERTES / F : FRAPPE FATALE");
         }
         return;
     }
@@ -96,9 +118,9 @@ void ui_build(Mesh *m,const Game *g,const App *app) {
         centered(m,126,1,ink,text);
     }else if(app->state==STATE_PAUSED)centered(m,126,1,ink,"PAUSE");
     else centered(m,126,1,muted,"UNE ARENE. DEUX ARMES. DES VAGUES DE CREATURES.");
-    for(int i=0;i<8;i++) {
-        float y=141+(float)i*18;
-        if(i==app->selected)mesh_rect(m,76,y-5,488,17,(Color){.20f,.23f,.15f});
+    for(int i=0;i<9;i++) {
+        float y=141+(float)i*16;
+        if(i==app->selected)mesh_rect(m,76,y-5,488,15,(Color){.20f,.23f,.15f});
         switch(i) {
             case 0:snprintf(text,sizeof(text),"%s",app->state==STATE_PAUSED?"REPRENDRE":"JOUER");break;
             case 1:snprintf(text,sizeof(text),"%s",g->cooperative?"QUITTER LE SALON":(app->state==STATE_PAUSED?"RECOMMENCER":"MULTIJOUEUR / SALONS"));break;
@@ -108,6 +130,10 @@ void ui_build(Mesh *m,const Game *g,const App *app) {
             case 4:snprintf(text,sizeof(text),"SON : %s",app->sound?"ACTIF":"COUPE");break;
             case 5:snprintf(text,sizeof(text),"PLEIN ECRAN : %s",app->fullscreen?"ACTIF":"NON");break;
             case 6:snprintf(text,sizeof(text),"MOUVEMENTS CAMERA : %s",app->motion?"ACTIFS":"REDUITS");break;
+            case 7: {
+                const char *names[]={"DETENTE","NORMAL","BRUTAL"};
+                snprintf(text,sizeof(text),"DIFFICULTE%s : %s",g->cooperative?" DE L'HOTE":"",names[g->cooperative?g->difficulty:app->difficulty]);break;
+            }
             default:snprintf(text,sizeof(text),"QUITTER");break;
         }
         if(i==app->selected)mesh_text(m,87,y,1,orange,">");

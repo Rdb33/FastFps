@@ -115,6 +115,7 @@ static void virtual_sessions(World *world) {
 static int tcp_session(World *world) {
     Network *host=calloc(1,sizeof(*host)),*client=calloc(1,sizeof(*client));assert(host&&client);
     net_init(host);net_init(client);strcpy(host->port_text,"37991");strcpy(client->port_text,"37991");
+    strcpy(client->address,"127.0.0.1");
     Game server,guest;game_reset(&server,world,28);game_reset(&guest,world,28);
     if(!net_host(host)||!net_join(client)){fprintf(stderr,"TCP non teste : %s / %s\n",host->message,client->message);net_close(host);net_close(client);free(host);free(client);return 77;}
     bool ready=false,started=false;

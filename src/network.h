@@ -2,8 +2,10 @@
 #define FASTFPS_NETWORK_H
 #include "fastfps.h"
 
-#define NET_PROTOCOL 3
+#define NET_PROTOCOL 4
 #define NET_DEFAULT_PORT 27015
+#define NET_DISCOVERY_PORT 27014
+#define NET_ROOMS 3
 #define NET_PACKET_MAX 16384
 #define NET_BUFFER_MAX 65536
 #define NET_HISTORY 256
@@ -33,12 +35,22 @@ typedef struct {
     Command commands[NET_HISTORY], last_command;
     unsigned head, count;
 } Peer;
+typedef struct {
+    char address[16], name[PLAYER_NAME_LENGTH+1];
+    int port, players;
+    RoomPhase phase;
+    double seen;
+} NearbyRoom;
+typedef struct {
+    char address[16];
+    bool vpn;
+} LocalAddress;
 typedef struct Network {
     NetMode mode;
     RoomPhase phase;
     int listener, local_id, port;
     bool connecting, has_snapshot;
-    char name[PLAYER_NAME_LENGTH+1], address[64], port_text[6], message[128];
+    char name[PLAYER_NAME_LENGTH+1], address[96], port_text[6], message[128];
     Member members[MAX_PLAYERS];
     Peer peers[MAX_PLAYERS];
     Command history[NET_HISTORY];
@@ -46,6 +58,14 @@ typedef struct Network {
     uint32_t round;
     double last_snapshot, snapshot_time, last_input;
     Game previous, current;
+    int discovery_fd, discovery_role;
+    bool discovery_requested, discovery_failed;
+    double discovery_query, last_ping;
+    uint32_t discovery_token;
+    NearbyRoom rooms[NET_ROOMS];
+    LocalAddress local_addresses[8];
+    int local_address_count;
+    float latency_ms;
 } Network;
 
 void net_init(Network *net);
@@ -58,6 +78,11 @@ void net_ready(Network *net);
 void net_tick(Network *net, Game *game, Command local, float dt, double now);
 void net_render(const Network *net, const Game *game, Game *view, double now);
 bool net_connected(const Network *net);
+bool net_parse_address(Network *net);
+void net_local_addresses(Network *net);
+void net_discovery_close(Network *net);
+void net_discovery_poll(Network *net, double now);
+bool net_invitation(const Network *net, char *text, size_t capacity);
 bool net_feed(Network *net, int peer, Game *game, const uint8_t *data, size_t size, double now);
 size_t net_take_output(Network *net, int peer, uint8_t *data, size_t capacity);
 void lobby_open(App *app);

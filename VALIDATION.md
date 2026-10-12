@@ -2,6 +2,13 @@
 
 Contrôles effectués sur la machine de développement, le 12 octobre 2026.
 
+## Version 0.4
+
+- Compilation C11 avec `-O2 -Wall -Wextra -Wpedantic` réussie sans avertissement.
+- Aucun test de gameplay, de protocole ou de réseau exécuté pour cette itération ; les résultats ci-dessous concernent les versions précédentes.
+- Les nouvelles invitations, la découverte UDP, les explosions, les effets répliqués et les difficultés restent à vérifier en jouant.
+- Connexions réelles, copie du presse-papiers, aide Tailscale, performances et compilation sur Pi 4 restent à valider sur les machines des joueurs. Le script VPN a été créé, sans installer ni activer Tailscale sur cette machine.
+
 ## Version 0.3
 
 - Compilation C11 et contrôles de protocole et coopération via `make test`.

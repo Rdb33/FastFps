@@ -2,7 +2,7 @@
 #define FASTFPS_CONFIG_H
 
 /* Réglages de la première base : gameplay proche d'un Doom moderne. */
-#define GAME_VERSION "0.3.0"
+#define GAME_VERSION "0.4.0"
 #define MAX_PLAYERS 4
 #define PLAYER_NAME_LENGTH 16
 #define FIXED_STEP (1.0f / 60.0f)
@@ -13,6 +13,7 @@
 #define MAX_CORPSES 8
 #define MAX_SOLIDS 64
 #define MAX_PICKUPS 8
+#define MAX_BARRELS 6
 #define NAV_W 28
 #define NAV_H 24
 #define PLAYER_RADIUS 0.38f

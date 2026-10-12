@@ -1,3 +1,18 @@
+# Version 0.4.0
+
+- Découverte automatique de trois salons sur le réseau local, sans service central.
+- Invitations `fastfps://IP:port`, copier/coller natif, adresses VPN prioritaires et mémorisation des champs.
+- Invités prêts automatiquement, ping affiché dans le salon et en jeu, aide réseau avec H.
+- Assistant Linux / Pi `reseau.sh` : installation et connexion Tailscale à la demande, état et lancement des salons.
+- Six barils explosifs, réactions en chaîne, explosions bloquées par le décor et réapparition entre les vagues.
+- Tirs à la tête, dégâts doublés, bonus de score et confirmations distinctes.
+- Direction des dégâts, alerte de santé basse, santé des alliés et compte à rebours des vagues.
+- Difficultés Détente / Normal / Brutal, choix de l'hôte et adaptation des vagues à l'équipe.
+- Effets de tirs et explosions transmis aux invités, avec respect du budget de particules local.
+- Repères industriels et recharge visible des soins ; rendu conservé à cinq appels de dessin.
+- Protocole réseau 4, incompatible avec la version 0.3.
+- Compilation réussie sans avertissement ; cette itération n'a pas fait l'objet de tests de gameplay ou réseau.
+
 # Version 0.3.0
 
 - Salons coopératifs jusqu’à quatre joueurs : création, connexion par IPv4, pseudos, joueurs prêts et lancement par l’hôte.

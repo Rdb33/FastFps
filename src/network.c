@@ -26,17 +26,19 @@ static void peer_clear(Peer *p) {
     memset(p,0,sizeof(*p));p->fd=-1;
 }
 void net_init(Network *n) {
-    memset(n,0,sizeof(*n));n->listener=-1;n->port=NET_DEFAULT_PORT;
+    memset(n,0,sizeof(*n));n->listener=-1;n->discovery_fd=-1;n->port=NET_DEFAULT_PORT;n->latency_ms=-1;
     snprintf(n->port_text,sizeof(n->port_text),"%d",NET_DEFAULT_PORT);
-    snprintf(n->name,sizeof(n->name),"JOUEUR");snprintf(n->address,sizeof(n->address),"127.0.0.1");
+    snprintf(n->name,sizeof(n->name),"JOUEUR");
     for(int i=0;i<MAX_PLAYERS;i++)n->peers[i].fd=-1;
 }
 void net_close(Network *n) {
+    net_discovery_close(n);
     if(n->listener>=0)close(n->listener);
     n->listener=-1;
     for(int i=0;i<MAX_PLAYERS;i++)peer_clear(&n->peers[i]);
     memset(n->members,0,sizeof(n->members));memset(n->history,0,sizeof(n->history));
     n->mode=NET_OFF;n->phase=ROOM_WAITING;n->connecting=false;n->has_snapshot=false;n->sequence=0;n->local_id=0;
+    n->latency_ms=-1;n->last_ping=0;
 }
 static bool settings(Network *n) {
     char *end=NULL;long port=strtol(n->port_text,&end,10);
@@ -54,6 +56,7 @@ static bool socket_setup(int fd) {
 }
 bool net_host(Network *n) {
     net_close(n);if(!settings(n))return false;
+    net_local_addresses(n);
     int fd=socket(AF_INET,SOCK_STREAM,0);
     if(fd<0){snprintf(n->message,sizeof(n->message),"RESEAU INDISPONIBLE : %s",strerror(errno));return false;}
     int yes=1;setsockopt(fd,SOL_SOCKET,SO_REUSEADDR,&yes,sizeof(yes));
@@ -63,7 +66,7 @@ bool net_host(Network *n) {
     }
     n->listener=fd;n->mode=NET_HOST;n->members[0].present=true;n->members[0].ready=true;
     snprintf(n->members[0].name,sizeof(n->members[0].name),"%s",n->name);
-    message(n,"SALON OUVERT - PARTAGE TON IP ET LE PORT");return true;
+    message(n,"SALON OUVERT - COPIE L'INVITATION POUR TES AMIS");return true;
 }
 static bool queue(Network *n,int id,PacketType type,const uint8_t *body,size_t size) {
     Peer *p=&n->peers[id];
@@ -80,7 +83,7 @@ static void hello(Network *n) {
     queue(n,0,PACKET_HELLO,body,sizeof(body));
 }
 bool net_join(Network *n) {
-    net_close(n);if(!settings(n))return false;
+    net_close(n);if(!net_parse_address(n)||!settings(n))return false;
     struct sockaddr_in address={.sin_family=AF_INET,.sin_port=htons((uint16_t)n->port)};
     if(inet_pton(AF_INET,n->address,&address.sin_addr)!=1){message(n,"ENTRE UNE ADRESSE IPv4, PAR EXEMPLE 192.168.1.20");return false;}
     int fd=socket(AF_INET,SOCK_STREAM,0);
@@ -123,6 +126,22 @@ static void reconcile(Network *n,Game *g,const uint8_t *data,size_t size,double 
     n->previous=n->has_snapshot?n->current:snapshot;n->current=snapshot;n->snapshot_time=now;n->has_snapshot=true;
     for(int i=0;i<MAX_PLAYERS;i++)if(i!=n->local_id&&snapshot.actors[i].shots!=n->previous.actors[i].shots)
         audio_play_at(snapshot.actors[i].player.weapon?SOUND_SHOTGUN:SOUND_SHOT,snapshot.actors[i].player.body.position);
+    const Actor *local=&snapshot.actors[n->local_id],*old=&n->previous.actors[n->local_id];
+    if(local->player.health<old->player.health)audio_play(SOUND_HURT);
+    if(local->player.health>old->player.health&&!old->dead)audio_play(SOUND_PICKUP);
+    if(local->kill_time>old->kill_time+.02f)audio_play(SOUND_KILL);
+    else if(local->headshot_time>old->headshot_time+.02f)audio_play(SOUND_HEADSHOT);
+    else if(local->hit_time>old->hit_time+.02f)audio_play(SOUND_HIT);
+    for(int i=0;i<snapshot.barrel_count;i++)if(snapshot.barrels[i].health<=0
+        &&i<n->previous.barrel_count&&n->previous.barrels[i].health>0)
+        audio_play_at(SOUND_EXPLOSION,snapshot.barrels[i].position);
+    for(int i=0;i<snapshot.enemy_count;i++) {
+        const Enemy *e=&snapshot.enemies[i];
+        for(int j=0;j<n->previous.enemy_count;j++)if(n->previous.enemies[j].id==e->id
+            &&e->attack_timer>n->previous.enemies[j].attack_timer+.04f)
+            audio_play_at(e->type==ENEMY_CASTER?SOUND_CAST:SOUND_GROWL,e->body.position);
+    }
+    if(snapshot.wave>n->previous.wave)audio_play(SOUND_WAVE);
     *g=snapshot;
     uint32_t ack=g->actors[n->local_id].input_ack,count=n->sequence-ack;
     audio_suppressed(true);
@@ -139,7 +158,15 @@ static void reconcile(Network *n,Game *g,const uint8_t *data,size_t size,double 
 }
 static bool packet(Network *n,int id,Game *g,uint8_t type,const uint8_t *body,size_t size,double now) {
     Peer *p=&n->peers[id];
-    if(type==PACKET_PING){if(size)return false;if(n->mode==NET_HOST)queue(n,id,PACKET_PING,NULL,0);return true;}
+    if(type==PACKET_PING) {
+        if(size!=4||!p->accepted)return false;
+        if(n->mode==NET_HOST)queue(n,id,PACKET_PING,body,size);
+        else {
+            uint32_t elapsed=(uint32_t)(uint64_t)(now*1000)-get32(body);
+            if(elapsed<12000)n->latency_ms=n->latency_ms<0?(float)elapsed:n->latency_ms*.7f+(float)elapsed*.3f;
+        }
+        return true;
+    }
     if(n->mode==NET_HOST) {
         if(type==PACKET_HELLO) {
             if(p->accepted||size!=2+PLAYER_NAME_LENGTH+1)return false;
@@ -172,7 +199,9 @@ static bool packet(Network *n,int id,Game *g,uint8_t type,const uint8_t *body,si
     }
     if(type==PACKET_WELCOME) {
         if(size!=1||body[0]==0||body[0]>=MAX_PLAYERS||p->accepted)return false;
-        n->local_id=body[0];p->accepted=true;n->connecting=false;message(n,"SALON REJOINT - MARQUE-TOI PRET");return true;
+        n->local_id=body[0];p->accepted=true;n->connecting=false;
+        uint8_t ready=1;queue(n,0,PACKET_READY,&ready,1);
+        message(n,"SALON REJOINT - TU ES PRET, L'HOTE PEUT LANCER");return true;
     }
     if(!p->accepted)return false;
     if(type==PACKET_ROSTER) {
@@ -276,7 +305,7 @@ void net_poll(Network *n,Game *g,double now) {
                     char text[128];snprintf(text,sizeof(text),"CONNEXION REFUSEE : %s",strerror(error?error:errno));disconnect(n,id,g,text);return;
                 }
                 p->connecting=false;hello(n);
-            }else if(now-p->started_connect>8){disconnect(n,id,g,"CONNEXION EXPIREE - VERIFIE IP, PORT ET BOX");return;}
+            }else if(now-p->started_connect>8){disconnect(n,id,g,"AUCUNE REPONSE - VERIFIE L'INVITATION ET LE VPN / PARE-FEU");return;}
             else continue;
         }
         bool lost=false;
@@ -300,7 +329,9 @@ void net_poll(Network *n,Game *g,double now) {
             disconnect(n,id,g,"CONNEXION AU SALON PERDUE");if(n->mode==NET_OFF)return;
         }
     }
-    if(n->mode==NET_CLIENT&&now-n->last_input>2){queue(n,0,PACKET_PING,NULL,0);n->last_input=now;}
+    if(n->mode==NET_CLIENT&&n->peers[0].accepted&&now-n->last_ping>1) {
+        uint8_t data[4];put32(data,(uint32_t)(uint64_t)(now*1000));queue(n,0,PACKET_PING,data,sizeof(data));n->last_ping=now;
+    }
 }
 void net_tick(Network *n,Game *g,Command local,float dt,double now) {
     if(n->phase!=ROOM_PLAYING)return;
@@ -333,6 +364,12 @@ static Vec3 position_lerp(Vec3 a,Vec3 b,float t){return vadd(a,vscale(vsub(b,a),
 void net_render(const Network *n,const Game *g,Game *view,double now) {
     *view=*g;
     if(n->mode!=NET_CLIENT||!n->has_snapshot)return;
+    float age=clampf((float)(now-n->snapshot_time),0,.1f);
+    view->time+=age;
+    for(int i=0;i<view->barrel_count;i++)view->barrels[i].explosion_time=fmaxf(0,view->barrels[i].explosion_time-age);
+    for(int i=0;i<view->particle_count;i++) {
+        Particle *p=&view->particles[i];p->life-=age;p->position=vadd(p->position,vscale(p->velocity,age));
+    }
     float alpha=clampf((float)((now-n->snapshot_time)/NET_SNAPSHOT_INTERVAL),0,1);
     for(int i=0;i<MAX_PLAYERS;i++)if(i!=n->local_id&&view->actors[i].active) {
         const Actor *a=&n->previous.actors[i],*b=&n->current.actors[i];

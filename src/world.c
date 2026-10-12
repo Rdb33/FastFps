@@ -59,6 +59,12 @@ Vec3 navigation_next(const World *w,float x,float z) {
     }
     return nav_center(best);
 }
+static void wall_label(Mesh *m,const char *text,Vec3 position,float yaw,Color color,float scale) {
+    int first=m->count;mesh_text(m,-(float)strlen(text)*3,0,1,color,text);
+    for(int i=first;i<m->count;i++){m->data[i].position.y=-m->data[i].position.y;m->data[i].normal=(Vec3){0,0,1};}
+    for(int i=first;i+2<m->count;i+=3){Vertex swap=m->data[i+1];m->data[i+1]=m->data[i+2];m->data[i+2]=swap;}
+    mesh_pose(m,first,position,yaw,0,scale);
+}
 bool world_init(World *w) {
     memset(w,0,sizeof(*w));if(!mesh_init(&w->mesh,12000))return false;
     Mesh *m=&w->mesh;Color accent={.9f,.39f,.15f};
@@ -92,6 +98,23 @@ bool world_init(World *w) {
         solid(w,(Vec3){x,0,z},(Vec3){3,1.15f,2.5f},(Color){.32f,.35f,.25f});
     for(int x=-15;x<=15;x+=30)mesh_box(m,(Vec3){x,.003f,0},(Vec3){.055f,.006f,41},(Color){.44f,.4f,.2f});
     for(int z=-17;z<=17;z+=34)mesh_box(m,(Vec3){0,.003f,z},(Vec3){45,.006f,.055f},(Color){.44f,.4f,.2f});
+    wall_label(m,"SECTEUR ZERO",(Vec3){0,6.1f,-23.43f},0,(Color){.95f,.58f,.25f},.13f);
+    wall_label(m,"SURVIE",(Vec3){0,6.1f,23.43f},PI_F,(Color){.35f,.75f,.9f},.15f);
+    for(int side=-1;side<=1;side+=2) {
+        for(int z=-18;z<=18;z+=36) {
+            mesh_box(m,(Vec3){side*27.38f,2.8f,z},(Vec3){.08f,1.1f,2.2f},(Color){.10f,.14f,.13f});
+            wall_label(m,side<0?(z<0?"01":"02"):(z<0?"03":"04"),
+                (Vec3){side*27.31f,3.7f,z},side<0?PI_F*.5f:-PI_F*.5f,(Color){.4f,.85f,.68f},.16f);
+            mesh_box(m,(Vec3){side*23,.016f,z},(Vec3){2,.025f,2},(Color){.10f,.27f,.18f});
+            mesh_box(m,(Vec3){side*23,.02f,z},(Vec3){2.1f,.015f,.08f},(Color){.22f,.65f,.35f});
+            mesh_box(m,(Vec3){side*23,.02f,z},(Vec3){.08f,.015f,2.1f},(Color){.22f,.65f,.35f});
+        }
+        mesh_box(m,(Vec3){side*25.9f,5.8f,0},(Vec3){.45f,.45f,43},(Color){.19f,.24f,.24f});
+        for(int z=-16;z<=16;z+=16) {
+            mesh_box(m,(Vec3){side*26.0f,4.9f,z},(Vec3){.65f,.55f,2},(Color){.1f,.12f,.12f});
+            mesh_box(m,(Vec3){side*25.65f,5.04f,z},(Vec3){.04f,.25f,1.55f},(Color){.67f,.77f,.57f});
+        }
+    }
     Vec3 spawns[8]={{-21,0,-17},{21,0,-17},{-21,0,17},{21,0,17},{0,0,-19},{23,0,0},{-23,0,0},{0,0,19}};
     memcpy(w->spawns,spawns,sizeof(spawns));
     for(int i=0;i<NAV_W*NAV_H;i++) {

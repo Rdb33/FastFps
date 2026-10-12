@@ -32,6 +32,7 @@ typedef struct {
     Player player;
     float shot_cooldown, recoil, hit_time, damage_time, shot_age, combo_timer;
     float respawn_timer, invulnerable;
+    float headshot_time, kill_time, damage_yaw;
     int combo;
     uint32_t input_ack, shots;
     bool active, dead, dash_pressed, melee_pressed;
@@ -51,6 +52,7 @@ typedef struct {
 typedef struct { Vec3 position, velocity; float life; Color color; } Projectile;
 typedef struct { Vec3 position, velocity; Color color; float life, max_life, size; } Particle;
 typedef struct { Vec3 position; float cooldown; } Pickup;
+typedef struct { Vec3 position; float health, explosion_time; int owner; } Barrel;
 typedef struct {
     World *world;
     Player player;
@@ -59,9 +61,11 @@ typedef struct {
     Projectile projectiles[MAX_PROJECTILES]; int projectile_count;
     Particle particles[MAX_PARTICLES]; int particle_count, particle_limit;
     Pickup pickups[MAX_PICKUPS]; int pickup_count;
-    int wave, score, kills, next_id;
+    Barrel barrels[MAX_BARRELS]; int barrel_count;
+    int wave, score, kills, next_id, difficulty;
     float time, wave_timer, nav_timer, shot_cooldown, recoil, hit_time, damage_time;
     float shot_age, footstep_timer, combo_timer;
+    float headshot_time, kill_time, damage_yaw;
     int combo;
     char message[96]; float message_time;
     bool dead;
@@ -88,16 +92,16 @@ struct Network;
 typedef struct {
     State state;
     bool running, fullscreen, sound, capture_error, motion;
-    int selected, quality, best_score, fps;
+    int selected, quality, best_score, fps, difficulty;
     float sensitivity;
     struct Network *network;
     int editing;
-    bool select_all;
+    bool select_all, network_help;
 } App;
 typedef enum { SOUND_SHOT, SOUND_SHOTGUN, SOUND_HIT, SOUND_KILL,
     SOUND_HURT, SOUND_JUMP, SOUND_PICKUP, SOUND_WAVE,
     SOUND_STEP, SOUND_LAND, SOUND_SWITCH, SOUND_PUMP, SOUND_MELEE,
-    SOUND_DASH, SOUND_CAST, SOUND_GROWL } Sound;
+    SOUND_DASH, SOUND_CAST, SOUND_GROWL, SOUND_EXPLOSION, SOUND_HEADSHOT } Sound;
 
 extern const Preset PRESETS[3];
 
@@ -173,6 +177,7 @@ bool renderer_screenshot(Renderer *renderer, const char *path);
 void animate_creature(Mesh *mesh, const Enemy *enemy, float time);
 void animate_weapon(Mesh *mesh, const Game *game, const App *app);
 void animate_teammate(Mesh *mesh, const Actor *actor, int id);
+void animate_barrel(Mesh *mesh, const Barrel *barrel, float time);
 
 /* ui.c */
 void ui_build(Mesh *mesh, const Game *game, const App *app);

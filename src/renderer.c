@@ -84,7 +84,7 @@ bool renderer_init(Renderer *r,World *world,const Preset *preset) {
     r->composite_position=glGetAttribLocation(r->composite_program,"aPosition");
     r->composite_uv=glGetAttribLocation(r->composite_program,"aUV");
     r->composite_texture=glGetUniformLocation(r->composite_program,"uTexture");
-    if(!mesh_init(&r->dynamic,20000)||!mesh_init(&r->gun,800)||!mesh_init(&r->ui,65536))return false;
+    if(!mesh_init(&r->dynamic,24000)||!mesh_init(&r->gun,800)||!mesh_init(&r->ui,98304))return false;
     r->world_vertices=world->mesh.count;
     allocate_buffer(&r->world_buffer,world->mesh.count,GL_STATIC_DRAW,world->mesh.data);
     allocate_buffer(&r->dynamic_buffer,r->dynamic.capacity,GL_DYNAMIC_DRAW,NULL);
@@ -119,6 +119,7 @@ void renderer_draw(Renderer *r,const Game *g,const App *app) {
     glClearColor(.045f,.04f,.032f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);glUseProgram(r->program);
     draw(r,r->world_buffer,r->world_vertices,matrix,1,0);
     Mesh *m=&r->dynamic;m->count=0;
+    for(int i=0;i<g->barrel_count;i++)animate_barrel(m,&g->barrels[i],g->time);
     for(int i=0;i<g->enemy_count;i++)animate_creature(m,&g->enemies[i],g->time);
     for(int i=0;i<g->corpse_count;i++)animate_creature(m,&g->corpses[i],g->time);
     if(g->cooperative)for(int i=0;i<MAX_PLAYERS;i++)if(g->actors[i].active&&i!=g->local_actor)
@@ -130,9 +131,18 @@ void renderer_draw(Renderer *r,const Game *g,const App *app) {
     }
     for(int i=0;i<g->particle_count;i++) {
         const Particle *particle=&g->particles[i];
+        if(particle->life<=0)continue;
         mesh_diamond(m,particle->position,particle->size*particle->life/particle->max_life,particle->color);
     }
-    for(int i=0;i<g->pickup_count;i++)if(g->pickups[i].cooldown==0) {
+    for(int i=0;i<g->pickup_count;i++) {
+        if(g->pickups[i].cooldown>0) {
+            Vec3 base=g->pickups[i].position;
+            mesh_box(m,vadd(base,(Vec3){0,.045f,0}),(Vec3){.18f,.04f,.6f},(Color){.15f,.32f,.22f});
+            mesh_box(m,vadd(base,(Vec3){0,.05f,0}),(Vec3){.6f,.04f,.18f},(Color){.15f,.32f,.22f});
+            float progress=1-clampf(g->pickups[i].cooldown/12,0,1);
+            mesh_box(m,vadd(base,(Vec3){0,.04f,.8f}),(Vec3){1.4f*progress+.01f,.03f,.08f},(Color){.25f,.7f,.4f});
+            continue;
+        }
         int first=m->count;
         Vec3 base=g->pickups[i].position;base.y=.45f+sinf(g->time*2+base.x)*.1f;
         mesh_box(m,(Vec3){0,0,0},(Vec3){.23f,.65f,.23f},(Color){.3f,1,.4f});
