@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#080e17">
+  <title>FASTFPS — secteur zéro</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <canvas id="game" aria-label="Arène de combat 3D"></canvas>
+  <div id="hud" hidden>
+    <div class="topbar"><div class="brand">FAST<span>FPS</span><small>SECTEUR ZÉRO / v0.1</small></div><div class="wave">VAGUE <b id="wave">01</b><small id="remaining">EN ATTENTE</small></div><div class="score"><small>SCORE</small><b id="score">00000</b></div></div>
+    <div id="announcement" role="status"></div>
+    <div id="crosshair"><i></i><i></i><i></i><i></i><span></span></div>
+    <div id="hitmarker">×</div><div id="damage"></div>
+    <div class="bottom"><div class="health"><small>INTÉGRITÉ</small><div><b id="health">100</b><span>+</span></div><div class="meter"><i id="healthbar"></i></div></div><div class="dash"><small>DASH <kbd>MAJ</kbd></small><div class="meter"><i id="dashbar"></i></div><span id="dashlabel">PRÊT</span></div><div class="weapon"><small>PULSE / MUNITIONS ∞</small><b id="speed">0 <span>m/s</span></b></div></div>
+    <div class="telemetry"><span id="fps">0 FPS</span><span id="presetlabel">PI 4</span><span>ÉCHAP · PAUSE</span></div>
+  </div>
+  <main id="menu" class="overlay">
+    <section class="panel">
+      <div class="eyebrow"><span></span> PROTOTYPE 0.1 / ARÈNE DE SURVIE</div>
+      <h1>FAST<span>FPS</span></h1>
+      <p class="tagline">Garde le rythme. Bouge. Survis.</p>
+      <div class="rule"></div>
+      <p id="menu-description">Des robots, une arène et un blaster à impulsion.<br>Élimine chaque vague pour passer à la suivante.</p>
+      <div id="result" hidden></div>
+      <div class="settings">
+        <label>RENDU<select id="quality"><option value="pi">Raspberry Pi 4 · 640 × 360 · 30 FPS</option><option value="balanced">Équilibré · 960 × 540 · 60 FPS</option><option value="desktop">PC · 1280 × 720 · 60 FPS</option></select></label>
+        <label>SENSIBILITÉ<input id="sensitivity" type="range" min="0.5" max="3" step="0.1" value="1"><output id="sensitivity-value">1.0</output></label>
+        <label class="sound"><input id="sound" type="checkbox" checked> Sons synthétiques</label>
+      </div>
+      <div class="actions"><button id="play">ENTRER DANS L’ARÈNE <span>→</span></button><button id="restart" class="secondary" hidden>RECOMMENCER</button><button id="fullscreen" class="secondary" title="Basculer en plein écran">⛶</button></div>
+      <p id="notice" role="status"></p>
+      <div class="controls"><div><kbd>ZQSD</kbd> / <kbd>WASD</kbd><span>Se déplacer</span></div><div><kbd>SOURIS</kbd><span>Viser · clic pour tirer</span></div><div><kbd>ESPACE</kbd><span>Sauter · maintenir pour enchaîner</span></div><div><kbd>MAJ</kbd><span>Dash dans la direction du mouvement</span></div></div>
+      <footer>3D légère · hors ligne · clavier et souris</footer>
+    </section>
+  </main>
+  <noscript>Active JavaScript dans ton navigateur pour jouer.</noscript>
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>

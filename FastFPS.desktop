@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=FastFPS
+Comment=FPS 3D rapide - Secteur zero
+Exec=/home/rdb/Projets/fastfps/lancer.sh
+Path=/home/rdb/Projets/fastfps
+Icon=applications-games
+Terminal=false
+Categories=Game;ActionGame;
+StartupNotify=false

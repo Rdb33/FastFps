@@ -1,0 +1,7 @@
+{
+  "name": "fastfps",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "FPS 3D léger, local et sans dépendance, pour Raspberry Pi 4."
+}
