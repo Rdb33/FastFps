@@ -13,20 +13,21 @@ static void settings_path(char *out,size_t size) {
 static void settings_read(App *app) {
     char path[2048];settings_path(path,sizeof(path));if(!path[0])return;
     FILE *file=fopen(path,"r");if(!file)return;
-    int quality=0,sound=1,best=0,motion=1,difficulty=1;float sensitivity=1;
-    if(fscanf(file,"%d %f %d %d %d %d",&quality,&sensitivity,&sound,&best,&motion,&difficulty)>=4) {
-        app->quality=quality>=0&&quality<3?quality:0;
+    int quality=0,sound=1,best=0,motion=1,difficulty=1,modern=1;float sensitivity=1;
+    if(fscanf(file,"%d %f %d %d %d %d %d",&quality,&sensitivity,&sound,&best,&motion,&difficulty,&modern)>=4) {
+        app->quality=quality>=0&&quality<PRESET_COUNT?quality:0;
         app->sensitivity=isfinite(sensitivity)?clampf(sensitivity,.3f,3):1;
         app->sound=sound!=0;app->best_score=best>=0?best:0;
         app->motion=motion!=0;
         app->difficulty=difficulty>=0&&difficulty<=2?difficulty:1;
+        app->modern=modern!=0;
     }
     fclose(file);
 }
 static void settings_write(const App *app) {
     char path[2048];settings_path(path,sizeof(path));if(!path[0])return;
     FILE *file=fopen(path,"w");if(!file)return;
-    fprintf(file,"%d %.2f %d %d %d %d\n",app->quality,app->sensitivity,app->sound,app->best_score,app->motion,app->difficulty);fclose(file);
+    fprintf(file,"%d %.2f %d %d %d %d %d\n",app->quality,app->sensitivity,app->sound,app->best_score,app->motion,app->difficulty,app->modern);fclose(file);
 }
 static void network_preferences(App *app,bool write) {
     char path[2048];char *directory=SDL_GetPrefPath("fastfps","fastfps");
@@ -72,7 +73,9 @@ static void toggle_fullscreen(App *app,Renderer *renderer) {
 }
 static void change_quality(App *app,Game *game,Renderer *renderer,int direction) {
     int previous=app->quality;
-    app->quality=(app->quality+direction+3)%3;
+    static const int order[PRESET_COUNT]={0,3,1,2};int index=0;
+    for(int i=0;i<PRESET_COUNT;i++)if(order[i]==app->quality)index=i;
+    app->quality=order[(index+direction+PRESET_COUNT)%PRESET_COUNT];
     if(!renderer_resize(renderer,&PRESETS[app->quality])) {
         app->quality=previous;
         if(!renderer_resize(renderer,&PRESETS[previous]))app->running=false;
@@ -99,7 +102,8 @@ static void menu_action(App *app,Game *game,Renderer *renderer,int direction) {
         case 7:
             if(game->cooperative&&app->network->mode==NET_CLIENT)break;
             app->difficulty=(app->difficulty+direction+3)%3;game->difficulty=app->difficulty;break;
-        case 8:app->running=false;break;
+        case 8:app->modern=!app->modern;break;
+        case 9:app->running=false;break;
     }
 }
 static int menu_hit(Renderer *r,int x,int y) {
@@ -108,8 +112,8 @@ static int menu_hit(Renderer *r,int x,int y) {
     if(draw_height>height){draw_height=(float)height;draw_width=draw_height*16/9;}
     float px=((float)x-((float)width-draw_width)/2)*640/draw_width;
     float py=((float)y-((float)height-draw_height)/2)*360/draw_height;
-    if(px<76||px>564||py<136||py>=280)return -1;
-    return (int)((py-136)/16);
+    if(px<76||px>564||py<136||py>=276)return -1;
+    return (int)((py-136)/14);
 }
 static Input read_input(void) {
     const Uint8 *keys=SDL_GetKeyboardState(NULL);
@@ -143,7 +147,8 @@ static Input demo_input(Game *game) {
 static void help(void) {
     puts("FASTFPS " GAME_VERSION " - FPS 3D natif\n"
         "Usage : fastfps [options]\n"
-        "  --quality pi|balanced|desktop  Profil de rendu\n"
+        "  --quality pi|pi-plus|balanced|desktop  Profil de rendu\n"
+        "  --retro / --modern            Style de rendu\n"
         "  --difficulty easy|normal|hard Niveau de difficulte\n"
         "  --host                        Creer un salon cooperatif\n"
         "  --join INVITATION             IPv4, IP:port ou fastfps://IP:port\n"
@@ -159,8 +164,8 @@ static void help(void) {
         "  --version                     Afficher la version\n");
 }
 int main(int argc,char **argv) {
-    App app={.state=STATE_MENU,.running=true,.sound=true,.motion=true,.sensitivity=1,.difficulty=1};
-    bool demo=false,cli_mute=false,cli_fullscreen=false;int cli_quality=-1,cli_difficulty=-1,frame_limit=0;
+    App app={.state=STATE_MENU,.running=true,.sound=true,.motion=true,.modern=true,.sensitivity=1,.difficulty=1};
+    bool demo=false,cli_mute=false,cli_fullscreen=false;int cli_quality=-1,cli_difficulty=-1,cli_modern=-1,frame_limit=0;
     const char *screenshot=NULL,*join_address=NULL,*player_name=NULL;
     bool host=false,multiplayer=false;int room_port=0;
     for(int i=1;i<argc;i++) {
@@ -178,6 +183,8 @@ int main(int argc,char **argv) {
         else if(strcmp(argv[i],"--demo")==0)demo=true;
         else if(strcmp(argv[i],"--mute")==0)cli_mute=true;
         else if(strcmp(argv[i],"--fullscreen")==0)cli_fullscreen=true;
+        else if(strcmp(argv[i],"--retro")==0)cli_modern=0;
+        else if(strcmp(argv[i],"--modern")==0)cli_modern=1;
         else if(strcmp(argv[i],"--difficulty")==0&&i+1<argc) {
             const char *value=argv[++i];
             if(strcmp(value,"easy")==0)cli_difficulty=0;
@@ -188,6 +195,7 @@ int main(int argc,char **argv) {
         else if(strcmp(argv[i],"--quality")==0&&i+1<argc) {
             const char *value=argv[++i];
             if(strcmp(value,"pi")==0)cli_quality=0;
+            else if(strcmp(value,"pi-plus")==0)cli_quality=3;
             else if(strcmp(value,"balanced")==0)cli_quality=1;
             else if(strcmp(value,"desktop")==0)cli_quality=2;
             else {fprintf(stderr,"Profil inconnu : %s\n",value);return 1;}
@@ -215,6 +223,7 @@ int main(int argc,char **argv) {
     if(join_address)snprintf(network->address,sizeof(network->address),"%s",join_address);
     if(cli_quality>=0)app.quality=cli_quality;
     if(cli_difficulty>=0)app.difficulty=cli_difficulty;
+    if(cli_modern>=0)app.modern=cli_modern!=0;
     if(cli_mute)app.sound=false;
     World world;Renderer renderer;Game game;memset(&renderer,0,sizeof(renderer));
     if(!world_init(&world)) {fprintf(stderr,"Memoire insuffisante.\n");SDL_Quit();free(network);return 1;}
@@ -264,15 +273,16 @@ int main(int argc,char **argv) {
                 else if(key==SDL_SCANCODE_F3){app.sound=!app.sound;audio_enabled(app.sound);}
                 else if(key==SDL_SCANCODE_F1)show_fps=!show_fps;
                 else if(key==SDL_SCANCODE_F4){app.motion=!app.motion;game.motion=app.motion;}
+                else if(key==SDL_SCANCODE_F5)app.modern=!app.modern;
                 else if(key==SDL_SCANCODE_ESCAPE) {
                     if(app.state==STATE_PLAYING||app.state==STATE_UPGRADE)pause_game(&app);
                     else if(app.state==STATE_PAUSED)start_game(&app,&game,false,demo);
                     else app.running=false;
                 }else if(app.state!=STATE_PLAYING) {
-                    if(key==SDL_SCANCODE_UP)app.selected=(app.selected+8)%9;
-                    else if(key==SDL_SCANCODE_DOWN)app.selected=(app.selected+1)%9;
+                    if(key==SDL_SCANCODE_UP)app.selected=(app.selected+9)%10;
+                    else if(key==SDL_SCANCODE_DOWN)app.selected=(app.selected+1)%10;
                     else if(key==SDL_SCANCODE_RETURN||key==SDL_SCANCODE_KP_ENTER||key==SDL_SCANCODE_SPACE)menu_action(&app,&game,&renderer,1);
-                    else if((key==SDL_SCANCODE_LEFT||key==SDL_SCANCODE_RIGHT)&&app.selected>=2&&app.selected<=7)
+                    else if((key==SDL_SCANCODE_LEFT||key==SDL_SCANCODE_RIGHT)&&app.selected>=2&&app.selected<=8)
                         menu_action(&app,&game,&renderer,key==SDL_SCANCODE_LEFT?-1:1);
                 }else if(key==SDL_SCANCODE_TAB)app.show_build=!app.show_build;
                 else if(key==SDL_SCANCODE_1||key==SDL_SCANCODE_KP_1)game_request_weapon(&game,0);

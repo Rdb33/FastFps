@@ -85,3 +85,12 @@ Les personnages jouables restent identiques pour cette version ; la variété de
 - [x] Statistiques et points affichés pendant la partie.
 - [ ] Jouer plusieurs configurations pour ajuster les modules et les champions.
 - [ ] Mesurer la 0.5 sur Pi et observer les choix simultanés en coopération.
+
+## Version 0.6 : présentation graphique
+
+- [x] Arène détaillée, matériaux procéduraux et géométrie biseautée.
+- [x] Surfaces lumineuses, deux lumières de combat et éclairage par pixel sur les profils avancés.
+- [x] Bloom de scène et interface à la résolution de la fenêtre.
+- [x] Profil Pi+ et changement Moderne / Rétro avec F5.
+- [ ] Observer les shaders et les captures sur les pilotes des joueurs.
+- [ ] Mesurer le compromis Pi+ sur Raspberry Pi et ajuster les effets.

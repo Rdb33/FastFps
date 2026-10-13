@@ -141,9 +141,9 @@ void ui_build(Mesh *m,const Game *g,const App *app) {
         centered(m,126,1,ink,text);
     }else if(app->state==STATE_PAUSED)centered(m,126,1,ink,"PAUSE");
     else centered(m,126,1,muted,"SURVIS. CHOISIS TES MODULES. AFFRONTE LES CHAMPIONS.");
-    for(int i=0;i<9;i++) {
-        float y=141+(float)i*16;
-        if(i==app->selected)mesh_rect(m,76,y-5,488,15,(Color){.20f,.23f,.15f});
+    for(int i=0;i<10;i++) {
+        float y=141+(float)i*14;
+        if(i==app->selected)mesh_rect(m,76,y-5,488,13,(Color){.20f,.23f,.15f});
         switch(i) {
             case 0:snprintf(text,sizeof(text),"%s",app->state==STATE_PAUSED?"REPRENDRE":"JOUER");break;
             case 1:snprintf(text,sizeof(text),"%s",g->cooperative?"QUITTER LE SALON":(app->state==STATE_PAUSED?"RECOMMENCER":"MULTIJOUEUR / SALONS"));break;
@@ -157,6 +157,7 @@ void ui_build(Mesh *m,const Game *g,const App *app) {
                 const char *names[]={"DETENTE","NORMAL","BRUTAL"};
                 snprintf(text,sizeof(text),"DIFFICULTE%s : %s",g->cooperative?" DE L'HOTE":"",names[g->cooperative?g->difficulty:app->difficulty]);break;
             }
+            case 8:snprintf(text,sizeof(text),"VISUEL : %s / F5",app->modern?"MODERNE":"RETRO");break;
             default:snprintf(text,sizeof(text),"QUITTER");break;
         }
         if(i==app->selected)mesh_text(m,87,y,1,orange,">");
@@ -170,5 +171,5 @@ void ui_build(Mesh *m,const Game *g,const App *app) {
     else centered(m,283,1,muted,"FLECHES / SOURIS : CHOISIR - ENTREE / CLIC : VALIDER");
     mesh_text(m,76,303,1,ink,"ZQSD / WASD : BOUGER   MAJ : SPRINT   ESPACE : SAUTER");
     mesh_text(m,76,316,1,ink,"CLIC : TIR   DROIT : ESQUIVE   F : FRAPPE   1/2 : ARMES");
-    centered(m,334,1,muted,"ECHAP : PAUSE - F11 : ECRAN - F2 : RENDU - F4 : CAMERA");
+    centered(m,334,1,muted,"ECHAP : PAUSE / F2 : QUALITE / F4 : CAMERA / F5 : VISUEL");
 }

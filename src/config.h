@@ -2,7 +2,8 @@
 #define FASTFPS_CONFIG_H
 
 /* Réglages de la première base : gameplay proche d'un Doom moderne. */
-#define GAME_VERSION "0.5.0"
+#define GAME_VERSION "0.6.0"
+#define PRESET_COUNT 4
 #define MAX_PLAYERS 4
 #define PLAYER_NAME_LENGTH 16
 #define FIXED_STEP (1.0f / 60.0f)

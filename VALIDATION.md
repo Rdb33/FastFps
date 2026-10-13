@@ -2,6 +2,15 @@
 
 Historique des contrôles sur la machine de développement, les 12 et 13 octobre 2026.
 
+## Version 0.6 — 13 octobre 2026
+
+- Compilation C11 avec `-O2 -Wall -Wextra -Wpedantic` réussie sans avertissement.
+- Diff Git vérifié sans erreur d’espacement.
+- Aucun test automatisé, lancement de jeu ou contrôle de shader / capture exécuté pour cette itération.
+- Les profils Pi, Pi+, Équilibré et PC, le changement Moderne / Rétro, la composition du HUD et les exports BMP restent à observer en jeu.
+- Les modifications graphiques n’ont pas encore été mesurées sur Raspberry Pi. Le retour positif de l’utilisateur concerne une version précédente.
+- Protocole réseau 5 conservé ; coordonnées des collisions et règles de simulation conservées.
+
 ## Version 0.5 — 13 octobre 2026
 
 - Compilation C11 avec `-O2 -Wall -Wextra -Wpedantic` réussie sans avertissement.

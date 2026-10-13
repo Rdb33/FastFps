@@ -4,15 +4,15 @@
 #include <math.h>
 
 bool mesh_init(Mesh *m,int capacity) {
-    m->data=calloc((size_t)capacity,sizeof(Vertex));m->capacity=capacity;m->count=0;
+    m->data=calloc((size_t)capacity,sizeof(Vertex));m->capacity=capacity;m->count=0;m->glow=0;
     return m->data!=NULL;
 }
 void mesh_free(Mesh *m) {free(m->data);m->data=NULL;m->count=0;m->capacity=0;}
 void mesh_triangle(Mesh *m,Vec3 a,Vec3 b,Vec3 c,Color color,Vec3 normal) {
     if (m->count+3>m->capacity) return;
-    m->data[m->count++]=(Vertex){a,color,normal};
-    m->data[m->count++]=(Vertex){b,color,normal};
-    m->data[m->count++]=(Vertex){c,color,normal};
+    m->data[m->count++]=(Vertex){a,color,normal,m->glow};
+    m->data[m->count++]=(Vertex){b,color,normal,m->glow};
+    m->data[m->count++]=(Vertex){c,color,normal,m->glow};
 }
 void mesh_quad(Mesh *m,Vec3 a,Vec3 b,Vec3 c,Vec3 d,Color color,Vec3 normal) {
     mesh_triangle(m,a,b,c,color,normal);mesh_triangle(m,a,c,d,color,normal);
@@ -29,14 +29,46 @@ void mesh_box(Mesh *m,Vec3 p,Vec3 s,Color color) {
 void mesh_diamond(Mesh *m,Vec3 p,float r,Color color) {
     Vec3 v[4]={{p.x+r,p.y,p.z},{p.x,p.y,p.z+r},{p.x-r,p.y,p.z},{p.x,p.y,p.z-r}};
     for (int i=0;i<4;i++) {
-        mesh_triangle(m,(Vec3){p.x,p.y+r,p.z},v[(i+1)%4],v[i],color,(Vec3){0,1,0});
-        mesh_triangle(m,(Vec3){p.x,p.y-r,p.z},v[i],v[(i+1)%4],color,(Vec3){0,-1,0});
+        float angle=((float)i+.5f)*PI_F/2;
+        mesh_triangle(m,(Vec3){p.x,p.y+r,p.z},v[(i+1)%4],v[i],color,
+            vnormalize((Vec3){cosf(angle),1,sinf(angle)}));
+        mesh_triangle(m,(Vec3){p.x,p.y-r,p.z},v[i],v[(i+1)%4],color,
+            vnormalize((Vec3){cosf(angle),-1,sinf(angle)}));
+    }
+}
+static Vec3 cross(Vec3 a,Vec3 b){return (Vec3){a.y*b.z-a.z*b.y,a.z*b.x-a.x*b.z,a.x*b.y-a.y*b.x};}
+void mesh_beveled_box(Mesh *m,Vec3 p,Vec3 size,float bevel,Color color) {
+    float x=size.x/2,z=size.z/2,b=clampf(bevel,0,fminf(x,z)*.7f);
+    Vec3 points[8]={{x-b,0,z},{x,0,z-b},{x,0,-z+b},{x-b,0,-z},
+        {-x+b,0,-z},{-x,0,-z+b},{-x,0,z-b},{-x+b,0,z}};
+    Vec3 top=vadd(p,(Vec3){0,size.y,0});
+    for(int i=0;i<8;i++) {
+        Vec3 a=vadd(p,points[i]),d=vadd(p,points[(i+1)%8]);
+        Vec3 normal=vnormalize(cross(vsub(d,a),(Vec3){0,1,0}));
+        mesh_quad(m,a,d,vadd(d,(Vec3){0,size.y,0}),vadd(a,(Vec3){0,size.y,0}),color,normal);
+        mesh_triangle(m,top,vadd(a,(Vec3){0,size.y,0}),vadd(d,(Vec3){0,size.y,0}),color,(Vec3){0,1,0});
+        mesh_triangle(m,p,d,a,color,(Vec3){0,-1,0});
+    }
+}
+void mesh_cylinder(Mesh *m,Vec3 start,Vec3 end,float radius,Color color,int sides) {
+    Vec3 direction=vsub(end,start);if(vlength(direction)<.0001f||radius<=0||sides<3)return;
+    direction=vnormalize(direction);
+    Vec3 axis=fabsf(direction.y)<.9f?(Vec3){0,1,0}:(Vec3){1,0,0};
+    Vec3 u=vnormalize(cross(direction,axis)),v=cross(direction,u);
+    for(int i=0;i<sides;i++) {
+        float a=(float)i*2*PI_F/(float)sides,b=(float)(i+1)*2*PI_F/(float)sides;
+        Vec3 na=vadd(vscale(u,cosf(a)),vscale(v,sinf(a))),nb=vadd(vscale(u,cosf(b)),vscale(v,sinf(b)));
+        Vec3 p=vadd(start,vscale(na,radius)),q=vadd(start,vscale(nb,radius));
+        Vec3 r=vadd(end,vscale(nb,radius)),s=vadd(end,vscale(na,radius));
+        mesh_quad(m,p,q,r,s,color,vnormalize(vadd(na,nb)));
+        mesh_triangle(m,start,q,p,color,vscale(direction,-1));
+        mesh_triangle(m,end,s,r,color,direction);
     }
 }
 /* Un joint simple suffit pour des bras et jambes articulés sans squelette GPU. */
 void mesh_joint_box(Mesh *m,Vec3 base,Vec3 size,Vec3 pivot,float angle,Color color) {
     int first=m->count;
-    mesh_box(m,base,size,color);
+    mesh_beveled_box(m,base,size,fminf(.045f,fminf(size.x,size.z)*.13f),color);
     float c=cosf(angle),s=sinf(angle);
     for(int i=first;i<m->count;i++) {
         Vertex *v=&m->data[i];

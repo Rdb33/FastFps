@@ -11,8 +11,8 @@ typedef struct { float x, y, z; } Vec3;
 typedef struct { float r, g, b; } Color;
 typedef struct { Vec3 min, max; } Box;
 typedef struct { float m[16]; } Mat4;
-typedef struct { Vec3 position; Color color; Vec3 normal; } Vertex;
-typedef struct { Vertex *data; int count, capacity; } Mesh;
+typedef struct { Vec3 position; Color color; Vec3 normal; float glow; } Vertex;
+typedef struct { Vertex *data; int count, capacity; float glow; } Mesh;
 typedef struct { Vec3 position, velocity; bool grounded; } Body;
 typedef enum { UPGRADE_POWER, UPGRADE_HASTE, UPGRADE_MOBILITY,
     UPGRADE_VITALITY, UPGRADE_ARMOR, UPGRADE_VAMPIRE } Upgrade;
@@ -93,17 +93,21 @@ typedef struct {
     GLuint program, composite_program;
     GLint position, color, normal, matrix, fog, unlit;
     GLint light_position, light_color, sector_color;
+    GLint light_position2, light_color2, glow, eye, detail, surface;
     GLint composite_position, composite_uv, composite_texture;
+    GLint composite_texel, composite_effects;
     GLuint world_buffer, dynamic_buffer, gun_buffer, ui_buffer, quad_buffer;
     GLuint framebuffer, texture, depth;
     Mesh dynamic, gun, ui;
     int world_vertices, width, height;
+    int detail_level;
+    bool modern;
 } Renderer;
 typedef enum { STATE_MENU, STATE_PLAYING, STATE_PAUSED, STATE_DEAD, STATE_NETWORK, STATE_LOBBY, STATE_UPGRADE } State;
 struct Network;
 typedef struct {
     State state;
-    bool running, fullscreen, sound, capture_error, motion;
+    bool running, fullscreen, sound, capture_error, motion, modern;
     int selected, quality, best_score, fps, difficulty;
     float sensitivity;
     struct Network *network;
@@ -118,7 +122,7 @@ typedef enum { SOUND_SHOT, SOUND_SHOTGUN, SOUND_HIT, SOUND_KILL,
     SOUND_DASH, SOUND_CAST, SOUND_GROWL, SOUND_EXPLOSION, SOUND_HEADSHOT,
     SOUND_UPGRADE, SOUND_CHAMPION } Sound;
 
-extern const Preset PRESETS[3];
+extern const Preset PRESETS[PRESET_COUNT];
 
 /* math.c */
 float clampf(float v, float lo, float hi);
@@ -139,6 +143,8 @@ void mesh_free(Mesh *mesh);
 void mesh_triangle(Mesh *mesh, Vec3 a, Vec3 b, Vec3 c, Color color, Vec3 normal);
 void mesh_quad(Mesh *mesh, Vec3 a, Vec3 b, Vec3 c, Vec3 d, Color color, Vec3 normal);
 void mesh_box(Mesh *mesh, Vec3 base, Vec3 size, Color color);
+void mesh_beveled_box(Mesh *mesh, Vec3 base, Vec3 size, float bevel, Color color);
+void mesh_cylinder(Mesh *mesh, Vec3 start, Vec3 end, float radius, Color color, int sides);
 void mesh_diamond(Mesh *mesh, Vec3 center, float radius, Color color);
 void mesh_joint_box(Mesh *mesh, Vec3 base, Vec3 size, Vec3 pivot, float angle, Color color);
 void mesh_pose(Mesh *mesh, int first, Vec3 position, float yaw, float pitch, float scale);
@@ -212,6 +218,7 @@ void animate_teammate(Mesh *mesh, const Actor *actor, int id);
 void animate_barrel(Mesh *mesh, const Barrel *barrel, float time);
 void animate_arena(Mesh *mesh, const Game *game, const App *app);
 Color sector_theme(int wave);
+int graphics_detail(int quality);
 
 /* ui.c */
 void ui_build(Mesh *mesh, const Game *game, const App *app);

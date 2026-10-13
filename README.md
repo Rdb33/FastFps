@@ -1,10 +1,30 @@
 # FASTFPS — Secteur zéro
 
-**FPS 3D natif, style Doom, pensé pour le Raspberry Pi 4.** Base à améliorer progressivement : déplacement nerveux, deux armes et survie dans une arène industrielle. Version **0.5.0** : progression pendant la partie, modules à choisir, champions et graphismes enrichis.
+**FPS 3D natif, style Doom, pensé pour le Raspberry Pi 4.** Base à améliorer progressivement : déplacement nerveux, deux armes et survie dans une arène industrielle. Version **0.6.0** : arène plus détaillée, matériaux procéduraux, éclairage amélioré et interface nette.
 
 Application en **C11**, **SDL2** (fenêtre, clavier, souris et son) et **OpenGL ES 2** (rendu 3D). Graphismes, police et sons sont générés localement.
 
 Le mode solo fonctionne hors ligne. Pour jouer ensemble, sélectionne **Multijoueur / salons** ; voir [MULTIJOUEUR.md](MULTIJOUEUR.md) pour la création, la connexion sur Internet et les limites de cette première version.
+
+## Graphismes — version 0.6
+
+- Arène industrielle avec panneaux muraux, plaques, conduites, traverses, grilles au sol et caisses renforcées.
+- Surfaces avec joints de panneaux et variations procédurales de matière ; aucun téléchargement de textures.
+- Créatures, casques, armures et armes avec coins biseautés, canons cylindriques, détails de visage et normales corrigées.
+- Surfaces lumineuses dédiées pour les yeux, le réacteur, les projectiles, les soins et les effets de combat.
+- Deux sources de lumière de combat : tirs, explosions, armes des alliés et charge des invocateurs.
+- Mode **Moderne** : luminosité / contraste ajustés, agrandissement lissé et, sur Pi+ / Équilibré / PC, éclairage par pixel, reflets et bloom léger.
+- Mode **Rétro** : éclairage simplifié, agrandissement sans lissage et glow de post-traitement désactivé. Change de style avec **F5** ou dans le menu ; le réglage est sauvegardé.
+- HUD et menus dessinés à la résolution de la fenêtre, après les effets de la 3D : texte net et effets de bloom limités à la scène.
+- Captures BMP composées avec les effets visuels et l’interface.
+
+Pour essayer le nouveau compromis sur le Pi :
+
+```bash
+./lancer.sh --quality pi-plus --modern
+```
+
+**F2** parcourt Pi → Pi+ → Équilibré → PC. Le profil Pi garde 640 × 360 et un éclairage moins coûteux. Pi+ vise 30 FPS à 854 × 480, avec les effets avancés. La nouvelle version n’a pas encore été mesurée sur un Pi réel ; utilise le compteur FPS pour choisir ton profil.
 
 ## Progression pendant la partie — version 0.5
 
@@ -101,6 +121,7 @@ Le Pi 4 possède un GPU compatible OpenGL ES ([documentation Raspberry Pi](https
 | Changer le profil de rendu | F2, ou le menu |
 | Activer / couper le son | F3, ou le menu |
 | Réduire les mouvements de caméra | F4, ou le menu |
+| Style Moderne / Rétro | F5, ou le menu |
 
 Les déplacements utilisent les positions physiques du clavier : ZQSD sur AZERTY et WASD sur QWERTY.
 
@@ -144,20 +165,23 @@ Une série d’éliminations espacées de moins de 3,5 secondes augmente le scor
 | Profil | Résolution interne | Limite | Particules maximum |
 | --- | --- | --- | --- |
 | Pi 4, par défaut | 640 × 360 | 30 FPS | 64 |
+| Pi+ | 854 × 480 | 30 FPS | 80 |
 | Équilibré | 960 × 540 | 60 FPS | 100 |
 | PC | 1280 × 720 | 60 FPS | 160 |
 
-En plein écran, la 3D reste à la résolution choisie puis est agrandie avec un filtre donnant un aspect rétro. Des bandes noires préservent les proportions 16:9.
+En plein écran, la 3D reste à la résolution choisie puis est agrandie avec lissage en mode Moderne ou sans lissage en mode Rétro. L’interface utilise la résolution de la fenêtre. Des bandes noires préservent les proportions 16:9.
 
-Cinq appels de dessin par image : décor, objets mobiles, arme, interface, agrandissement. Décor chargé une seule fois sur le GPU, tableaux et buffers réutilisés, aucune allocation dans la boucle normale de jeu. Les animations transforment les sommets dans ces mêmes buffers, sans ajouter d’appels de dessin. Pas de textures de décor, ombres calculées par cartes de profondeur ou anticrénelage. Les ombres stylisées sont des anneaux géométriques et la vignette est intégrée à l’agrandissement existant. La seule texture contient l’image intermédiaire à agrandir. Simulation à pas fixe de 60 Hz ; navigation partagée calculée environ trois fois par seconde.
+Cinq appels de dessin par image : décor, objets mobiles, arme, agrandissement avec effets, puis interface à la résolution de la fenêtre. Décor chargé une seule fois sur le GPU, tableaux et buffers réutilisés, aucune allocation dans la boucle normale de jeu. Les animations transforment les sommets dans ces mêmes buffers, sans ajouter d’appels de dessin. Les matériaux sont générés dans le shader, avec des effets plus simples sur le profil Pi. Les ombres stylisées restent géométriques ; aucun rendu supplémentaire de cartes d’ombres. Les effets de contraste, vignette et bloom sont intégrés à l’agrandissement existant. La texture de scène est réutilisée ; les captures allouent une cible temporaire uniquement au moment de l’export. Simulation à pas fixe de 60 Hz ; navigation partagée calculée environ trois fois par seconde.
 
-**Un essai sur Raspberry Pi a été rapporté comme satisfaisant par l’utilisateur pour la version précédente. Les nouveaux effets de la 0.5 restent à mesurer ; aucune valeur de FPS réelle n’a été fournie.** La fluidité dépendra du matériel, des pilotes et de la température. Les inspections visuelles ici utilisent un rendu logiciel hors écran sur la machine de développement ; elles ne mesurent pas les performances du Pi. Le compteur FPS permet une première mesure en jeu.
+**Un essai sur Raspberry Pi a été rapporté comme satisfaisant par l’utilisateur pour la version précédente. Les nouveaux effets de la 0.6 restent à mesurer ; aucune valeur de FPS réelle n’a été fournie.** La fluidité dépendra du matériel, des pilotes et de la température. Les inspections visuelles ici utilisent un rendu logiciel hors écran sur la machine de développement ; elles ne mesurent pas les performances du Pi. Le compteur FPS permet une première mesure en jeu.
 
 ## Options
 
 ```bash
 ./lancer.sh --quality pi --fullscreen
+./lancer.sh --quality pi-plus --modern
 ./lancer.sh --quality balanced
+./lancer.sh --retro
 ./lancer.sh --mute
 ./lancer.sh --difficulty hard
 ./lancer.sh --multiplayer
@@ -208,7 +232,7 @@ Carte et paramètres sont actuellement dans les sources. Aucune option de compil
 
 Une carte et un mode survie solo ou coopératif. Collisions par boîtes, trajectoires parfois anguleuses. Pas encore de rampes, accroupissement, rechargement, sauvegarde de partie ou manette.
 
-La coopération utilise un joueur hôte qui fait autorité sur le monde, un état d’entrée `Input`, des identifiants d’ennemis stables, une prédiction du déplacement et une interpolation à l’affichage. La connexion se fait par IPv4 et port TCP, sans service central dans le jeu. Tailscale utilise ses propres services de connexion et éventuellement de relais. La validation entre deux machines et sur Internet reste à faire : voir [VALIDATION.md](VALIDATION.md). Tous les joueurs doivent utiliser la version 0.5 ; le protocole 5 est incompatible avec les versions 0.3 et 0.4.
+La coopération utilise un joueur hôte qui fait autorité sur le monde, un état d’entrée `Input`, des identifiants d’ennemis stables, une prédiction du déplacement et une interpolation à l’affichage. La connexion se fait par IPv4 et port TCP, sans service central dans le jeu. Tailscale utilise ses propres services de connexion et éventuellement de relais. La validation entre deux machines et sur Internet reste à faire : voir [VALIDATION.md](VALIDATION.md). Les versions 0.5 et 0.6 utilisent le même protocole 5 et les mêmes collisions. Le protocole reste incompatible avec les versions 0.3 et 0.4.
 
 Voir [ROADMAP.md](ROADMAP.md). Le prototype navigateur est conservé dans `prototype-web/` comme archive ; le lanceur principal utilise **l’application native**.
 

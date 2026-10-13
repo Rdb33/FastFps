@@ -1,3 +1,16 @@
+# Version 0.6.0
+
+- Arène enrichie : panneaux industriels, conduites, traverses, grilles, caisses renforcées et supports de réacteur.
+- Géométrie biseautée, primitives cylindriques, modèles plus détaillés et normales des diamants corrigées.
+- Matières procédurales, surfaces émissives, deux sources de lumière de combat et éclairage par pixel sur les profils avancés.
+- Mode Moderne avec contraste, agrandissement lissé et bloom léger ; mode Rétro avec éclairage plus simple et filtre sans lissage.
+- Nouveau profil Pi+ à 854 × 480 / cible 30 FPS / 80 particules ; profil Pi conservé à 640 × 360.
+- F5 pour changer de style, réglage persistant, options --modern / --retro / --quality pi-plus.
+- Interface rendue après l’agrandissement pour conserver des textes nets et éviter le bloom sur le HUD.
+- Export BMP composé avec les effets et l’interface dans une cible temporaire.
+- Cinq appels de dessin par image conservés ; protocole 5 et collisions compatibles avec la 0.5.
+- Compilation C11 réussie sans avertissement ; nouveaux shaders et performances en jeu restent à valider sur les machines des joueurs.
+
 # Version 0.5.0
 
 - Progression limitée à la partie : un module à choisir après chaque vague, niveau de personnage et six branches à cinq rangs.

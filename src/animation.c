@@ -28,18 +28,22 @@ void animate_creature(Mesh *mesh, const Enemy *e, float time) {
     if(e->flash>0)skin=(Color){1,.88f,.67f};
     if(e->elite){armor=(Color){.88f,.59f,.18f};eye=(Color){1,.87f,.36f};skin=(Color){.37f,.26f,.16f};}
     float stagger=dead?0:e->stagger*.24f;
-    mesh_box(mesh,(Vec3){0,.50f+shoulder,stagger},(Vec3){width,.65f,.55f},skin);
-    mesh_box(mesh,(Vec3){0,.95f+shoulder,-.02f+stagger},(Vec3){width+.13f,.28f,.61f},armor);
-    mesh_box(mesh,(Vec3){0,1.22f+shoulder,stagger},(Vec3){.57f,.38f,.51f},skin);
+    mesh_beveled_box(mesh,(Vec3){0,.50f+shoulder,stagger},(Vec3){width,.65f,.55f},.065f,skin);
+    mesh_beveled_box(mesh,(Vec3){0,.95f+shoulder,-.02f+stagger},(Vec3){width+.13f,.28f,.61f},.08f,armor);
+    mesh_beveled_box(mesh,(Vec3){0,1.22f+shoulder,stagger},(Vec3){.57f,.38f,.51f},.075f,skin);
+    mesh->glow=dead?0:.8f;
     mesh_box(mesh,(Vec3){-.14f,1.40f+shoulder,-.268f+stagger},(Vec3){.105f,.075f,.04f},eye);
     mesh_box(mesh,(Vec3){.14f,1.40f+shoulder,-.268f+stagger},(Vec3){.105f,.075f,.04f},eye);
+    mesh->glow=0;
     mesh_box(mesh,(Vec3){0,1.26f+shoulder,-.276f+stagger},(Vec3){.27f,.07f,.035f},(Color){.10f,.07f,.05f});
+    mesh_box(mesh,(Vec3){0,1.45f+shoulder,-.285f+stagger},(Vec3){.43f,.035f,.045f},armor);
+    for(int tooth=-1;tooth<=1;tooth++)mesh_box(mesh,(Vec3){(float)tooth*.065f,1.255f+shoulder,-.3f+stagger},(Vec3){.032f,.034f,.018f},(Color){.73f,.70f,.51f});
     if(e->type==ENEMY_CASTER) {
         mesh_diamond(mesh,(Vec3){0,1.69f+shoulder,.015f},.19f,armor);
         mesh_box(mesh,(Vec3){0,.54f+shoulder,.10f},(Vec3){.53f,.48f,.42f},armor);
     } else if(e->type==ENEMY_BRUTE) {
-        mesh_box(mesh,(Vec3){-.55f,1.02f+shoulder,0},(Vec3){.35f,.27f,.68f},armor);
-        mesh_box(mesh,(Vec3){.55f,1.02f+shoulder,0},(Vec3){.35f,.27f,.68f},armor);
+        mesh_beveled_box(mesh,(Vec3){-.55f,1.02f+shoulder,0},(Vec3){.35f,.27f,.68f},.06f,armor);
+        mesh_beveled_box(mesh,(Vec3){.55f,1.02f+shoulder,0},(Vec3){.35f,.27f,.68f},.06f,armor);
         mesh_diamond(mesh,(Vec3){-.34f,1.68f+shoulder,0},.20f,armor);
         mesh_diamond(mesh,(Vec3){.34f,1.68f+shoulder,0},.20f,armor);
     } else {
@@ -58,6 +62,7 @@ void animate_creature(Mesh *mesh, const Enemy *e, float time) {
         mesh_joint_box(mesh,(Vec3){pivot.x,.49f+shoulder,-.035f},(Vec3){.25f,.17f,.30f},pivot,arm_angle,armor);
     }
     if(!dead&&e->type==ENEMY_CASTER&&e->attack_timer>0&&!e->attack_fired) {
+        mesh->glow=1;
         float charge=clampf(progress/.62f,0,1);
         mesh_diamond(mesh,(Vec3){0,1.2f,-.67f},.07f+.16f*charge,(Color){.3f,1,.83f});
         mesh_diamond(mesh,(Vec3){0,1.2f,-.67f},.055f,(Color){.95f,1,.70f});
@@ -65,9 +70,12 @@ void animate_creature(Mesh *mesh, const Enemy *e, float time) {
             float angle=time*9+(float)i*2*PI_F/3;
             mesh_diamond(mesh,(Vec3){sinf(angle)*.24f,1.2f+cosf(angle)*.24f,-.67f},.035f,(Color){.42f,1,.82f});
         }
+        mesh->glow=0;
     }
     if(e->elite) {
+        mesh->glow=dead?0:.8f;
         mesh_diamond(mesh,(Vec3){0,.89f+shoulder,-.34f},.16f,(Color){1,.68f,.18f});
+        mesh->glow=0;
         for(int side=-1;side<=1;side+=2) {
             mesh_diamond(mesh,(Vec3){(float)side*.19f,1.76f+shoulder,0},.16f,armor);
             mesh_box(mesh,(Vec3){(float)side*.53f,.64f+shoulder,-.14f},(Vec3){.22f,.44f,.08f},armor);
@@ -112,26 +120,35 @@ void animate_weapon(Mesh *mesh, const Game *g, const App *app) {
     if(p->upgrades[UPGRADE_POWER])metal=(Color){.47f,.47f,.32f};
     if(p->upgrade_flash>0)accent=(Color){.65f,1,1};
     if(p->weapon==0) {
-        mesh_box(mesh,base,(Vec3){.23f,.20f,.46f},dark);
-        mesh_box(mesh,vadd(base,(Vec3){0,.12f,-.12f}),(Vec3){.14f,.11f,.48f},metal);
+        mesh_beveled_box(mesh,base,(Vec3){.23f,.20f,.46f},.035f,dark);
+        mesh_beveled_box(mesh,vadd(base,(Vec3){0,.12f,-.12f}),(Vec3){.14f,.11f,.48f},.025f,metal);
         mesh_box(mesh,vadd(base,(Vec3){0,.21f,-.14f}),(Vec3){.035f,.035f,.42f},(Color){1,.53f,.2f});
         mesh_box(mesh,vadd(base,(Vec3){0,-.12f,.13f}),(Vec3){.16f,.20f,.18f},dark);
-        mesh_box(mesh,vadd(base,(Vec3){.10f,-.10f,.12f}),(Vec3){.13f,.13f,.22f},glove);
+        mesh_beveled_box(mesh,vadd(base,(Vec3){.10f,-.10f,.12f}),(Vec3){.13f,.13f,.22f},.025f,glove);
         mesh_box(mesh,vadd(base,(Vec3){.14f,-.19f,.30f}),(Vec3){.12f,.15f,.30f},skin);
         for(int side=-1;side<=1;side+=2) {
             mesh_box(mesh,vadd(base,(Vec3){side*.13f,.07f,-.01f}),(Vec3){.035f,.08f,.23f},metal);
-            mesh_box(mesh,vadd(base,(Vec3){side*.15f,.095f,-.01f}),(Vec3){.012f,.025f,.19f},accent);
+            mesh->glow=.85f;mesh_box(mesh,vadd(base,(Vec3){side*.15f,.095f,-.01f}),(Vec3){.012f,.025f,.19f},accent);mesh->glow=0;
         }
         mesh_box(mesh,vadd(base,(Vec3){0,.235f,.07f}),(Vec3){.085f,.045f,.075f},dark);
+        int sides=graphics_detail(app->quality)>0?10:6;
+        mesh_cylinder(mesh,vadd(base,(Vec3){0,.17f,-.20f}),vadd(base,(Vec3){0,.17f,-.48f}),.075f,metal,sides);
+        mesh_cylinder(mesh,vadd(base,(Vec3){0,.17f,-.482f}),vadd(base,(Vec3){0,.17f,-.486f}),.045f,(Color){.045f,.065f,.07f},sides);
+        mesh->glow=.65f;
+        mesh_cylinder(mesh,vadd(base,(Vec3){0,.17f,-.46f}),vadd(base,(Vec3){0,.17f,-.472f}),.079f,accent,sides);
+        mesh->glow=0;
         if(p->upgrades[UPGRADE_POWER]>=2) {
             mesh_box(mesh,vadd(base,(Vec3){-.13f,.08f,-.26f}),(Vec3){.08f,.10f,.18f},accent);
             mesh_box(mesh,vadd(base,(Vec3){.13f,.08f,-.26f}),(Vec3){.08f,.10f,.18f},accent);
         }
     } else {
         float pump=g->shot_age>.12f&&g->shot_age<.48f?sinf((g->shot_age-.12f)/.36f*PI_F)*.14f:0;
-        mesh_box(mesh,base,(Vec3){.30f,.18f,.45f},(Color){.40f,.25f,.12f});
-        mesh_box(mesh,vadd(base,(Vec3){-.077f,.10f,-.15f}),(Vec3){.13f,.13f,.55f},metal);
-        mesh_box(mesh,vadd(base,(Vec3){.077f,.10f,-.15f}),(Vec3){.13f,.13f,.55f},metal);
+        mesh_beveled_box(mesh,base,(Vec3){.30f,.18f,.45f},.04f,(Color){.40f,.25f,.12f});
+        int sides=graphics_detail(app->quality)>0?10:6;
+        for(int side=-1;side<=1;side+=2) {
+            mesh_cylinder(mesh,vadd(base,(Vec3){(float)side*.077f,.165f,.08f}),vadd(base,(Vec3){(float)side*.077f,.165f,-.42f}),.068f,metal,sides);
+            mesh_cylinder(mesh,vadd(base,(Vec3){(float)side*.077f,.165f,-.425f}),vadd(base,(Vec3){(float)side*.077f,.165f,-.429f}),.044f,(Color){.045f,.06f,.055f},sides);
+        }
         mesh_box(mesh,vadd(base,(Vec3){0,-.11f,.18f}),(Vec3){.23f,.14f,.22f},dark);
         mesh_box(mesh,vadd(base,(Vec3){0,-.045f,-.14f+pump}),(Vec3){.32f,.09f,.17f},dark);
         mesh_box(mesh,vadd(base,(Vec3){-.10f,-.10f,-.12f+pump}),(Vec3){.18f,.12f,.22f},glove);
@@ -145,11 +162,13 @@ void animate_weapon(Mesh *mesh, const Game *g, const App *app) {
         }
     }
     if(g->shot_age<.055f&&p->weapon_switch==0) {
+        mesh->glow=1;
         mesh_diamond(mesh,vadd(base,(Vec3){0,.17f,-.45f}),p->weapon?.14f:.085f,(Color){1,.85f,.40f});
         for(int i=0;i<4;i++) {
             float angle=(float)i*PI_F/2+g->shot_age*18;
             mesh_diamond(mesh,vadd(base,(Vec3){sinf(angle)*.11f,.17f+cosf(angle)*.11f,-.46f}),.022f,(Color){1,.66f,.25f});
         }
+        mesh->glow=0;
     }
     mesh_pose(mesh,0,(Vec3){-p->strafe_blend*.014f*motion,p->sway_y*motion,0},
         0,g->recoil*(p->weapon?.12f:.08f),1);
@@ -164,9 +183,11 @@ void animate_teammate(Mesh *m,const Actor *actor,int id) {
     static const Color colors[MAX_PLAYERS]={{.20f,.56f,.77f},{.25f,.72f,.70f},{.34f,.49f,.82f},{.74f,.65f,.28f}};
     Color armor=colors[id],dark={.12f,.20f,.24f},visor={.6f,.95f,1};
     float stride=sinf(p->bob)*p->movement_blend*.5f;
-    mesh_box(m,(Vec3){0,.53f,0},(Vec3){.66f,.62f,.43f},armor);
-    mesh_box(m,(Vec3){0,1.15f,0},(Vec3){.52f,.35f,.45f},dark);
+    mesh_beveled_box(m,(Vec3){0,.53f,0},(Vec3){.66f,.62f,.43f},.07f,armor);
+    mesh_beveled_box(m,(Vec3){0,1.15f,0},(Vec3){.52f,.35f,.45f},.08f,dark);
+    m->glow=actor->dead?0:.55f;
     mesh_box(m,(Vec3){0,1.29f,-.24f},(Vec3){.43f,.09f,.035f},visor);
+    m->glow=0;
     mesh_box(m,(Vec3){0,.72f,.26f},(Vec3){.40f,.39f,.18f},dark);
     for(int side=-1;side<=1;side+=2) {
         Vec3 hip={side*.2f,.58f,0};
@@ -183,6 +204,7 @@ void animate_teammate(Mesh *m,const Actor *actor,int id) {
 void animate_barrel(Mesh *m,const Barrel *b,float time) {
     if(b->health<=0) {
         if(b->explosion_time<=0)return;
+        m->glow=1;
         float age=.65f-b->explosion_time,fade=b->explosion_time/.65f;
         Color fire={fade,fade*.58f,fade*.12f};
         Vec3 center=vadd(b->position,(Vec3){0,.08f,0});
@@ -196,6 +218,7 @@ void animate_barrel(Mesh *m,const Barrel *b,float time) {
             mesh_quad(m,p,q,r,s,fire,(Vec3){0,1,0});
         }
         if(age<.24f)mesh_diamond(m,vadd(b->position,(Vec3){0,.65f,0}),(.25f+age*5)*fade,fire);
+        m->glow=0;
         return;
     }
     Color red={.65f,.13f,.07f},band={.16f,.17f,.13f};
