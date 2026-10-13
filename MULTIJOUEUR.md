@@ -1,4 +1,4 @@
-# Salons coopératifs — version 0.4
+# Salons coopératifs — version 0.5
 
 Un joueur héberge un salon sur son ordinateur ; jusqu’à trois amis le rejoignent. L’hôte lance la partie quand les joueurs sont prêts. Le jeu utilise une **adresse IPv4 et un port TCP**, sans service central ni frais d’hébergement.
 
@@ -73,7 +73,7 @@ Deux possibilités pour cette première version :
 - **Connexion directe** : l’hôte partage son adresse IPv4 publique et configure sa box pour rediriger le **port TCP 27015** vers l’adresse locale de son ordinateur. Le port choisi doit aussi être autorisé par son pare-feu.
 - **VPN privé reliant les joueurs** : les invités utilisent l’adresse IPv4 du VPN de l’hôte. Le VPN peut lui-même utiliser des services de connexion ou de relais ; le jeu ne gère pas ces services.
 
-Si la connexion de l’hôte est derrière un NAT d’opérateur (CGNAT), une redirection dans sa propre box peut ne pas suffire. Il faut alors une adresse publique accessible, un VPN approprié ou, plus tard, un relais intégré. Le jeu n’effectue pas de traversée automatique des box. La version 0.4 fournit une invitation contenant l’IPv4 et le port, sans code de salon ni relais intégré.
+Si la connexion de l’hôte est derrière un NAT d’opérateur (CGNAT), une redirection dans sa propre box peut ne pas suffire. Il faut alors une adresse publique accessible, un VPN approprié ou, plus tard, un relais intégré. Le jeu n’effectue pas de traversée automatique des box. La version 0.5 fournit une invitation contenant l’IPv4 et le port, sans code de salon ni relais intégré.
 
 ## Jouer ensemble
 
@@ -85,6 +85,14 @@ Si la connexion de l’hôte est derrière un NAT d’opérateur (CGNAT), une re
 - `Échap` libère ta souris et ouvre ton menu : **la partie des autres continue**. Sélectionne **Reprendre** pour revenir.
 - Quitter le salon en tant qu’invité retire uniquement cet invité. Fermer le salon de l’hôte déconnecte tout le monde. Il n’y a pas encore de transfert automatique du rôle d’hôte.
 
+## Modules et progression en coopération
+
+Chaque joueur reçoit ses propres propositions après une vague terminée et choisit son module avec les touches 1 / 2 / 3 ou un clic. La sélection est envoyée à l’hôte, qui applique le bonus et confirme le nouvel état. Les autres joueurs continuent à voir la même arène pendant cette intermission.
+
+Le choix dure au maximum 15 secondes ; la première proposition est sélectionnée automatiquement si nécessaire. Quand toute l’équipe a choisi, il reste trois secondes avant la vague suivante. Les modules restent installés après une réapparition. Relancer une partie depuis le salon remet toutes les améliorations à zéro.
+
+Les champions apparaissent toutes les cinq vagues pour toute l’équipe. Les points restent partagés, tandis que la santé, les modules, les éliminations personnelles et les impacts à la tête sont suivis par joueur.
+
 ## Architecture et limites
 
 L’hôte simule les joueurs, les ennemis, les collisions et les dégâts à 60 Hz. Les invités transmettent leurs commandes ; ils prédisent leur déplacement puis se corrigent à partir de l’état confirmé par l’hôte. Les positions des autres joueurs et des ennemis sont interpolées à l’affichage.
@@ -93,7 +101,7 @@ Les états du monde sont transmis environ **20 fois par seconde**. L’encodage 
 
 Cette première version utilise **TCP**, avec des sockets non bloquantes et `TCP_NODELAY`, pour garder un transport simple et fiable. Les pertes de paquets peuvent toutefois provoquer des retards de livraison : le passage à UDP avec des messages fiables ciblés sera à étudier si les parties réelles le demandent. Voir les références [TCP](https://man7.org/linux/man-pages/man7/tcp.7.html) et [connexion non bloquante](https://man7.org/linux/man-pages/man2/connect.2.html).
 
-Il reste à mesurer la latence réelle, le débit et la charge sur le Pi 4, surtout lorsqu’il héberge et affiche le jeu simultanément. Les effets de particules des tirs et explosions sont répliqués, en respectant la limite du profil graphique de chaque invité. Les dégâts et éliminations sont décidés par l’hôte. Le ping affiché mesure l’aller-retour TCP, avec un léger lissage. Tous les joueurs doivent utiliser la 0.4 : le protocole 4 est incompatible avec la 0.3.
+Il reste à mesurer la latence réelle, le débit et la charge sur le Pi 4, surtout lorsqu’il héberge et affiche le jeu simultanément. Les effets de particules des tirs et explosions sont répliqués, en respectant la limite du profil graphique de chaque invité. Les dégâts et éliminations sont décidés par l’hôte. Le ping affiché mesure l’aller-retour TCP, avec un léger lissage. Tous les joueurs doivent utiliser la 0.5 : le protocole 5 est incompatible avec la 0.3 et la 0.4.
 
 ## Contrôles disponibles
 
@@ -106,4 +114,4 @@ make test-tcp
 
 `make test-tcp` ouvre réellement un hôte et un client sur `127.0.0.1:37991`, sans fenêtre, et vérifie la connexion et les échanges. Le port doit être libre. Ce contrôle doit être lancé dans un environnement qui autorise les sockets.
 
-Les contrôles en mémoire ont été exécutés pour la version 0.3. La version 0.4 a été compilée sans avertissement, mais ses contrôles n’ont pas été exécutés. L’environnement de développement bloque la création de sockets : **une connexion réelle ou une partie entre deux machines reste à valider**. Le résultat détaillé est dans [VALIDATION.md](VALIDATION.md).
+Les contrôles en mémoire ont été exécutés pour la version 0.3. La version 0.5 a été compilée sans avertissement, mais ses contrôles n’ont pas été exécutés. L’environnement de développement bloque la création de sockets : **une connexion réelle ou une partie entre deux machines reste à valider**. Le résultat détaillé est dans [VALIDATION.md](VALIDATION.md).

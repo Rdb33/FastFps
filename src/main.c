@@ -52,11 +52,11 @@ static void network_preferences(App *app,bool write) {
     fclose(file);
 }
 static void pause_game(App *app) {
-    if(app->state!=STATE_PLAYING)return;
+    if(app->state!=STATE_PLAYING&&app->state!=STATE_UPGRADE)return;
     app->state=STATE_PAUSED;app->selected=0;SDL_SetRelativeMouseMode(SDL_FALSE);
 }
 static void start_game(App *app,Game *game,bool restart,bool demo) {
-    if(restart||app->state!=STATE_PAUSED)game_reset(game,game->world,PRESETS[app->quality].particles);
+    if(restart||app->state!=STATE_PAUSED){game_reset(game,game->world,PRESETS[app->quality].particles);app->show_build=false;}
     game->motion=app->motion;
     if(!game->cooperative||app->network->mode==NET_HOST)game->difficulty=app->difficulty;
     if(!demo&&SDL_SetRelativeMouseMode(SDL_TRUE)!=0) {
@@ -118,13 +118,14 @@ static Input read_input(void) {
     bool back=keys[SDL_SCANCODE_S]||keys[SDL_SCANCODE_DOWN];
     bool left=keys[SDL_SCANCODE_A]||keys[SDL_SCANCODE_LEFT];
     bool right=keys[SDL_SCANCODE_D]||keys[SDL_SCANCODE_RIGHT];
-    return (Input){(float)forward-(float)back,(float)right-(float)left,
-        keys[SDL_SCANCODE_SPACE]!=0,keys[SDL_SCANCODE_LSHIFT]||keys[SDL_SCANCODE_RSHIFT],
-        (SDL_GetMouseState(NULL,NULL)&SDL_BUTTON(SDL_BUTTON_LEFT))!=0,
-        keys[SDL_SCANCODE_LALT]||(SDL_GetMouseState(NULL,NULL)&SDL_BUTTON(SDL_BUTTON_RIGHT))!=0,
-        keys[SDL_SCANCODE_F]!=0};
+    return (Input){.forward=(float)forward-(float)back,.right=(float)right-(float)left,
+        .jump=keys[SDL_SCANCODE_SPACE]!=0,.sprint=keys[SDL_SCANCODE_LSHIFT]||keys[SDL_SCANCODE_RSHIFT],
+        .firing=(SDL_GetMouseState(NULL,NULL)&SDL_BUTTON(SDL_BUTTON_LEFT))!=0,
+        .dash=keys[SDL_SCANCODE_LALT]||(SDL_GetMouseState(NULL,NULL)&SDL_BUTTON(SDL_BUTTON_RIGHT))!=0,
+        .melee=keys[SDL_SCANCODE_F]!=0};
 }
 static Input demo_input(Game *game) {
+    if(game->player.upgrade_pending)return (Input){.upgrade=1};
     Player *p=&game->player;
     if(game->enemy_count) {
         Enemy *nearest=&game->enemies[0];float distance=1e9f;
@@ -239,6 +240,7 @@ int main(int argc,char **argv) {
         SDL_Event event;
         while(SDL_PollEvent(&event)) {
             if(lobby_event(&app,&game,&renderer,&event))continue;
+            if(upgrade_event(&app,&game,&renderer,&event))continue;
             if(event.type==SDL_QUIT)app.running=false;
             else if(event.type==SDL_WINDOWEVENT&&event.window.event==SDL_WINDOWEVENT_FOCUS_LOST&&!demo)pause_game(&app);
             else if(event.type==SDL_MOUSEMOTION) {
@@ -263,7 +265,7 @@ int main(int argc,char **argv) {
                 else if(key==SDL_SCANCODE_F1)show_fps=!show_fps;
                 else if(key==SDL_SCANCODE_F4){app.motion=!app.motion;game.motion=app.motion;}
                 else if(key==SDL_SCANCODE_ESCAPE) {
-                    if(app.state==STATE_PLAYING)pause_game(&app);
+                    if(app.state==STATE_PLAYING||app.state==STATE_UPGRADE)pause_game(&app);
                     else if(app.state==STATE_PAUSED)start_game(&app,&game,false,demo);
                     else app.running=false;
                 }else if(app.state!=STATE_PLAYING) {
@@ -272,23 +274,28 @@ int main(int argc,char **argv) {
                     else if(key==SDL_SCANCODE_RETURN||key==SDL_SCANCODE_KP_ENTER||key==SDL_SCANCODE_SPACE)menu_action(&app,&game,&renderer,1);
                     else if((key==SDL_SCANCODE_LEFT||key==SDL_SCANCODE_RIGHT)&&app.selected>=2&&app.selected<=7)
                         menu_action(&app,&game,&renderer,key==SDL_SCANCODE_LEFT?-1:1);
-                }else if(key==SDL_SCANCODE_1||key==SDL_SCANCODE_KP_1)game_request_weapon(&game,0);
+                }else if(key==SDL_SCANCODE_TAB)app.show_build=!app.show_build;
+                else if(key==SDL_SCANCODE_1||key==SDL_SCANCODE_KP_1)game_request_weapon(&game,0);
                 else if(key==SDL_SCANCODE_2||key==SDL_SCANCODE_KP_2)game_request_weapon(&game,1);
             }
         }
         double now=(double)SDL_GetPerformanceCounter()/frequency;
         net_discovery_poll(network,now);net_poll(network,&game,now);lobby_sync(&app,&game);
+        upgrade_sync(&app,&game,demo);
         double elapsed=fmin(now-previous,.1);previous=now;
-        if(app.state==STATE_PLAYING||network->phase==ROOM_PLAYING) {
+        app.ui_time=fmodf(app.ui_time+(float)elapsed,600);
+        if(app.state==STATE_PLAYING||app.state==STATE_UPGRADE||network->phase==ROOM_PLAYING) {
             accumulator+=elapsed;int steps=0;
             while(accumulator>=FIXED_STEP&&steps<MAX_CATCHUP_STEPS) {
                 Input input=app.state==STATE_PLAYING?(demo?demo_input(&game):read_input()):(Input){0};
+                if(app.state==STATE_UPGRADE)input.upgrade=app.upgrade_choice;
                 if(game.dead)input=(Input){0};
                 if(network->mode!=NET_OFF) {
                     Command command={.input=input,.yaw=game.player.yaw,.pitch=game.player.pitch,
                         .weapon=game.player.weapon_switch>0?game.player.weapon_target:game.player.weapon};
                     net_tick(network,&game,command,FIXED_STEP,now);lobby_sync(&app,&game);
                 }else game_update(&game,input,FIXED_STEP);
+                upgrade_sync(&app,&game,demo);
                 accumulator-=FIXED_STEP;steps++;
                 if(game.dead&&!game.cooperative) {
                     app.state=STATE_DEAD;app.selected=0;SDL_SetRelativeMouseMode(SDL_FALSE);
@@ -298,7 +305,7 @@ int main(int argc,char **argv) {
             }
             if(steps==MAX_CATCHUP_STEPS)accumulator=0;
         }else accumulator=0;
-        double interval=1.0/(app.state==STATE_PLAYING?PRESETS[app.quality].fps:30);
+        double interval=1.0/((app.state==STATE_PLAYING||app.state==STATE_UPGRADE)?PRESETS[app.quality].fps:30);
         if(now-last_render>=interval-.0005) {
             last_render=now;
             int actual_fps=app.fps;if(!show_fps)app.fps=-1;
@@ -309,7 +316,7 @@ int main(int argc,char **argv) {
             if(frame_limit>0&&rendered>=frame_limit)app.running=false;
         }
         double until_draw=interval-((double)SDL_GetPerformanceCounter()/frequency-last_render);
-        double until_update=(app.state==STATE_PLAYING||network->phase==ROOM_PLAYING)?FIXED_STEP-accumulator:.008;
+        double until_update=(app.state==STATE_PLAYING||app.state==STATE_UPGRADE||network->phase==ROOM_PLAYING)?FIXED_STEP-accumulator:.008;
         double wait=fmin(.008,fmin(until_draw,until_update));if(wait>.001)SDL_Delay((Uint32)(wait*1000));
     }
     int exit_code=0;

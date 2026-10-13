@@ -61,6 +61,20 @@ void mesh_rect(Mesh *m,float x,float y,float w,float h,Color c) {
     mesh_quad(m,(Vec3){x,y,0},(Vec3){x+w,y,0},(Vec3){x+w,y+h,0},(Vec3){x,y+h,0},c,(Vec3){0,1,0});
 }
 
+void mesh_ring(Mesh *m,Vec3 p,float radius,float width,Color color,int segments) {
+    if(radius<=0||width<=0||segments<3)return;
+    float inner=fmaxf(0,radius-width);
+    for(int i=0;i<segments;i++) {
+        float a=(float)i*2*PI_F/(float)segments,b=(float)(i+1)*2*PI_F/(float)segments;
+        Vec3 v0={p.x+sinf(a)*radius,p.y,p.z+cosf(a)*radius};
+        Vec3 v1={p.x+sinf(b)*radius,p.y,p.z+cosf(b)*radius};
+        Vec3 v2={p.x+sinf(b)*inner,p.y,p.z+cosf(b)*inner};
+        Vec3 v3={p.x+sinf(a)*inner,p.y,p.z+cosf(a)*inner};
+        mesh_quad(m,v0,v1,v2,v3,color,(Vec3){0,1,0});
+        mesh_quad(m,v3,v2,v1,v0,color,(Vec3){0,-1,0});
+    }
+}
+
 /* Police 5 x 7 locale : pas de dépendance à SDL_ttf ni à des fichiers de police. */
 static const uint8_t letters[26][7]={
  {14,17,17,31,17,17,17},{30,17,17,30,17,17,30},{14,17,16,16,16,17,14},
@@ -93,6 +107,7 @@ static uint8_t punctuation(unsigned char c,int row) {
         case '!':return row<4||row==6?4:0;
         case '(':return row==0||row==6?2:4;
         case ')':return row==0||row==6?8:4;
+        case '%':{static const uint8_t bits[7]={25,26,2,4,8,11,19};return bits[row];}
         default:return 0;
     }
 }

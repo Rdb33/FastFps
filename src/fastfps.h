@@ -14,6 +14,8 @@ typedef struct { float m[16]; } Mat4;
 typedef struct { Vec3 position; Color color; Vec3 normal; } Vertex;
 typedef struct { Vertex *data; int count, capacity; } Mesh;
 typedef struct { Vec3 position, velocity; bool grounded; } Body;
+typedef enum { UPGRADE_POWER, UPGRADE_HASTE, UPGRADE_MOBILITY,
+    UPGRADE_VITALITY, UPGRADE_ARMOR, UPGRADE_VAMPIRE } Upgrade;
 typedef struct {
     Mesh mesh;
     Box solids[MAX_SOLIDS]; int solid_count;
@@ -27,6 +29,9 @@ typedef struct {
     float movement_blend, strafe_blend, landing, sway_x, sway_y, step_timer;
     float dash_timer, dash_cooldown, weapon_switch, melee_timer;
     int weapon, weapon_target;
+    uint8_t upgrades[UPGRADE_COUNT], offers[UPGRADE_CHOICES];
+    bool upgrade_pending;
+    float upgrade_flash;
 } Player;
 typedef struct {
     Player player;
@@ -34,6 +39,8 @@ typedef struct {
     float respawn_timer, invulnerable;
     float headshot_time, kill_time, damage_yaw;
     int combo;
+    int run_kills, run_headshots, reward_points;
+    float reward_time;
     uint32_t input_ack, shots;
     bool active, dead, dash_pressed, melee_pressed;
     char name[PLAYER_NAME_LENGTH+1];
@@ -48,6 +55,7 @@ typedef struct {
     Vec3 attack_direction, knockback;
     bool attack_fired;
     int target_actor;
+    bool elite;
 } Enemy;
 typedef struct { Vec3 position, velocity; float life; Color color; } Projectile;
 typedef struct { Vec3 position, velocity; Color color; float life, max_life, size; } Particle;
@@ -63,10 +71,13 @@ typedef struct {
     Pickup pickups[MAX_PICKUPS]; int pickup_count;
     Barrel barrels[MAX_BARRELS]; int barrel_count;
     int wave, score, kills, next_id, difficulty;
+    int completed_waves;
     float time, wave_timer, nav_timer, shot_cooldown, recoil, hit_time, damage_time;
     float shot_age, footstep_timer, combo_timer;
     float headshot_time, kill_time, damage_yaw;
     int combo;
+    int reward_points;
+    float reward_time, wave_clear_time;
     char message[96]; float message_time;
     bool dead;
     bool motion, dash_pressed, melee_pressed;
@@ -75,19 +86,20 @@ typedef struct {
     uint32_t tick;
     bool cooperative, round_over, prediction;
 } Game;
-typedef struct { float forward, right; bool jump, sprint, firing, dash, melee; } Input;
+typedef struct { float forward, right; bool jump, sprint, firing, dash, melee; int upgrade; } Input;
 typedef struct { int width, height, fps, particles; const char *name; } Preset;
 typedef struct {
     SDL_Window *window; SDL_GLContext context;
     GLuint program, composite_program;
     GLint position, color, normal, matrix, fog, unlit;
+    GLint light_position, light_color, sector_color;
     GLint composite_position, composite_uv, composite_texture;
     GLuint world_buffer, dynamic_buffer, gun_buffer, ui_buffer, quad_buffer;
     GLuint framebuffer, texture, depth;
     Mesh dynamic, gun, ui;
     int world_vertices, width, height;
 } Renderer;
-typedef enum { STATE_MENU, STATE_PLAYING, STATE_PAUSED, STATE_DEAD, STATE_NETWORK, STATE_LOBBY } State;
+typedef enum { STATE_MENU, STATE_PLAYING, STATE_PAUSED, STATE_DEAD, STATE_NETWORK, STATE_LOBBY, STATE_UPGRADE } State;
 struct Network;
 typedef struct {
     State state;
@@ -96,12 +108,15 @@ typedef struct {
     float sensitivity;
     struct Network *network;
     int editing;
-    bool select_all, network_help;
+    bool select_all, network_help, show_build;
+    int upgrade_choice;
+    float ui_time;
 } App;
 typedef enum { SOUND_SHOT, SOUND_SHOTGUN, SOUND_HIT, SOUND_KILL,
     SOUND_HURT, SOUND_JUMP, SOUND_PICKUP, SOUND_WAVE,
     SOUND_STEP, SOUND_LAND, SOUND_SWITCH, SOUND_PUMP, SOUND_MELEE,
-    SOUND_DASH, SOUND_CAST, SOUND_GROWL, SOUND_EXPLOSION, SOUND_HEADSHOT } Sound;
+    SOUND_DASH, SOUND_CAST, SOUND_GROWL, SOUND_EXPLOSION, SOUND_HEADSHOT,
+    SOUND_UPGRADE, SOUND_CHAMPION } Sound;
 
 extern const Preset PRESETS[3];
 
@@ -129,6 +144,7 @@ void mesh_joint_box(Mesh *mesh, Vec3 base, Vec3 size, Vec3 pivot, float angle, C
 void mesh_pose(Mesh *mesh, int first, Vec3 position, float yaw, float pitch, float scale);
 void mesh_rect(Mesh *mesh, float x, float y, float w, float h, Color color);
 void mesh_text(Mesh *mesh, float x, float y, int scale, Color color, const char *text);
+void mesh_ring(Mesh *mesh, Vec3 center, float radius, float width, Color color, int segments);
 
 /* world.c */
 bool world_init(World *world);
@@ -157,6 +173,22 @@ void game_start_coop(Game *game, const bool active[MAX_PLAYERS], int local_actor
 void game_update_coop(Game *game, const Input inputs[MAX_PLAYERS], float dt);
 void game_predict(Game *game, Input input, float dt);
 
+/* progression.c : améliorations remises à zéro à chaque partie. */
+float player_max_health(const Player *player);
+float player_damage_multiplier(const Player *player);
+float player_fire_interval(const Player *player);
+float player_dash_cooldown(const Player *player);
+int player_level(const Player *player);
+float enemy_size(const Enemy *enemy);
+void game_offer_upgrades(Game *game);
+bool game_choose_upgrade(Game *game, int choice);
+const char *upgrade_name(int upgrade);
+const char *upgrade_description(int upgrade);
+Color upgrade_color(int upgrade);
+void upgrade_sync(App *app, const Game *game, bool demo);
+bool upgrade_event(App *app, const Game *game, Renderer *renderer, const SDL_Event *event);
+void upgrade_ui(Mesh *mesh, const Game *game, const App *app);
+
 /* audio.c */
 void audio_init(void);
 void audio_enabled(bool enabled);
@@ -178,6 +210,8 @@ void animate_creature(Mesh *mesh, const Enemy *enemy, float time);
 void animate_weapon(Mesh *mesh, const Game *game, const App *app);
 void animate_teammate(Mesh *mesh, const Actor *actor, int id);
 void animate_barrel(Mesh *mesh, const Barrel *barrel, float time);
+void animate_arena(Mesh *mesh, const Game *game, const App *app);
+Color sector_theme(int wave);
 
 /* ui.c */
 void ui_build(Mesh *mesh, const Game *game, const App *app);

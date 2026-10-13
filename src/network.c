@@ -129,6 +129,7 @@ static void reconcile(Network *n,Game *g,const uint8_t *data,size_t size,double 
     const Actor *local=&snapshot.actors[n->local_id],*old=&n->previous.actors[n->local_id];
     if(local->player.health<old->player.health)audio_play(SOUND_HURT);
     if(local->player.health>old->player.health&&!old->dead)audio_play(SOUND_PICKUP);
+    if(player_level(&local->player)>player_level(&old->player))audio_play(SOUND_UPGRADE);
     if(local->kill_time>old->kill_time+.02f)audio_play(SOUND_KILL);
     else if(local->headshot_time>old->headshot_time+.02f)audio_play(SOUND_HEADSHOT);
     else if(local->hit_time>old->hit_time+.02f)audio_play(SOUND_HIT);
@@ -141,7 +142,8 @@ static void reconcile(Network *n,Game *g,const uint8_t *data,size_t size,double 
             &&e->attack_timer>n->previous.enemies[j].attack_timer+.04f)
             audio_play_at(e->type==ENEMY_CASTER?SOUND_CAST:SOUND_GROWL,e->body.position);
     }
-    if(snapshot.wave>n->previous.wave)audio_play(SOUND_WAVE);
+    if(snapshot.wave>n->previous.wave)audio_play(snapshot.wave%5==0?SOUND_CHAMPION:SOUND_WAVE);
+    if(snapshot.completed_waves>n->previous.completed_waves)audio_play(SOUND_UPGRADE);
     *g=snapshot;
     uint32_t ack=g->actors[n->local_id].input_ack,count=n->sequence-ack;
     audio_suppressed(true);

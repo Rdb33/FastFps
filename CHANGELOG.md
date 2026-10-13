@@ -1,3 +1,17 @@
+# Version 0.5.0
+
+- Progression limitée à la partie : un module à choisir après chaque vague, niveau de personnage et six branches à cinq rangs.
+- Surcharge, Cadence, Réflexes, Vitalité, Blindage et Vampirisme ; effets réels sur les armes, la frappe, les déplacements et la survie.
+- Cartes animées, choix au clavier ou à la souris, panneau de configuration avec Tab, intermission de 15 secondes et sélection automatique à expiration.
+- Propositions individuelles en coopération, choix validés par l’hôte, conservation des modules après réapparition et remise à zéro entre les parties.
+- Champions dorés toutes les cinq vagues, attaque de zone annoncée au sol, bonus de score et secteurs aux ambiances lumineuses distinctes.
+- Réacteur animé, anneaux visibles des deux côtés, particules d’ambiance, ombres stylisées et éclairage des tirs / explosions sur les sommets.
+- Détails et évolution visuelle des armes, flashs de bouche étoilés, douilles, respiration et mouvement d’esquive.
+- Points d’élimination animés et résumé de fin de partie.
+- Budgets de particules : 64 sur Pi, 100 en Équilibré, 160 sur PC ; cinq appels de dessin conservés.
+- Protocole réseau 5, incompatible avec les versions précédentes.
+- Compilation C11 réussie sans avertissement ; gameplay, nouveau rendu et coopération de cette version restent à vérifier en jouant.
+
 # Version 0.4.0
 
 - Découverte automatique de trois salons sur le réseau local, sans service central.

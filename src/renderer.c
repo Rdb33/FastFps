@@ -6,15 +6,20 @@
 #include <string.h>
 
 const Preset PRESETS[3]={
-    {640,360,30,28,"PI 4"},{960,540,60,64,"EQUILIBRE"},{1280,720,60,100,"PC"}
+    {640,360,30,64,"PI 4"},{960,540,60,100,"EQUILIBRE"},{1280,720,60,160,"PC"}
 };
 static const char *vertex_source=
     "attribute vec3 aPosition;attribute vec3 aColor;attribute vec3 aNormal;"
     "uniform mat4 uMatrix;uniform float uFog;uniform float uUnlit;"
+    "uniform vec3 uLightPosition;uniform vec3 uLightColor;uniform vec3 uSectorColor;"
     "varying vec3 vColor;varying float vFog;"
     "void main(){gl_Position=uMatrix*vec4(aPosition,1.0);"
     "float light=0.64+0.36*max(dot(aNormal,normalize(vec3(-0.4,0.9,0.25))),0.0);"
-    "vColor=aColor*mix(light,1.0,uUnlit);"
+    "float flash=max(0.0,1.0-length(aPosition-uLightPosition)/7.0);"
+    "float core=max(0.0,1.0-length(aPosition-vec3(0.0,4.15,0.0))/11.0);"
+    "vec3 lit=aColor*light*(vec3(0.82)+uSectorColor*0.18);"
+    "lit+=flash*flash*uLightColor*0.7+core*core*uSectorColor*0.065;"
+    "vColor=mix(lit,aColor,uUnlit);"
     "vFog=clamp((gl_Position.w-16.0)/65.0,0.0,0.75)*uFog;}";
 static const char *fragment_source=
     "precision mediump float;varying vec3 vColor;varying float vFog;"
@@ -24,7 +29,8 @@ static const char *composite_vertex=
     "void main(){vUV=aUV;gl_Position=vec4(aPosition,0.0,1.0);}";
 static const char *composite_fragment=
     "precision mediump float;uniform sampler2D uTexture;varying vec2 vUV;"
-    "void main(){gl_FragColor=texture2D(uTexture,vUV);}";
+    "void main(){vec4 color=texture2D(uTexture,vUV);vec2 edge=vUV-vec2(0.5);"
+    "color.rgb*=1.0-dot(edge,edge)*0.18;gl_FragColor=color;}";
 
 static GLuint compile(GLenum type,const char *source) {
     GLuint shader=glCreateShader(type);glShaderSource(shader,1,&source,NULL);glCompileShader(shader);
@@ -81,10 +87,12 @@ bool renderer_init(Renderer *r,World *world,const Preset *preset) {
     r->position=glGetAttribLocation(r->program,"aPosition");r->color=glGetAttribLocation(r->program,"aColor");
     r->normal=glGetAttribLocation(r->program,"aNormal");r->matrix=glGetUniformLocation(r->program,"uMatrix");
     r->fog=glGetUniformLocation(r->program,"uFog");r->unlit=glGetUniformLocation(r->program,"uUnlit");
+    r->light_position=glGetUniformLocation(r->program,"uLightPosition");r->light_color=glGetUniformLocation(r->program,"uLightColor");
+    r->sector_color=glGetUniformLocation(r->program,"uSectorColor");
     r->composite_position=glGetAttribLocation(r->composite_program,"aPosition");
     r->composite_uv=glGetAttribLocation(r->composite_program,"aUV");
     r->composite_texture=glGetUniformLocation(r->composite_program,"uTexture");
-    if(!mesh_init(&r->dynamic,24000)||!mesh_init(&r->gun,800)||!mesh_init(&r->ui,98304))return false;
+    if(!mesh_init(&r->dynamic,40000)||!mesh_init(&r->gun,1800)||!mesh_init(&r->ui,131072))return false;
     r->world_vertices=world->mesh.count;
     allocate_buffer(&r->world_buffer,world->mesh.count,GL_STATIC_DRAW,world->mesh.data);
     allocate_buffer(&r->dynamic_buffer,r->dynamic.capacity,GL_DYNAMIC_DRAW,NULL);
@@ -117,8 +125,20 @@ void renderer_draw(Renderer *r,const Game *g,const App *app) {
     glBindFramebuffer(GL_FRAMEBUFFER,r->framebuffer);glViewport(0,0,r->width,r->height);
     glEnable(GL_DEPTH_TEST);glEnable(GL_CULL_FACE);glDisable(GL_BLEND);
     glClearColor(.045f,.04f,.032f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);glUseProgram(r->program);
+    Color theme=sector_theme(g->wave);glUniform3f(r->sector_color,theme.r,theme.g,theme.b);
+    Vec3 light=player_eye(p,app->motion);Color flash={0,0,0};float strength=0;
+    if(g->shot_age<.10f) {
+        strength=1-g->shot_age/.10f;light=vadd(light,vscale(look_direction(p->yaw,p->pitch),.65f));
+        flash=(Color){strength,strength*.57f,strength*.23f};
+    }
+    for(int i=0;i<g->barrel_count;i++)if(g->barrels[i].explosion_time>.4f) {
+        float blast=(g->barrels[i].explosion_time-.4f)*4;
+        if(blast>strength){strength=blast;light=vadd(g->barrels[i].position,(Vec3){0,1,0});flash=(Color){blast,blast*.46f,blast*.12f};}
+    }
+    glUniform3f(r->light_position,light.x,light.y,light.z);glUniform3f(r->light_color,flash.r,flash.g,flash.b);
     draw(r,r->world_buffer,r->world_vertices,matrix,1,0);
     Mesh *m=&r->dynamic;m->count=0;
+    animate_arena(m,g,app);
     for(int i=0;i<g->barrel_count;i++)animate_barrel(m,&g->barrels[i],g->time);
     for(int i=0;i<g->enemy_count;i++)animate_creature(m,&g->enemies[i],g->time);
     for(int i=0;i<g->corpse_count;i++)animate_creature(m,&g->corpses[i],g->time);
@@ -151,6 +171,7 @@ void renderer_draw(Renderer *r,const Game *g,const App *app) {
     }
     upload(r->dynamic_buffer,m);draw(r,r->dynamic_buffer,m->count,matrix,1,0);
     m=&r->gun;animate_weapon(m,g,app);
+    glUniform3f(r->light_color,0,0,0);glUniform3f(r->sector_color,.75f,.85f,1);
     glClear(GL_DEPTH_BUFFER_BIT);upload(r->gun_buffer,m);draw(r,r->gun_buffer,m->count,projection,0,0);
     glDisable(GL_DEPTH_TEST);glDisable(GL_CULL_FACE);
     ui_build(&r->ui,g,app);upload(r->ui_buffer,&r->ui);

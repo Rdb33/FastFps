@@ -29,6 +29,9 @@ static void player_write(Writer *w,const Player *p) {
     F(weapon_switch);F(melee_timer);
     #undef F
     w8(w,(uint8_t)p->weapon);w8(w,(uint8_t)p->weapon_target);
+    for(int i=0;i<UPGRADE_COUNT;i++)w8(w,p->upgrades[i]);
+    for(int i=0;i<UPGRADE_CHOICES;i++)w8(w,p->offers[i]);
+    w8(w,p->upgrade_pending);wf(w,p->upgrade_flash);
 }
 static void player_read(Reader *r,Player *p) {
     rb(r,&p->body);
@@ -38,7 +41,11 @@ static void player_read(Reader *r,Player *p) {
     F(weapon_switch);F(melee_timer);
     #undef F
     p->weapon=r8(r);p->weapon_target=r8(r);
-    if(p->weapon>1||p->weapon_target>1||p->health<0||p->health>100||fabsf(p->pitch)>1.46f)r->ok=false;
+    for(int i=0;i<UPGRADE_COUNT;i++){p->upgrades[i]=r8(r);if(p->upgrades[i]>UPGRADE_MAX_LEVEL)r->ok=false;}
+    for(int i=0;i<UPGRADE_CHOICES;i++){p->offers[i]=r8(r);if(p->offers[i]>=UPGRADE_COUNT)r->ok=false;}
+    uint8_t pending=r8(r);p->upgrade_pending=pending!=0;p->upgrade_flash=rf(r);
+    if(pending>1||p->upgrade_flash<0||p->upgrade_flash>1.5f)r->ok=false;
+    if(p->weapon>1||p->weapon_target>1||p->health<0||p->health>player_max_health(p)||fabsf(p->pitch)>1.46f)r->ok=false;
 }
 static void actor_write(Writer *w,const Actor *a) {
     w8(w,(uint8_t)((a->active?1:0)|(a->dead?2:0)|(a->dash_pressed?4:0)|(a->melee_pressed?8:0)));
@@ -48,6 +55,7 @@ static void actor_write(Writer *w,const Actor *a) {
     F(headshot_time);F(kill_time);F(damage_yaw);
     #undef F
     w32(w,(uint32_t)a->combo);w32(w,a->input_ack);w32(w,a->shots);
+    w32(w,(uint32_t)a->run_kills);w32(w,(uint32_t)a->run_headshots);w32(w,(uint32_t)a->reward_points);wf(w,a->reward_time);
 }
 static void actor_read(Reader *r,Actor *a) {
     uint8_t flags=r8(r);if(flags>15)r->ok=false;
@@ -59,6 +67,9 @@ static void actor_read(Reader *r,Actor *a) {
     #undef F
     uint32_t combo=r32(r);if(combo>1000000)r->ok=false;a->combo=(int)combo;
     a->input_ack=r32(r);a->shots=r32(r);
+    uint32_t kills=r32(r),heads=r32(r),reward=r32(r);
+    if(kills>1000000||heads>10000000||reward>2147483647u)r->ok=false;
+    a->run_kills=(int)kills;a->run_headshots=(int)heads;a->reward_points=(int)reward;a->reward_time=rf(r);
 }
 static void enemy_write(Writer *w,const Enemy *e) {
     w32(w,(uint32_t)e->id);w8(w,(uint8_t)e->type);wb(w,&e->body);
@@ -67,6 +78,7 @@ static void enemy_write(Writer *w,const Enemy *e) {
     F(movement_blend);F(attack_timer);F(attack_duration);F(stagger);F(spawn_time);F(death_time);
     #undef F
     wv(w,e->attack_direction);wv(w,e->knockback);w8(w,e->attack_fired);w8(w,(uint8_t)e->target_actor);
+    w8(w,e->elite);
 }
 static void enemy_read(Reader *r,Enemy *e) {
     uint32_t id=r32(r);if(id>2147483647u)r->ok=false;e->id=(int)id;e->type=r8(r);rb(r,&e->body);
@@ -76,6 +88,7 @@ static void enemy_read(Reader *r,Enemy *e) {
     #undef F
     e->attack_direction=rv(r);e->knockback=rv(r);uint8_t fired=r8(r);e->attack_fired=fired!=0;
     e->target_actor=r8(r);
+    uint8_t elite=r8(r);e->elite=elite!=0;if(elite>1)r->ok=false;
     if(e->type>ENEMY_BRUTE||fired>1||e->target_actor>=MAX_PLAYERS||e->attack_timer<0
         ||(e->attack_timer>0&&e->attack_duration<=0)||e->max_health<0||e->max_health>10000)r->ok=false;
 }
@@ -84,14 +97,15 @@ size_t protocol_command_write(uint8_t *data,size_t capacity,const Command *c) {
     Writer w={data,capacity,0,true};w32(&w,c->sequence);w32(&w,c->round);wf(&w,c->yaw);wf(&w,c->pitch);
     wf(&w,c->input.forward);wf(&w,c->input.right);
     uint8_t flags=(uint8_t)((c->input.jump?1:0)|(c->input.sprint?2:0)|(c->input.firing?4:0)|(c->input.dash?8:0)|(c->input.melee?16:0));
-    w8(&w,flags);w8(&w,(uint8_t)c->weapon);return w.ok?w.pos:0;
+    w8(&w,flags);w8(&w,(uint8_t)c->weapon);w8(&w,(uint8_t)c->input.upgrade);return w.ok?w.pos:0;
 }
 bool protocol_command_read(Command *c,const uint8_t *data,size_t size) {
     Reader r={data,size,0,true};Command out={0};out.sequence=r32(&r);out.round=r32(&r);out.yaw=rf(&r);out.pitch=rf(&r);
     out.input.forward=rf(&r);out.input.right=rf(&r);uint8_t flags=r8(&r);out.weapon=r8(&r);
     out.input.jump=(flags&1)!=0;out.input.sprint=(flags&2)!=0;out.input.firing=(flags&4)!=0;
     out.input.dash=(flags&8)!=0;out.input.melee=(flags&16)!=0;
-    if(flags>31||out.weapon>1||fabsf(out.yaw)>2*PI_F+.01f||fabsf(out.pitch)>1.46f
+    out.input.upgrade=r8(&r);
+    if(flags>31||out.weapon>1||out.input.upgrade>UPGRADE_CHOICES||fabsf(out.yaw)>2*PI_F+.01f||fabsf(out.pitch)>1.46f
         ||fabsf(out.input.forward)>1||fabsf(out.input.right)>1)r.ok=false;
     if(!r.ok||r.pos!=size)return false;
     *c=out;return true;
@@ -103,6 +117,7 @@ size_t protocol_snapshot_write(uint8_t *data,size_t capacity,const Game *g) {
     Writer w={data,capacity,0,true};w8(&w,NET_PROTOCOL);w8(&w,(uint8_t)g->difficulty);w32(&w,g->tick);
     w8(&w,g->round_over);w32(&w,(uint32_t)g->wave);w32(&w,(uint32_t)g->score);w32(&w,(uint32_t)g->kills);
     wf(&w,g->time);wf(&w,g->wave_timer);wf(&w,g->message_time);ws(&w,g->message,95);
+    w32(&w,(uint32_t)g->completed_waves);wf(&w,g->wave_clear_time);
     for(int i=0;i<MAX_PLAYERS;i++)actor_write(&w,&g->actors[i]);
     w8(&w,(uint8_t)g->enemy_count);for(int i=0;i<g->enemy_count;i++)enemy_write(&w,&g->enemies[i]);
     w8(&w,(uint8_t)g->corpse_count);for(int i=0;i<g->corpse_count;i++)enemy_write(&w,&g->corpses[i]);
@@ -130,6 +145,8 @@ bool protocol_snapshot_read(Game *g,const uint8_t *data,size_t size) {
     if(wave>1000000||score>2147483647u||kills>2147483647u)r.ok=false;
     out.wave=(int)wave;out.score=(int)score;out.kills=(int)kills;
     out.time=rf(&r);out.wave_timer=rf(&r);out.message_time=rf(&r);rs(&r,out.message,sizeof(out.message));
+    uint32_t completed=r32(&r);if(completed>1000000||completed>wave)r.ok=false;
+    out.completed_waves=(int)completed;out.wave_clear_time=rf(&r);
     for(int i=0;i<MAX_PLAYERS;i++)actor_read(&r,&out.actors[i]);
     out.enemy_count=r8(&r);if(out.enemy_count>MAX_ENEMIES)return false;
     for(int i=0;i<out.enemy_count;i++)enemy_read(&r,&out.enemies[i]);

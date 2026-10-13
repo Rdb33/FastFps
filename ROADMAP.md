@@ -75,3 +75,13 @@ Les personnages jouables restent identiques pour cette version ; la variété de
 - [x] Repères visuels dans l'arène et recharge visible des soins.
 - [ ] Parties réelles entre deux machines, avec et sans VPN.
 - [ ] Ajuster l'équilibrage et mesurer les performances sur Pi.
+
+## Version 0.5 : progression pendant la partie
+
+- [x] Six modules à cinq rangs, choix entre les vagues et panneau de configuration.
+- [x] Choix individuel en coopération et validation par l’hôte.
+- [x] Champions toutes les cinq vagues et changement d’ambiance du secteur.
+- [x] Réacteur animé, ombres stylisées, lumières de combat et armes évolutives.
+- [x] Statistiques et points affichés pendant la partie.
+- [ ] Jouer plusieurs configurations pour ajuster les modules et les champions.
+- [ ] Mesurer la 0.5 sur Pi et observer les choix simultanés en coopération.

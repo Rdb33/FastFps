@@ -68,6 +68,8 @@ static void play(Sound sound,float volume,float pan) {
         {.start=90,.end=40,.duration=.25f,.volume=.10f,.noise=true},
         {.start=85,.end=18,.duration=.45f,.volume=.32f,.noise=true},
         {.start=1050,.end=620,.duration=.09f,.volume=.09f},
+        {.start=420,.end=1250,.duration=.45f,.volume=.14f},
+        {.start=70,.end=200,.duration=.65f,.volume=.20f,.noise=true},
     };
     if((unsigned)sound>=sizeof(sounds)/sizeof(sounds[0]))return;
     SDL_LockAudioDevice(device);

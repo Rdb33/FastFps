@@ -56,18 +56,19 @@ void update_player(World *world,Player *p,Input input,float dt) {
     if(input.dash&&p->dash_cooldown==0) {
         if(length==0){wx=sy;wz=-cy;}
         b->velocity.x=wx*DASH_SPEED;b->velocity.z=wz*DASH_SPEED;
-        p->dash_timer=DASH_DURATION;p->dash_cooldown=DASH_COOLDOWN;
+        p->dash_timer=DASH_DURATION;p->dash_cooldown=player_dash_cooldown(p);
         audio_play(SOUND_DASH);
     }
-    float speed=input.sprint?PLAYER_SPRINT:PLAYER_SPEED;
+    float mobility=1+.03f*(float)p->upgrades[UPGRADE_MOBILITY];
+    float speed=(input.sprint?PLAYER_SPRINT:PLAYER_SPEED)*mobility;
     float acceleration=b->grounded?PLAYER_ACCELERATION:22;
     if(p->dash_timer==0&&(length>0||b->grounded)) {
         b->velocity.x=approach(b->velocity.x,wx*speed,acceleration*dt);
         b->velocity.z=approach(b->velocity.z,wz*speed,acceleration*dt);
     }
     float current=hypotf(b->velocity.x,b->velocity.z);
-    if(p->dash_timer==0&&current>PLAYER_SPRINT) {
-        b->velocity.x*=PLAYER_SPRINT/current;b->velocity.z*=PLAYER_SPRINT/current;
+    if(p->dash_timer==0&&current>PLAYER_SPRINT*mobility) {
+        b->velocity.x*=PLAYER_SPRINT*mobility/current;b->velocity.z*=PLAYER_SPRINT*mobility/current;
     }
     if(b->grounded&&input.jump){b->velocity.y=PLAYER_JUMP;b->grounded=false;audio_play(SOUND_JUMP);}
     move_horizontal(world,b,b->velocity.x*dt,b->velocity.z*dt,PLAYER_RADIUS,PLAYER_HEIGHT,PLAYER_STEP);

@@ -1,6 +1,14 @@
 # Contrôles de FASTFPS
 
-Contrôles effectués sur la machine de développement, le 12 octobre 2026.
+Historique des contrôles sur la machine de développement, les 12 et 13 octobre 2026.
+
+## Version 0.5 — 13 octobre 2026
+
+- Compilation C11 avec `-O2 -Wall -Wextra -Wpedantic` réussie sans avertissement.
+- Diff Git vérifié sans erreur d’espacement.
+- Aucun test automatisé, test de gameplay, rendu exécuté ou contrôle réseau lancé pour cette itération.
+- Les nouveaux shaders, cartes de modules, champions et choix en coopération doivent être observés en jeu sur les machines des joueurs.
+- L’utilisateur rapporte un essai satisfaisant de la version précédente sur Raspberry Pi. Les nouveaux budgets graphiques n’ont pas encore été mesurés sur Pi ; aucun FPS réel n’a été fourni.
 
 ## Version 0.4
 
@@ -44,4 +52,4 @@ Contrôles effectués sur la machine de développement, le 12 octobre 2026.
 
 La session graphique interactive de cette machine n'est pas accessible à l'environnement d'exécution. La capture réelle du clavier/souris et les changements de fenêtre restent à vérifier en jouant depuis le bureau.
 
-**Aucun Raspberry Pi 4 réel n'a encore été utilisé.** Les résultats hors écran ne prouvent pas les performances sur Pi. La prochaine validation doit être une compilation ARM et une partie sur le Pi, en observant le compteur FPS et la température.
+**Pour les contrôles historiques de développement ci-dessus, aucun Raspberry Pi 4 réel n’avait été utilisé. Un essai satisfaisant sur Raspberry Pi a depuis été rapporté par l’utilisateur pour la version précédente.** Les résultats hors écran ne prouvent pas les performances sur Pi. La prochaine validation doit être une compilation ARM et une partie sur le Pi, en observant le compteur FPS et la température.
