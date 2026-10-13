@@ -2,6 +2,20 @@
 
 Historique des contrôles sur la machine de développement, les 12 et 13 octobre 2026.
 
+## Version 0.7 — 13 octobre 2026
+
+- Compilation C11 avec `-O2 -Wall -Wextra -Wpedantic`, sans avertissement.
+- `make test` réussi : encodage et messages fragmentés, quatre joueurs en mémoire, prédiction, transitions de manche, changement d’arène et rechargement transmis aux trois invités.
+- Nouveaux tests : trois morts solo par projectile, vies et réapparition avec modules conservés, rechargement automatique / manuel, blocage des armes, déblocages aux rounds 10 / 20 / 30, rotation sur 32 rounds, points d’apparition et barils libres, navigation entre les apparitions sur les trois maps.
+- Game over coopératif testé alors que tous les compteurs de retour sont déjà à zéro : la partie termine avant toute réapparition.
+- Tests de sliders et saisie avec fenêtre SDL fictive : glissement, limites, virgule décimale, saisie au-delà de la borne ; modules bloqués pendant le délai et le tir maintenu, clics répétés sur une carte sans installation, bouton de confirmation distinct.
+- Snapshot maximal (18 ennemis, 8 corps, 72 projectiles, 160 particules et quatre joueurs) : 14 473 octets pour une limite de 16 384. Lecture tronquée rejetée sans modifier la map ; chargeurs et rechargement conservés après décodage.
+- Tests de gameplay et de réseau exécutés avec AddressSanitizer et UndefinedBehaviorSanitizer, sans erreur signalée. Détection des fuites désactivée pour ces lancements SDL.
+- Shaders, menu, trois maps, quatre poses de rechargement, modules et game over rendus hors écran avec Mesa llvmpipe ; captures inspectées. Les quatre modèles d’armes restent sous 1 400 sommets pour une capacité de 3 200.
+- Démonstration Pi+ / Moderne de 180 images : terminée, tirs et éliminations, compteur final de 29 FPS sur cette machine avec rendu logiciel. Ce chiffre ne mesure pas le Pi.
+- Diff Git contrôlé. Connexion TCP réelle entre machines, comportement sous latence et performances Pi restent à vérifier sur les machines des joueurs ; aucun changement de VPN effectué.
+- Protocole réseau 6 : tous les joueurs doivent mettre à jour leur jeu.
+
 ## Version 0.6 — 13 octobre 2026
 
 - Compilation C11 avec `-O2 -Wall -Wextra -Wpedantic` réussie sans avertissement.

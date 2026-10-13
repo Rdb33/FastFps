@@ -94,3 +94,16 @@ Les personnages jouables restent identiques pour cette version ; la variété de
 - [x] Profil Pi+ et changement Moderne / Rétro avec F5.
 - [ ] Observer les shaders et les captures sur les pilotes des joueurs.
 - [ ] Mesurer le compromis Pi+ sur Raspberry Pi et ajuster les effets.
+
+## Version 0.7 : survie, arsenal et maps
+
+- [x] Luminosité, sliders et saisie numérique bornée.
+- [x] Trois vies en solo et écran de game over collectif.
+- [x] Réacteur, Fonderie et Bastion, rotation tous les cinq rounds.
+- [x] Choix des modules protégé et confirmé explicitement.
+- [x] Chargeurs et rechargement manuel / automatique avec animation.
+- [x] Quatre armes et déblocages aux rounds 10, 20 et 30.
+- [x] Difficulté accrue, soins plus espacés et visibilité de l’arsenal.
+- [x] Tests de simulation, de saisie et de transitions en coopération.
+- [ ] Ajuster l’équilibrage et mesurer les nouvelles vagues sur un Pi 4.
+- [ ] Observer une vraie partie en coopération entre deux machines.

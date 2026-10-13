@@ -26,26 +26,31 @@ static void player_write(Writer *w,const Player *p) {
     #define F(field) wf(w,p->field)
     F(yaw);F(pitch);F(health);F(bob);F(pad_cooldown);F(movement_blend);F(strafe_blend);
     F(landing);F(sway_x);F(sway_y);F(step_timer);F(dash_timer);F(dash_cooldown);
-    F(weapon_switch);F(melee_timer);
+    F(weapon_switch);F(melee_timer);F(reload_timer);F(reload_duration);F(upgrade_lock);
     #undef F
     w8(w,(uint8_t)p->weapon);w8(w,(uint8_t)p->weapon_target);
+    for(int i=0;i<WEAPON_COUNT;i++)w8(w,p->ammo[i]);
     for(int i=0;i<UPGRADE_COUNT;i++)w8(w,p->upgrades[i]);
     for(int i=0;i<UPGRADE_CHOICES;i++)w8(w,p->offers[i]);
-    w8(w,p->upgrade_pending);wf(w,p->upgrade_flash);
+    w8(w,p->upgrade_pending);w8(w,p->last_upgrade);wf(w,p->upgrade_flash);
 }
 static void player_read(Reader *r,Player *p) {
     rb(r,&p->body);
     #define F(field) p->field=rf(r)
     F(yaw);F(pitch);F(health);F(bob);F(pad_cooldown);F(movement_blend);F(strafe_blend);
     F(landing);F(sway_x);F(sway_y);F(step_timer);F(dash_timer);F(dash_cooldown);
-    F(weapon_switch);F(melee_timer);
+    F(weapon_switch);F(melee_timer);F(reload_timer);F(reload_duration);F(upgrade_lock);
     #undef F
     p->weapon=r8(r);p->weapon_target=r8(r);
+    for(int i=0;i<WEAPON_COUNT;i++){p->ammo[i]=r8(r);if(p->ammo[i]>WEAPONS[i].magazine)r->ok=false;}
+    if(p->reload_timer<0||p->reload_timer>2.2f||p->reload_duration<0||p->reload_duration>2.2f
+        ||p->upgrade_lock<0||p->upgrade_lock>UPGRADE_LOCK_TIME+.01f)r->ok=false;
     for(int i=0;i<UPGRADE_COUNT;i++){p->upgrades[i]=r8(r);if(p->upgrades[i]>UPGRADE_MAX_LEVEL)r->ok=false;}
     for(int i=0;i<UPGRADE_CHOICES;i++){p->offers[i]=r8(r);if(p->offers[i]>=UPGRADE_COUNT)r->ok=false;}
-    uint8_t pending=r8(r);p->upgrade_pending=pending!=0;p->upgrade_flash=rf(r);
+    uint8_t pending=r8(r);p->upgrade_pending=pending!=0;p->last_upgrade=r8(r);p->upgrade_flash=rf(r);
+    if(p->last_upgrade>=UPGRADE_COUNT)r->ok=false;
     if(pending>1||p->upgrade_flash<0||p->upgrade_flash>1.5f)r->ok=false;
-    if(p->weapon>1||p->weapon_target>1||p->health<0||p->health>player_max_health(p)||fabsf(p->pitch)>1.46f)r->ok=false;
+    if(p->weapon>=WEAPON_COUNT||p->weapon_target>=WEAPON_COUNT||p->health<0||p->health>player_max_health(p)||fabsf(p->pitch)>1.46f)r->ok=false;
 }
 static void actor_write(Writer *w,const Actor *a) {
     w8(w,(uint8_t)((a->active?1:0)|(a->dead?2:0)|(a->dash_pressed?4:0)|(a->melee_pressed?8:0)));
@@ -96,16 +101,16 @@ static void enemy_read(Reader *r,Enemy *e) {
 size_t protocol_command_write(uint8_t *data,size_t capacity,const Command *c) {
     Writer w={data,capacity,0,true};w32(&w,c->sequence);w32(&w,c->round);wf(&w,c->yaw);wf(&w,c->pitch);
     wf(&w,c->input.forward);wf(&w,c->input.right);
-    uint8_t flags=(uint8_t)((c->input.jump?1:0)|(c->input.sprint?2:0)|(c->input.firing?4:0)|(c->input.dash?8:0)|(c->input.melee?16:0));
+    uint8_t flags=(uint8_t)((c->input.jump?1:0)|(c->input.sprint?2:0)|(c->input.firing?4:0)|(c->input.dash?8:0)|(c->input.melee?16:0)|(c->input.reload?32:0));
     w8(&w,flags);w8(&w,(uint8_t)c->weapon);w8(&w,(uint8_t)c->input.upgrade);return w.ok?w.pos:0;
 }
 bool protocol_command_read(Command *c,const uint8_t *data,size_t size) {
     Reader r={data,size,0,true};Command out={0};out.sequence=r32(&r);out.round=r32(&r);out.yaw=rf(&r);out.pitch=rf(&r);
     out.input.forward=rf(&r);out.input.right=rf(&r);uint8_t flags=r8(&r);out.weapon=r8(&r);
     out.input.jump=(flags&1)!=0;out.input.sprint=(flags&2)!=0;out.input.firing=(flags&4)!=0;
-    out.input.dash=(flags&8)!=0;out.input.melee=(flags&16)!=0;
+    out.input.dash=(flags&8)!=0;out.input.melee=(flags&16)!=0;out.input.reload=(flags&32)!=0;
     out.input.upgrade=r8(&r);
-    if(flags>31||out.weapon>1||out.input.upgrade>UPGRADE_CHOICES||fabsf(out.yaw)>2*PI_F+.01f||fabsf(out.pitch)>1.46f
+    if(flags>63||out.weapon>=WEAPON_COUNT||out.input.upgrade>UPGRADE_CHOICES||fabsf(out.yaw)>2*PI_F+.01f||fabsf(out.pitch)>1.46f
         ||fabsf(out.input.forward)>1||fabsf(out.input.right)>1)r.ok=false;
     if(!r.ok||r.pos!=size)return false;
     *c=out;return true;
@@ -115,7 +120,7 @@ size_t protocol_snapshot_write(uint8_t *data,size_t capacity,const Game *g) {
         ||g->projectile_count<0||g->projectile_count>MAX_PROJECTILES||g->pickup_count<0||g->pickup_count>MAX_PICKUPS
         ||g->barrel_count<0||g->barrel_count>MAX_BARRELS||g->particle_count<0||g->particle_count>MAX_PARTICLES)return 0;
     Writer w={data,capacity,0,true};w8(&w,NET_PROTOCOL);w8(&w,(uint8_t)g->difficulty);w32(&w,g->tick);
-    w8(&w,g->round_over);w32(&w,(uint32_t)g->wave);w32(&w,(uint32_t)g->score);w32(&w,(uint32_t)g->kills);
+    w8(&w,(uint8_t)g->map_id);w8(&w,(uint8_t)g->lives);w8(&w,g->round_over);w32(&w,(uint32_t)g->wave);w32(&w,(uint32_t)g->score);w32(&w,(uint32_t)g->kills);
     wf(&w,g->time);wf(&w,g->wave_timer);wf(&w,g->message_time);ws(&w,g->message,95);
     w32(&w,(uint32_t)g->completed_waves);wf(&w,g->wave_clear_time);
     for(int i=0;i<MAX_PLAYERS;i++)actor_write(&w,&g->actors[i]);
@@ -140,7 +145,9 @@ bool protocol_snapshot_read(Game *g,const uint8_t *data,size_t size) {
     Reader r={data,size,0,true};Game out=*g;
     if(r8(&r)!=NET_PROTOCOL)return false;
     out.difficulty=r8(&r);if(out.difficulty>2)return false;
-    out.tick=r32(&r);uint8_t ended=r8(&r);if(ended>1)r.ok=false;out.round_over=ended!=0;
+    out.tick=r32(&r);out.map_id=r8(&r);out.lives=r8(&r);
+    if(out.map_id>=MAP_COUNT||out.lives>3)return false;
+    uint8_t ended=r8(&r);if(ended>1)r.ok=false;out.round_over=ended!=0;
     uint32_t wave=r32(&r),score=r32(&r),kills=r32(&r);
     if(wave>1000000||score>2147483647u||kills>2147483647u)r.ok=false;
     out.wave=(int)wave;out.score=(int)score;out.kills=(int)kills;
@@ -171,6 +178,12 @@ bool protocol_snapshot_read(Game *g,const uint8_t *data,size_t size) {
         if(out.particle_count<out.particle_limit&&out.particle_count<MAX_PARTICLES)out.particles[out.particle_count++]=p;
     }
     if(!r.ok||r.pos!=size||out.local_actor<0||out.local_actor>=MAX_PLAYERS)return false;
+    if(out.map_id!=((out.wave>0?out.wave-1:0)/5)%MAP_COUNT)return false;
+    for(int i=0;i<MAX_PLAYERS;i++)if(out.actors[i].active) {
+        if(out.actors[i].player.weapon>=game_unlocked_weapons(&out)||out.actors[i].player.weapon_target>=game_unlocked_weapons(&out))return false;
+    }
+    /* Reconstruire seulement après validation complète : un paquet invalide ne change pas les collisions. */
+    world_set_map(out.world,out.map_id);
     out.cooperative=true;out.current_actor=-1;game_actor_select(&out,out.local_actor);
     *g=out;return true;
 }

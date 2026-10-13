@@ -13,21 +13,21 @@ static void settings_path(char *out,size_t size) {
 static void settings_read(App *app) {
     char path[2048];settings_path(path,sizeof(path));if(!path[0])return;
     FILE *file=fopen(path,"r");if(!file)return;
-    int quality=0,sound=1,best=0,motion=1,difficulty=1,modern=1;float sensitivity=1;
-    if(fscanf(file,"%d %f %d %d %d %d %d",&quality,&sensitivity,&sound,&best,&motion,&difficulty,&modern)>=4) {
+    int quality=0,sound=1,best=0,motion=1,difficulty=1,modern=1;float sensitivity=1,brightness=1;
+    if(fscanf(file,"%d %f %d %d %d %d %d %f",&quality,&sensitivity,&sound,&best,&motion,&difficulty,&modern,&brightness)>=4) {
         app->quality=quality>=0&&quality<PRESET_COUNT?quality:0;
         app->sensitivity=isfinite(sensitivity)?clampf(sensitivity,.3f,3):1;
         app->sound=sound!=0;app->best_score=best>=0?best:0;
         app->motion=motion!=0;
         app->difficulty=difficulty>=0&&difficulty<=2?difficulty:1;
-        app->modern=modern!=0;
+        app->modern=modern!=0;app->brightness=isfinite(brightness)?clampf(brightness,.5f,2):1;
     }
     fclose(file);
 }
 static void settings_write(const App *app) {
     char path[2048];settings_path(path,sizeof(path));if(!path[0])return;
     FILE *file=fopen(path,"w");if(!file)return;
-    fprintf(file,"%d %.2f %d %d %d %d %d\n",app->quality,app->sensitivity,app->sound,app->best_score,app->motion,app->difficulty,app->modern);fclose(file);
+    fprintf(file,"%d %.2f %d %d %d %d %d %.2f\n",app->quality,app->sensitivity,app->sound,app->best_score,app->motion,app->difficulty,app->modern,app->brightness);fclose(file);
 }
 static void network_preferences(App *app,bool write) {
     char path[2048];char *directory=SDL_GetPrefPath("fastfps","fastfps");
@@ -85,17 +85,17 @@ static void change_quality(App *app,Game *game,Renderer *renderer,int direction)
 }
 static void menu_action(App *app,Game *game,Renderer *renderer,int direction) {
     switch(app->selected) {
-        case 0:start_game(app,game,false,false);break;
+        case 0:
+            if(game->cooperative&&app->network->phase==ROOM_FINISHED){app->state=STATE_LOBBY;app->selected=0;}
+            else start_game(app,game,false,false);
+            break;
         case 1:
             if(game->cooperative){net_close(app->network);game_reset(game,game->world,game->particle_limit);game->difficulty=app->difficulty;lobby_open(app);}
             else if(app->state==STATE_PAUSED)start_game(app,game,true,false);
             else lobby_open(app);
             break;
         case 2:change_quality(app,game,renderer,direction);break;
-        case 3:app->sensitivity+=.1f*(float)direction;
-            if(app->sensitivity>3.01f)app->sensitivity=.3f;
-            if(app->sensitivity<.29f)app->sensitivity=3;
-            break;
+        case 3:app->sensitivity=clampf(app->sensitivity+.05f*(float)direction,.3f,3);break;
         case 4:app->sound=!app->sound;audio_enabled(app->sound);break;
         case 5:toggle_fullscreen(app,renderer);break;
         case 6:app->motion=!app->motion;game->motion=app->motion;break;
@@ -103,7 +103,8 @@ static void menu_action(App *app,Game *game,Renderer *renderer,int direction) {
             if(game->cooperative&&app->network->mode==NET_CLIENT)break;
             app->difficulty=(app->difficulty+direction+3)%3;game->difficulty=app->difficulty;break;
         case 8:app->modern=!app->modern;break;
-        case 9:app->running=false;break;
+        case 9:app->brightness=clampf(app->brightness+.05f*(float)direction,.5f,2);break;
+        case 10:app->running=false;break;
     }
 }
 static int menu_hit(Renderer *r,int x,int y) {
@@ -112,8 +113,8 @@ static int menu_hit(Renderer *r,int x,int y) {
     if(draw_height>height){draw_height=(float)height;draw_width=draw_height*16/9;}
     float px=((float)x-((float)width-draw_width)/2)*640/draw_width;
     float py=((float)y-((float)height-draw_height)/2)*360/draw_height;
-    if(px<76||px>564||py<136||py>=276)return -1;
-    return (int)((py-136)/14);
+    if(px<76||px>564||py<128||py>=128+MENU_ROWS*14)return -1;
+    return (int)((py-128)/14);
 }
 static Input read_input(void) {
     const Uint8 *keys=SDL_GetKeyboardState(NULL);
@@ -126,7 +127,7 @@ static Input read_input(void) {
         .jump=keys[SDL_SCANCODE_SPACE]!=0,.sprint=keys[SDL_SCANCODE_LSHIFT]||keys[SDL_SCANCODE_RSHIFT],
         .firing=(SDL_GetMouseState(NULL,NULL)&SDL_BUTTON(SDL_BUTTON_LEFT))!=0,
         .dash=keys[SDL_SCANCODE_LALT]||(SDL_GetMouseState(NULL,NULL)&SDL_BUTTON(SDL_BUTTON_RIGHT))!=0,
-        .melee=keys[SDL_SCANCODE_F]!=0};
+        .melee=keys[SDL_SCANCODE_F]!=0,.reload=keys[SDL_SCANCODE_R]!=0};
 }
 static Input demo_input(Game *game) {
     if(game->player.upgrade_pending)return (Input){.upgrade=1};
@@ -164,7 +165,7 @@ static void help(void) {
         "  --version                     Afficher la version\n");
 }
 int main(int argc,char **argv) {
-    App app={.state=STATE_MENU,.running=true,.sound=true,.motion=true,.modern=true,.sensitivity=1,.difficulty=1};
+    App app={.state=STATE_MENU,.running=true,.sound=true,.motion=true,.modern=true,.sensitivity=1,.brightness=1,.difficulty=1,.numeric_edit=-1,.slider_drag=-1};
     bool demo=false,cli_mute=false,cli_fullscreen=false;int cli_quality=-1,cli_difficulty=-1,cli_modern=-1,frame_limit=0;
     const char *screenshot=NULL,*join_address=NULL,*player_name=NULL;
     bool host=false,multiplayer=false;int room_port=0;
@@ -248,6 +249,7 @@ int main(int argc,char **argv) {
     while(app.running) {
         SDL_Event event;
         while(SDL_PollEvent(&event)) {
+            if(settings_event(&app,&renderer,&event))continue;
             if(lobby_event(&app,&game,&renderer,&event))continue;
             if(upgrade_event(&app,&game,&renderer,&event))continue;
             if(event.type==SDL_QUIT)app.running=false;
@@ -265,7 +267,7 @@ int main(int argc,char **argv) {
                 int hit=menu_hit(&renderer,event.button.x,event.button.y);
                 if(hit>=0){app.selected=hit;menu_action(&app,&game,&renderer,1);}
             }else if(event.type==SDL_MOUSEWHEEL&&app.state==STATE_PLAYING) {
-                game_request_weapon(&game,1-game.player.weapon);
+                game_cycle_weapon(&game,event.wheel.y<0?1:-1);
             }else if(event.type==SDL_KEYDOWN&&!event.key.repeat) {
                 SDL_Scancode key=event.key.keysym.scancode;
                 if(key==SDL_SCANCODE_F11)toggle_fullscreen(&app,&renderer);
@@ -279,14 +281,16 @@ int main(int argc,char **argv) {
                     else if(app.state==STATE_PAUSED)start_game(&app,&game,false,demo);
                     else app.running=false;
                 }else if(app.state!=STATE_PLAYING) {
-                    if(key==SDL_SCANCODE_UP)app.selected=(app.selected+9)%10;
-                    else if(key==SDL_SCANCODE_DOWN)app.selected=(app.selected+1)%10;
+                    if(key==SDL_SCANCODE_UP)app.selected=(app.selected+MENU_ROWS-1)%MENU_ROWS;
+                    else if(key==SDL_SCANCODE_DOWN)app.selected=(app.selected+1)%MENU_ROWS;
                     else if(key==SDL_SCANCODE_RETURN||key==SDL_SCANCODE_KP_ENTER||key==SDL_SCANCODE_SPACE)menu_action(&app,&game,&renderer,1);
-                    else if((key==SDL_SCANCODE_LEFT||key==SDL_SCANCODE_RIGHT)&&app.selected>=2&&app.selected<=8)
+                    else if((key==SDL_SCANCODE_LEFT||key==SDL_SCANCODE_RIGHT)&&app.selected>=2&&app.selected<=9)
                         menu_action(&app,&game,&renderer,key==SDL_SCANCODE_LEFT?-1:1);
                 }else if(key==SDL_SCANCODE_TAB)app.show_build=!app.show_build;
                 else if(key==SDL_SCANCODE_1||key==SDL_SCANCODE_KP_1)game_request_weapon(&game,0);
                 else if(key==SDL_SCANCODE_2||key==SDL_SCANCODE_KP_2)game_request_weapon(&game,1);
+                else if(key==SDL_SCANCODE_3||key==SDL_SCANCODE_KP_3)game_request_weapon(&game,2);
+                else if(key==SDL_SCANCODE_4||key==SDL_SCANCODE_KP_4)game_request_weapon(&game,3);
             }
         }
         double now=(double)SDL_GetPerformanceCounter()/frequency;
@@ -307,7 +311,7 @@ int main(int argc,char **argv) {
                 }else game_update(&game,input,FIXED_STEP);
                 upgrade_sync(&app,&game,demo);
                 accumulator-=FIXED_STEP;steps++;
-                if(game.dead&&!game.cooperative) {
+                if(game.round_over&&!game.cooperative) {
                     app.state=STATE_DEAD;app.selected=0;SDL_SetRelativeMouseMode(SDL_FALSE);
                     if(game.score>app.best_score)app.best_score=game.score;
                     break;

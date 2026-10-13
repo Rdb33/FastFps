@@ -142,11 +142,11 @@ void lobby_sync(App *app,Game *g) {
         }
         return;
     }
-    if(n->phase==ROOM_PLAYING&&app->state==STATE_LOBBY) {
+    if(n->phase==ROOM_PLAYING&&(app->state==STATE_LOBBY||app->state==STATE_DEAD)) {
         app->capture_error=SDL_SetRelativeMouseMode(SDL_TRUE)!=0;
         app->state=app->capture_error?STATE_PAUSED:STATE_PLAYING;g->motion=app->motion;
-    }else if(n->phase==ROOM_FINISHED&&app->state!=STATE_LOBBY) {
-        app->state=STATE_LOBBY;app->selected=0;SDL_SetRelativeMouseMode(SDL_FALSE);
+    }else if(n->phase==ROOM_FINISHED&&app->state!=STATE_LOBBY&&app->state!=STATE_DEAD) {
+        app->state=STATE_DEAD;app->selected=0;SDL_SetRelativeMouseMode(SDL_FALSE);
         if(g->score>app->best_score)app->best_score=g->score;
     }
 }

@@ -18,6 +18,8 @@ typedef enum { UPGRADE_POWER, UPGRADE_HASTE, UPGRADE_MOBILITY,
     UPGRADE_VITALITY, UPGRADE_ARMOR, UPGRADE_VAMPIRE } Upgrade;
 typedef struct {
     Mesh mesh;
+    int map_id;
+    uint32_t revision;
     Box solids[MAX_SOLIDS]; int solid_count;
     Vec3 spawns[8];
     uint8_t passable[NAV_W * NAV_H];
@@ -29,8 +31,11 @@ typedef struct {
     float movement_blend, strafe_blend, landing, sway_x, sway_y, step_timer;
     float dash_timer, dash_cooldown, weapon_switch, melee_timer;
     int weapon, weapon_target;
+    uint8_t ammo[WEAPON_COUNT];
+    float reload_timer, reload_duration, upgrade_lock;
     uint8_t upgrades[UPGRADE_COUNT], offers[UPGRADE_CHOICES];
     bool upgrade_pending;
+    uint8_t last_upgrade;
     float upgrade_flash;
 } Player;
 typedef struct {
@@ -71,7 +76,7 @@ typedef struct {
     Pickup pickups[MAX_PICKUPS]; int pickup_count;
     Barrel barrels[MAX_BARRELS]; int barrel_count;
     int wave, score, kills, next_id, difficulty;
-    int completed_waves;
+    int completed_waves, map_id, lives;
     float time, wave_timer, nav_timer, shot_cooldown, recoil, hit_time, damage_time;
     float shot_age, footstep_timer, combo_timer;
     float headshot_time, kill_time, damage_yaw;
@@ -86,7 +91,9 @@ typedef struct {
     uint32_t tick;
     bool cooperative, round_over, prediction;
 } Game;
-typedef struct { float forward, right; bool jump, sprint, firing, dash, melee; int upgrade; } Input;
+typedef struct { float forward, right; bool jump, sprint, firing, dash, melee, reload; int upgrade; } Input;
+typedef struct { const char *name; int magazine, unlock_wave; float interval, reload, damage; Color color; } Weapon;
+extern const Weapon WEAPONS[WEAPON_COUNT];
 typedef struct { int width, height, fps, particles; const char *name; } Preset;
 typedef struct {
     SDL_Window *window; SDL_GLContext context;
@@ -96,6 +103,9 @@ typedef struct {
     GLint light_position2, light_color2, glow, eye, detail, surface;
     GLint composite_position, composite_uv, composite_texture;
     GLint composite_texel, composite_effects;
+    GLint composite_brightness;
+    float brightness;
+    uint32_t world_revision;
     GLuint world_buffer, dynamic_buffer, gun_buffer, ui_buffer, quad_buffer;
     GLuint framebuffer, texture, depth;
     Mesh dynamic, gun, ui;
@@ -109,7 +119,11 @@ typedef struct {
     State state;
     bool running, fullscreen, sound, capture_error, motion, modern;
     int selected, quality, best_score, fps, difficulty;
-    float sensitivity;
+    float sensitivity, brightness;
+    int numeric_edit, slider_drag;
+    char numeric_text[16];
+    Uint32 upgrade_ready_at;
+    bool upgrade_released, upgrade_confirm;
     struct Network *network;
     int editing;
     bool select_all, network_help, show_build;
@@ -154,6 +168,8 @@ void mesh_ring(Mesh *mesh, Vec3 center, float radius, float width, Color color, 
 
 /* world.c */
 bool world_init(World *world);
+void world_set_map(World *world, int id);
+const char *world_map_name(int id);
 bool world_blocked(const World *world, Vec3 position, float radius, float height, int ignore);
 float world_ray(const World *world, Vec3 origin, Vec3 direction, float range);
 void navigation_update(World *world, float x, float z);
@@ -172,6 +188,9 @@ void game_update(Game *game, Input input, float dt);
 void game_shoot(Game *game);
 void game_burst(Game *game, Vec3 position, Color color, int count);
 void game_request_weapon(Game *game, int weapon);
+void game_reload(Game *game);
+int game_unlocked_weapons(const Game *game);
+void game_cycle_weapon(Game *game, int direction);
 void game_melee(Game *game);
 void game_actor_save(Game *game);
 void game_actor_select(Game *game, int id);
@@ -222,5 +241,7 @@ int graphics_detail(int quality);
 
 /* ui.c */
 void ui_build(Mesh *mesh, const Game *game, const App *app);
+bool settings_event(App *app, Renderer *renderer, const SDL_Event *event);
+void settings_controls(Mesh *mesh, const App *app, int row, float y);
 
 #endif

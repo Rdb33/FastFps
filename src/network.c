@@ -146,8 +146,9 @@ static void reconcile(Network *n,Game *g,const uint8_t *data,size_t size,double 
     if(snapshot.completed_waves>n->previous.completed_waves)audio_play(SOUND_UPGRADE);
     *g=snapshot;
     uint32_t ack=g->actors[n->local_id].input_ack,count=n->sequence-ack;
+    if(snapshot.map_id!=n->previous.map_id){count=0;n->previous=snapshot;}
     audio_suppressed(true);
-    if(count<NET_HISTORY)for(uint32_t i=1;i<=count;i++) {
+    if(!g->round_over&&count<NET_HISTORY)for(uint32_t i=1;i<=count;i++) {
         uint32_t seq=ack+i;const Command *c=&n->history[seq%NET_HISTORY];
         if(c->sequence!=seq)continue;
         g->player.yaw=c->yaw;g->player.pitch=c->pitch;

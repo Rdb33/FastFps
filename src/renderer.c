@@ -60,7 +60,7 @@ static const char *composite_vertex=
     "attribute vec2 aPosition;attribute vec2 aUV;varying mediump vec2 vUV;"
     "void main(){vUV=aUV;gl_Position=vec4(aPosition,0.0,1.0);}";
 static const char *composite_fragment=
-    "precision mediump float;uniform sampler2D uTexture;uniform vec2 uTexel;uniform vec2 uEffects;varying mediump vec2 vUV;"
+    "precision mediump float;uniform sampler2D uTexture;uniform vec2 uTexel;uniform vec2 uEffects;uniform float uBrightness;varying mediump vec2 vUV;"
     "void main(){vec3 color=texture2D(uTexture,vUV).rgb;"
     "if(uEffects.y>0.0){vec2 d=uTexel*2.5;vec3 glow=vec3(0.0);"
     "glow+=max(texture2D(uTexture,vUV+vec2(d.x,0.0)).rgb-vec3(0.68),vec3(0.0));"
@@ -69,7 +69,7 @@ static const char *composite_fragment=
     "glow+=max(texture2D(uTexture,vUV-vec2(0.0,d.y)).rgb-vec3(0.68),vec3(0.0));"
     "color+=glow*uEffects.y;}"
     "if(uEffects.x>0.5){color=pow(max(color*1.08,vec3(0.0)),vec3(0.80));color=(color-vec3(0.5))*1.05+vec3(0.5);}"
-    "vec2 edge=vUV-vec2(0.5);color*=1.0-dot(edge,edge)*0.22;gl_FragColor=vec4(color,1.0);}";
+    "vec2 edge=vUV-vec2(0.5);color*=1.0-dot(edge,edge)*0.22;gl_FragColor=vec4(pow(max(color,vec3(0.0)),vec3(1.0/uBrightness)),1.0);}";
 
 static GLuint compile(GLenum type,const char *source) {
     GLuint shader=glCreateShader(type);glShaderSource(shader,1,&source,NULL);glCompileShader(shader);
@@ -135,8 +135,9 @@ bool renderer_init(Renderer *r,World *world,const Preset *preset) {
     r->composite_position=glGetAttribLocation(r->composite_program,"aPosition");
     r->composite_uv=glGetAttribLocation(r->composite_program,"aUV");
     r->composite_texture=glGetUniformLocation(r->composite_program,"uTexture");
+    r->composite_brightness=glGetUniformLocation(r->composite_program,"uBrightness");
     r->composite_texel=glGetUniformLocation(r->composite_program,"uTexel");r->composite_effects=glGetUniformLocation(r->composite_program,"uEffects");
-    if(!mesh_init(&r->dynamic,64000)||!mesh_init(&r->gun,3200)||!mesh_init(&r->ui,131072))return false;
+    if(!mesh_init(&r->dynamic,90000)||!mesh_init(&r->gun,3200)||!mesh_init(&r->ui,131072))return false;
     r->world_vertices=world->mesh.count;
     allocate_buffer(&r->world_buffer,world->mesh.count,GL_STATIC_DRAW,world->mesh.data);
     allocate_buffer(&r->dynamic_buffer,r->dynamic.capacity,GL_DYNAMIC_DRAW,NULL);
@@ -175,11 +176,17 @@ static void composite(Renderer *r,GLuint target,int x,int y,int width,int height
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,r->modern?GL_LINEAR:GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,r->modern?GL_LINEAR:GL_NEAREST);
     glUniform1i(r->composite_texture,0);glUniform2f(r->composite_texel,1.0f/(float)r->width,1.0f/(float)r->height);
+    glUniform1f(r->composite_brightness,r->brightness);
     glUniform2f(r->composite_effects,r->modern?1:0,r->modern&&r->detail_level>0?.16f:0);
     glDrawArrays(GL_TRIANGLES,0,6);
 }
 void renderer_draw(Renderer *r,const Game *g,const App *app) {
-    r->modern=app->modern;
+    r->modern=app->modern;r->brightness=app->brightness;
+    if(r->world_revision!=g->world->revision) {
+        glBindBuffer(GL_ARRAY_BUFFER,r->world_buffer);
+        glBufferData(GL_ARRAY_BUFFER,(GLsizeiptr)g->world->mesh.count*(GLsizeiptr)sizeof(Vertex),g->world->mesh.data,GL_STATIC_DRAW);
+        r->world_vertices=g->world->mesh.count;r->world_revision=g->world->revision;
+    }
     const Player *p=&g->player;float speed=hypotf(p->body.velocity.x,p->body.velocity.z);
     float fov=(87+(app->motion?speed*.2f:0))*PI_F/180;
     Mat4 projection=perspective(fov,(float)r->width/(float)r->height,.05f,100);

@@ -1,4 +1,4 @@
-# Salons coopératifs — version 0.6
+# Salons coopératifs — version 0.7
 
 Un joueur héberge un salon sur son ordinateur ; jusqu’à trois amis le rejoignent. L’hôte lance la partie quand les joueurs sont prêts. Le jeu utilise une **adresse IPv4 et un port TCP**, sans service central ni frais d’hébergement.
 
@@ -73,7 +73,7 @@ Deux possibilités pour cette première version :
 - **Connexion directe** : l’hôte partage son adresse IPv4 publique et configure sa box pour rediriger le **port TCP 27015** vers l’adresse locale de son ordinateur. Le port choisi doit aussi être autorisé par son pare-feu.
 - **VPN privé reliant les joueurs** : les invités utilisent l’adresse IPv4 du VPN de l’hôte. Le VPN peut lui-même utiliser des services de connexion ou de relais ; le jeu ne gère pas ces services.
 
-Si la connexion de l’hôte est derrière un NAT d’opérateur (CGNAT), une redirection dans sa propre box peut ne pas suffire. Il faut alors une adresse publique accessible, un VPN approprié ou, plus tard, un relais intégré. Le jeu n’effectue pas de traversée automatique des box. La version 0.6 fournit une invitation contenant l’IPv4 et le port, sans code de salon ni relais intégré.
+Si la connexion de l’hôte est derrière un NAT d’opérateur (CGNAT), une redirection dans sa propre box peut ne pas suffire. Il faut alors une adresse publique accessible, un VPN approprié ou, plus tard, un relais intégré. Le jeu n’effectue pas de traversée automatique des box. La version 0.7 fournit une invitation contenant l’IPv4 et le port, sans code de salon ni relais intégré.
 
 ## Jouer ensemble
 
@@ -81,17 +81,17 @@ Si la connexion de l’hôte est derrière un NAT d’opérateur (CGNAT), une re
 - Les alliés ont des silhouettes avec casque et armure colorée, différentes des créatures. Leurs noms et leur statut apparaissent dans l’interface.
 - Pas de dégâts directs entre alliés. Les explosions des barils sont un danger pour toute l’équipe, y compris le tireur.
 - Si un joueur tombe, il revient après **5 secondes** tant qu’un allié reste en vie, puis bénéficie de **2 secondes de protection**.
-- Si toute l’équipe tombe, la manche s’arrête et le salon affiche le résultat. L’hôte peut relancer une partie.
+- Si toute l’équipe tombe simultanément, la partie s’arrête sur un écran de game over. Choisis Retour au salon ; l’hôte peut relancer une partie. Une réapparition imminente ne sauve pas une équipe entièrement éliminée.
 - `Échap` libère ta souris et ouvre ton menu : **la partie des autres continue**. Sélectionne **Reprendre** pour revenir.
 - Quitter le salon en tant qu’invité retire uniquement cet invité. Fermer le salon de l’hôte déconnecte tout le monde. Il n’y a pas encore de transfert automatique du rôle d’hôte.
 
 ## Modules et progression en coopération
 
-Chaque joueur reçoit ses propres propositions après une vague terminée et choisit son module avec les touches 1 / 2 / 3 ou un clic. La sélection est envoyée à l’hôte, qui applique le bonus et confirme le nouvel état. Les autres joueurs continuent à voir la même arène pendant cette intermission.
+Chaque joueur reçoit ses propres propositions après une vague terminée et sélectionne son module avec les touches 1 / 2 / 3 ou un clic, après une seconde de blocage et le relâchement du tir. Entrée ou le bouton Valider confirme le choix. La sélection est envoyée à l’hôte, qui applique le bonus et confirme le nouvel état. Les autres joueurs continuent à voir la même arène pendant cette intermission.
 
 Le choix dure au maximum 15 secondes ; la première proposition est sélectionnée automatiquement si nécessaire. Quand toute l’équipe a choisi, il reste trois secondes avant la vague suivante. Les modules restent installés après une réapparition. Relancer une partie depuis le salon remet toutes les améliorations à zéro.
 
-Les champions apparaissent toutes les cinq vagues pour toute l’équipe. Les points restent partagés, tandis que la santé, les modules, les éliminations personnelles et les impacts à la tête sont suivis par joueur.
+Les champions apparaissent toutes les cinq vagues pour toute l’équipe. La map change pour tous au début des rounds 6, 11, 16, etc., avec reconstruction locale des collisions et du décor. Les armes se débloquent aux rounds 10, 20 et 30 ; chargeurs et rechargements sont suivis séparément par joueur et confirmés par l’hôte. Les points restent partagés, tandis que la santé, les modules, les éliminations personnelles et les impacts à la tête sont suivis par joueur.
 
 ## Architecture et limites
 
@@ -101,7 +101,7 @@ Les états du monde sont transmis environ **20 fois par seconde**. L’encodage 
 
 Cette première version utilise **TCP**, avec des sockets non bloquantes et `TCP_NODELAY`, pour garder un transport simple et fiable. Les pertes de paquets peuvent toutefois provoquer des retards de livraison : le passage à UDP avec des messages fiables ciblés sera à étudier si les parties réelles le demandent. Voir les références [TCP](https://man7.org/linux/man-pages/man7/tcp.7.html) et [connexion non bloquante](https://man7.org/linux/man-pages/man2/connect.2.html).
 
-Il reste à mesurer la latence réelle, le débit et la charge sur le Pi 4, surtout lorsqu’il héberge et affiche le jeu simultanément. Les effets de particules des tirs et explosions sont répliqués, en respectant la limite du profil graphique de chaque invité. Les dégâts et éliminations sont décidés par l’hôte. Le ping affiché mesure l’aller-retour TCP, avec un léger lissage. Les versions 0.5 et 0.6 partagent le protocole 5, incompatible avec la 0.3 et la 0.4. Les profils graphiques peuvent différer entre les joueurs.
+Il reste à mesurer la latence réelle, le débit et la charge sur le Pi 4, surtout lorsqu’il héberge et affiche le jeu simultanément. Les effets de particules des tirs et explosions sont répliqués, en respectant la limite du profil graphique de chaque invité. Les dégâts et éliminations sont décidés par l’hôte. Le ping affiché mesure l’aller-retour TCP, avec un léger lissage. La version 0.7 utilise le protocole 6, incompatible avec toutes les versions précédentes : mets à jour chaque ordinateur. Les profils graphiques peuvent différer entre les joueurs.
 
 ## Contrôles disponibles
 
@@ -110,8 +110,8 @@ make test
 make test-tcp
 ```
 
-`make test` contrôle le protocole, les messages fragmentés, quatre joueurs, les changements de manche, la prédiction et la coopération avec un transport en mémoire.
+`make test` contrôle le protocole, les messages fragmentés, quatre joueurs, les transitions de map et de manche, la prédiction, les chargeurs et la coopération avec un transport en mémoire. Il contrôle aussi les vies solo, les déblocages, la protection des modules, les sliders et la saisie numérique avec une fenêtre SDL fictive.
 
 `make test-tcp` ouvre réellement un hôte et un client sur `127.0.0.1:37991`, sans fenêtre, et vérifie la connexion et les échanges. Le port doit être libre. Ce contrôle doit être lancé dans un environnement qui autorise les sockets.
 
-Les contrôles en mémoire ont été exécutés pour la version 0.3. La version 0.6 a été compilée sans avertissement, mais ses contrôles n’ont pas été exécutés. L’environnement de développement bloque la création de sockets : **une connexion réelle ou une partie entre deux machines reste à valider**. Le résultat détaillé est dans [VALIDATION.md](VALIDATION.md).
+Les contrôles en mémoire et les tests de gameplay ont été exécutés pour la version 0.7, qui compile sans avertissement. L’environnement de développement bloque la création de sockets : **une connexion réelle ou une partie entre deux machines reste à valider**. Le résultat détaillé est dans [VALIDATION.md](VALIDATION.md).

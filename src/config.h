@@ -2,13 +2,16 @@
 #define FASTFPS_CONFIG_H
 
 /* Réglages de la première base : gameplay proche d'un Doom moderne. */
-#define GAME_VERSION "0.6.0"
+#define GAME_VERSION "0.7.0"
+#define MAP_COUNT 3
+#define WEAPON_COUNT 4
+#define MENU_ROWS 11
 #define PRESET_COUNT 4
 #define MAX_PLAYERS 4
 #define PLAYER_NAME_LENGTH 16
 #define FIXED_STEP (1.0f / 60.0f)
 #define MAX_CATCHUP_STEPS 6
-#define MAX_ENEMIES 12
+#define MAX_ENEMIES 18
 #define MAX_PROJECTILES 72
 #define MAX_PARTICLES 160
 #define MAX_CORPSES 8
@@ -19,6 +22,7 @@
 #define UPGRADE_MAX_LEVEL 5
 #define UPGRADE_CHOICES 3
 #define INTERMISSION_TIME 15.0f
+#define UPGRADE_LOCK_TIME 1.0f
 #define NAV_W 28
 #define NAV_H 24
 #define PLAYER_RADIUS 0.38f

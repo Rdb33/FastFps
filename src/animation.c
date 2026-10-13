@@ -109,6 +109,9 @@ void animate_weapon(Mesh *mesh, const Game *g, const App *app) {
     float sway=sinf(p->bob)*blend*.022f*motion;
     float vertical=(fabsf(cosf(p->bob))*blend*.012f+sinf(g->time*2.1f)*.003f*(1-blend))*motion;
     float lower=p->weapon_switch>0?sinf(p->weapon_switch/WEAPON_SWITCH_TIME*PI_F)*.40f:0;
+    float reload=p->reload_timer>0?1-p->reload_timer/p->reload_duration:0;
+    float reload_pose=p->reload_timer>0?sinf(reload*PI_F):0;
+    lower+=reload_pose*.10f;
     float melee_age=MELEE_COOLDOWN-p->melee_timer;
     float punch=p->melee_timer>0&&melee_age<.30f?sinf(melee_age/.30f*PI_F):0;
     Vec3 base={sway-p->sway_x*motion,-.39f-vertical-lower-g->recoil*.035f+p->landing*.4f*motion,
@@ -116,7 +119,7 @@ void animate_weapon(Mesh *mesh, const Game *g, const App *app) {
     if(punch>0)base.y-=punch*.22f;
     base.y-=p->dash_timer/DASH_DURATION*.06f*motion;
     Color metal={.35f,.39f,.35f},dark={.13f,.16f,.13f},glove={.30f,.36f,.21f},skin={.63f,.43f,.28f};
-    Color accent=p->upgrades[UPGRADE_POWER]>=3?(Color){1,.71f,.2f}:(Color){.35f,.85f,1};
+    Color accent=p->upgrades[UPGRADE_POWER]>=3?(Color){1,.71f,.2f}:WEAPONS[p->weapon].color;
     if(p->upgrades[UPGRADE_POWER])metal=(Color){.47f,.47f,.32f};
     if(p->upgrade_flash>0)accent=(Color){.65f,1,1};
     if(p->weapon==0) {
@@ -141,7 +144,7 @@ void animate_weapon(Mesh *mesh, const Game *g, const App *app) {
             mesh_box(mesh,vadd(base,(Vec3){-.13f,.08f,-.26f}),(Vec3){.08f,.10f,.18f},accent);
             mesh_box(mesh,vadd(base,(Vec3){.13f,.08f,-.26f}),(Vec3){.08f,.10f,.18f},accent);
         }
-    } else {
+    } else if(p->weapon==1) {
         float pump=g->shot_age>.12f&&g->shot_age<.48f?sinf((g->shot_age-.12f)/.36f*PI_F)*.14f:0;
         mesh_beveled_box(mesh,base,(Vec3){.30f,.18f,.45f},.04f,(Color){.40f,.25f,.12f});
         int sides=graphics_detail(app->quality)>0?10:6;
@@ -161,17 +164,50 @@ void animate_weapon(Mesh *mesh, const Game *g, const App *app) {
             mesh_box(mesh,vadd(base,(Vec3){.077f,.16f,-.22f}),(Vec3){.04f,.02f,.4f},accent);
         }
     }
+    if(p->weapon>=2) {
+        bool rail=p->weapon==3;int sides=graphics_detail(app->quality)>0?10:6;
+        mesh_beveled_box(mesh,base,(Vec3){rail?.31f:.27f,.20f,.54f},.045f,dark);
+        mesh_beveled_box(mesh,vadd(base,(Vec3){0,.14f,-.05f}),(Vec3){.18f,.13f,.63f},.03f,metal);
+        mesh_cylinder(mesh,vadd(base,(Vec3){0,.18f,-.25f}),vadd(base,(Vec3){0,.18f,-.64f}),rail?.09f:.065f,metal,sides);
+        mesh_cylinder(mesh,vadd(base,(Vec3){0,.18f,-.645f}),vadd(base,(Vec3){0,.18f,-.65f}),.043f,(Color){.04f,.045f,.055f},sides);
+        mesh_box(mesh,vadd(base,(Vec3){0,-.08f,.12f}),(Vec3){.14f,.17f,.15f},dark);
+        mesh_beveled_box(mesh,vadd(base,(Vec3){.1f,-.1f,.16f}),(Vec3){.14f,.13f,.2f},.025f,glove);
+        mesh_box(mesh,vadd(base,(Vec3){.16f,-.20f,.30f}),(Vec3){.12f,.15f,.28f},skin);
+        mesh_box(mesh,vadd(base,(Vec3){-.12f,-.08f,-.22f}),(Vec3){.14f,.13f,.2f},glove);
+        if(rail) {
+            mesh_cylinder(mesh,vadd(base,(Vec3){0,.32f,.02f}),vadd(base,(Vec3){0,.32f,-.12f}),.07f,dark,sides);
+            mesh->glow=.8f;
+            for(int i=0;i<4;i++)for(int side=-1;side<=1;side+=2)
+                mesh_box(mesh,vadd(base,(Vec3){(float)side*.1f,.18f,-.23f-(float)i*.09f}),(Vec3){.025f,.09f,.048f},accent);
+            mesh->glow=0;
+        }else {
+            for(int i=0;i<4;i++)mesh_box(mesh,vadd(base,(Vec3){0,.25f,-.3f-(float)i*.05f}),(Vec3){.16f,.025f,.022f},dark);
+            mesh_box(mesh,vadd(base,(Vec3){0,.32f,.02f}),(Vec3){.09f,.05f,.055f},accent);
+        }
+    }
+    /* Chargeur retiré puis remis en place, et main gauche qui accompagne le geste. */
+    if(p->weapon!=1) {
+        float lift=reload_pose*.18f;
+        mesh_beveled_box(mesh,vadd(base,(Vec3){-reload_pose*.18f,-.16f+lift,.02f}),(Vec3){.12f,.20f,.14f},.02f,dark);
+        mesh->glow=.5f;mesh_box(mesh,vadd(base,(Vec3){.065f-reload_pose*.18f,-.12f+lift,.02f}),(Vec3){.008f,.1f,.08f},accent);mesh->glow=0;
+    }
+    if(p->reload_timer>0) {
+        Vec3 hand=vadd(base,(Vec3){-.12f-reload_pose*.08f,-.04f+reload_pose*.12f,-.07f});
+        mesh_beveled_box(mesh,hand,(Vec3){.16f,.13f,.18f},.025f,glove);
+        mesh_box(mesh,vadd(hand,(Vec3){-.06f,-.10f,.16f}),(Vec3){.13f,.17f,.28f},skin);
+        if(p->weapon==1)mesh_cylinder(mesh,vadd(hand,(Vec3){.03f,.08f,-.13f}),vadd(hand,(Vec3){.03f,.08f,-.20f}),.032f,accent,6);
+    }
     if(g->shot_age<.055f&&p->weapon_switch==0) {
         mesh->glow=1;
-        mesh_diamond(mesh,vadd(base,(Vec3){0,.17f,-.45f}),p->weapon?.14f:.085f,(Color){1,.85f,.40f});
+        mesh_diamond(mesh,vadd(base,(Vec3){0,.17f,p->weapon>=2?-.66f:-.45f}),p->weapon==1?.14f:.085f,(Color){1,.85f,.40f});
         for(int i=0;i<4;i++) {
             float angle=(float)i*PI_F/2+g->shot_age*18;
-            mesh_diamond(mesh,vadd(base,(Vec3){sinf(angle)*.11f,.17f+cosf(angle)*.11f,-.46f}),.022f,(Color){1,.66f,.25f});
+            mesh_diamond(mesh,vadd(base,(Vec3){sinf(angle)*.11f,.17f+cosf(angle)*.11f,p->weapon>=2?-.67f:-.46f}),.022f,(Color){1,.66f,.25f});
         }
         mesh->glow=0;
     }
     mesh_pose(mesh,0,(Vec3){-p->strafe_blend*.014f*motion,p->sway_y*motion,0},
-        0,g->recoil*(p->weapon?.12f:.08f),1);
+        reload_pose*.13f,g->recoil*(p->weapon==1?.12f:.08f)+reload_pose*.16f,1);
     if(punch>0) {
         Vec3 fist={-.18f+punch*.13f,-.39f+punch*.16f,-.36f-punch*.42f};
         mesh_box(mesh,fist,(Vec3){.20f,.19f,.23f},glove);

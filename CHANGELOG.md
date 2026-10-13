@@ -1,3 +1,16 @@
+# Version 0.7.0
+
+- Luminosité réglable de 50 à 200 %, sensibilité de 0,30 à 3,00 : sliders, saisie directe, limites, validation et sauvegarde.
+- Trois vies solo, retour après trois secondes avec progression conservée, écran de game over après la troisième mort.
+- Game over collectif en coopération dès que tous les joueurs sont morts ; retour au salon et relancement par l’hôte.
+- Trois layouts jouables : Réacteur, Fonderie et Bastion ; changement tous les cinq rounds, navigation et collisions reconstruites, réapparition sûre de l’équipe.
+- Vagues jusqu’à 18 ennemis, progression de résistance accélérée, déplacements et projectiles plus rapides, soins moins abondants.
+- Modules : blocage initial d’une seconde, relâchement du tir et confirmation explicite par Entrée ou un bouton distinct des cartes ; nom du module installé dans le HUD.
+- Chargeurs indépendants, R pour recharger, rechargement automatique à vide, blocage du tir / changement d’arme pendant le geste ; modèles et mains animés.
+- Arsenal progressif : Pulse au départ, fusil à pompe au round 10, mitrailleuse au round 20, lance rail au round 30 ; molette limitée aux armes disponibles et liste dans Tab.
+- Protocole réseau 6 : maps, chargeurs, rechargements et verrouillage des modules validés par l’hôte ; mise à jour de tous les joueurs nécessaire.
+- Tests de gameplay et de quatre joueurs en mémoire, encodage maximal sous 16 Ko, contrôles de saisie et rendu hors écran. Performances Pi et connexion réelle restent à confirmer.
+
 # Version 0.6.0
 
 - Arène enrichie : panneaux industriels, conduites, traverses, grilles, caisses renforcées et supports de réacteur.

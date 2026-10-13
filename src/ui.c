@@ -25,7 +25,7 @@ void ui_build(Mesh *m,const Game *g,const App *app) {
     if(app->state==STATE_NETWORK||app->state==STATE_LOBBY){lobby_build(m,g,app);return;}
     if(app->state==STATE_PLAYING||app->state==STATE_UPGRADE) {
         mesh_rect(m,0,0,640,30,(Color){.05f,.055f,.045f});
-        mesh_text(m,12,11,1,orange,"FASTFPS / SECTEUR ZERO");
+        snprintf(text,sizeof(text),"FASTFPS / %s",world_map_name(g->map_id));mesh_text(m,12,11,1,orange,text);
         snprintf(text,sizeof(text),"SECTEUR %02d / VAGUE %02d / %d ENNEMIS",(g->wave?g->wave-1:0)/5+1,g->wave,g->enemy_count);centered(m,11,1,ink,text);
         mesh_rect(m,0,30,640,2,(Color){.12f,.16f,.19f});
         mesh_rect(m,0,30,640*(float)(g->completed_waves%5)/5,2,(Color){.35f,.72f,.86f});
@@ -38,7 +38,17 @@ void ui_build(Mesh *m,const Game *g,const App *app) {
         mesh_rect(m,79,334,70,5,(Color){.22f,.23f,.16f});
         mesh_rect(m,79,334,70*g->player.health/player_max_health(&g->player),5,g->player.health<30?orange:green);
         snprintf(text,sizeof(text),"/%d",(int)player_max_health(&g->player));mesh_text(m,80,345,1,muted,text);
-        centered(m,319,1,muted,g->player.weapon==0?"[1] PULSE":"[2] FUSIL A POMPE");
+        snprintf(text,sizeof(text),"[%d] %s",g->player.weapon+1,WEAPONS[g->player.weapon].name);centered(m,319,1,muted,text);
+        if(g->player.reload_timer>0) {
+            snprintf(text,sizeof(text),"RECHARGE %.1f S",g->player.reload_timer);
+            centered(m,352,1,orange,text);
+            mesh_rect(m,260,345,120,3,(Color){.17f,.22f,.24f});
+            mesh_rect(m,260,345,120*(1-g->player.reload_timer/g->player.reload_duration),3,(Color){.35f,.8f,1});
+        }else {
+            snprintf(text,sizeof(text),"%d / %d MUNITIONS / R : RECHARGER",g->player.ammo[g->player.weapon],WEAPONS[g->player.weapon].magazine);
+            centered(m,352,1,g->player.ammo[g->player.weapon]<3?orange:muted,text);
+        }
+        if(!g->cooperative){snprintf(text,sizeof(text),"%d VIES",g->lives);mesh_text(m,160,318,1,green,text);}
         snprintf(text,sizeof(text),"NIVEAU %02d / %d MODULES",player_level(&g->player),player_level(&g->player)-1);centered(m,336,1,ink,text);
         mesh_text(m,498,315,1,muted,"DROIT : ESQUIVE");
         mesh_rect(m,498,332,123,4,(Color){.22f,.23f,.16f});
@@ -66,6 +76,10 @@ void ui_build(Mesh *m,const Game *g,const App *app) {
                 centered(m,145,2,orange,text);centered(m,166,1,ink,"TES ALLIES PEUVENT CONTINUER");
             }
         }
+        if(g->dead&&!g->cooperative&&!g->round_over) {
+            snprintf(text,sizeof(text),"%d VIES / RETOUR DANS %.0f S",g->lives,ceilf(g->actors[0].respawn_timer));
+            centered(m,145,2,orange,text);centered(m,168,1,ink,"TES MODULES ET TA PROGRESSION SONT CONSERVES");
+        }
         if(g->message_time>0)centered(m,64,1,orange,g->message);
         if(g->reward_time>0) {
             snprintf(text,sizeof(text),"+%d",g->reward_points);
@@ -76,7 +90,10 @@ void ui_build(Mesh *m,const Game *g,const App *app) {
             mesh_rect(m,x,285,24,9,(Color){color.r*.2f,color.g*.2f,color.b*.2f});
             snprintf(text,sizeof(text),"%d",g->player.upgrades[i]);mesh_text(m,x+9,286,1,color,text);
         }
-        if(g->player.upgrade_flash>0&&!g->player.upgrade_pending)centered(m,249,1,(Color){.4f,.9f,1},"MODULE INSTALLE / PUISSANCE AUGMENTEE");
+        if(g->player.upgrade_flash>0&&!g->player.upgrade_pending) {
+            snprintf(text,sizeof(text),"MODULE INSTALLE : %s / RANG %d",upgrade_name(g->player.last_upgrade),g->player.upgrades[g->player.last_upgrade]);
+            centered(m,249,1,(Color){.4f,.9f,1},text);
+        }
         if(g->wave_timer>0&&g->enemy_count==0) {
             snprintf(text,sizeof(text),"PROCHAINE VAGUE DANS %.0f",ceilf(g->wave_timer));
             centered(m,122,1,ink,text);
@@ -128,6 +145,16 @@ void ui_build(Mesh *m,const Game *g,const App *app) {
                 mesh_text(m,20,138+(float)i*14,1,g->player.upgrades[i]?upgrade_color(i):muted,text);
             }
         }
+        if(app->show_build&&app->state==STATE_PLAYING) {
+            mesh_rect(m,424,108,206,114,(Color){.04f,.065f,.08f});
+            mesh_text(m,434,119,1,ink,"ARSENAL DE CETTE PARTIE");
+            for(int i=0;i<WEAPON_COUNT;i++) {
+                bool available=i<game_unlocked_weapons(g);
+                snprintf(text,sizeof(text),"%d %-14s %s",i+1,WEAPONS[i].name,available?"PRET":"");
+                mesh_text(m,434,138+(float)i*19,1,available?WEAPONS[i].color:muted,text);
+                if(!available){snprintf(text,sizeof(text),"R%d",WEAPONS[i].unlock_wave);mesh_text(m,581,138+(float)i*19,1,muted,text);}
+            }
+        }
         if(app->state==STATE_UPGRADE)upgrade_ui(m,g,app);
         return;
     }
@@ -135,21 +162,21 @@ void ui_build(Mesh *m,const Game *g,const App *app) {
     mesh_rect(m,48,12,544,3,orange);mesh_rect(m,48,345,544,3,(Color){.27f,.29f,.20f});
     mesh_text(m,73,26,1,muted,"FASTFPS " GAME_VERSION " / APPLICATION NATIVE / OPENGL ES 2");
     mesh_text(m,153,44,8,ink,"FASTFPS");
-    centered(m,110,1,orange,app->state==STATE_DEAD?"TU ES TOMBE. REPRENDS LE COMBAT.":"BOUGE. TIRE. SURVIS.");
+    centered(m,110,1,orange,app->state==STATE_DEAD?(g->cooperative?"GAME OVER / EQUIPE ELIMINEE":"GAME OVER / TES TROIS VIES SONT EPUISEES"):"BOUGE. TIRE. SURVIS.");
     if(app->state==STATE_DEAD) {
         snprintf(text,sizeof(text),"SCORE %d / NIVEAU %d / %d ELIMINATIONS",g->score,player_level(&g->player),g->actors[g->local_actor].run_kills);
-        centered(m,126,1,ink,text);
-    }else if(app->state==STATE_PAUSED)centered(m,126,1,ink,"PAUSE");
-    else centered(m,126,1,muted,"SURVIS. CHOISIS TES MODULES. AFFRONTE LES CHAMPIONS.");
-    for(int i=0;i<10;i++) {
-        float y=141+(float)i*14;
+        centered(m,119,1,ink,text);
+    }else if(app->state==STATE_PAUSED)centered(m,119,1,ink,"PAUSE");
+    else centered(m,119,1,muted,"SURVIS. CHOISIS TES MODULES. AFFRONTE LES CHAMPIONS.");
+    for(int i=0;i<MENU_ROWS;i++) {
+        float y=133+(float)i*14;
         if(i==app->selected)mesh_rect(m,76,y-5,488,13,(Color){.20f,.23f,.15f});
         switch(i) {
-            case 0:snprintf(text,sizeof(text),"%s",app->state==STATE_PAUSED?"REPRENDRE":"JOUER");break;
+            case 0:snprintf(text,sizeof(text),"%s",g->cooperative&&app->state==STATE_DEAD?"RETOUR AU SALON":(app->state==STATE_PAUSED?"REPRENDRE":(app->state==STATE_DEAD?"RECOMMENCER":"JOUER")));break;
             case 1:snprintf(text,sizeof(text),"%s",g->cooperative?"QUITTER LE SALON":(app->state==STATE_PAUSED?"RECOMMENCER":"MULTIJOUEUR / SALONS"));break;
             case 2:snprintf(text,sizeof(text),"RENDU : %s / %d X %d / %d FPS",PRESETS[app->quality].name,
                 PRESETS[app->quality].width,PRESETS[app->quality].height,PRESETS[app->quality].fps);break;
-            case 3:snprintf(text,sizeof(text),"SENSIBILITE : %.1f",app->sensitivity);break;
+            case 3:snprintf(text,sizeof(text),"SENSIBILITE (0.30-3.00)");break;
             case 4:snprintf(text,sizeof(text),"SON : %s",app->sound?"ACTIF":"COUPE");break;
             case 5:snprintf(text,sizeof(text),"PLEIN ECRAN : %s",app->fullscreen?"ACTIF":"NON");break;
             case 6:snprintf(text,sizeof(text),"MOUVEMENTS CAMERA : %s",app->motion?"ACTIFS":"REDUITS");break;
@@ -158,18 +185,20 @@ void ui_build(Mesh *m,const Game *g,const App *app) {
                 snprintf(text,sizeof(text),"DIFFICULTE%s : %s",g->cooperative?" DE L'HOTE":"",names[g->cooperative?g->difficulty:app->difficulty]);break;
             }
             case 8:snprintf(text,sizeof(text),"VISUEL : %s / F5",app->modern?"MODERNE":"RETRO");break;
+            case 9:snprintf(text,sizeof(text),"LUMINOSITE (50-200%%)");break;
             default:snprintf(text,sizeof(text),"QUITTER");break;
         }
         if(i==app->selected)mesh_text(m,87,y,1,orange,">");
         mesh_text(m,106,y,1,i==app->selected?ink:muted,text);
+        settings_controls(m,app,i,y);
     }
-    if(app->capture_error)centered(m,283,1,orange,"CAPTURE SOURIS REFUSEE - REESSAIE OU CHANGE DE SESSION");
+    if(app->capture_error)centered(m,290,1,orange,"CAPTURE SOURIS REFUSEE - REESSAIE OU CHANGE DE SESSION");
     else if(app->state==STATE_DEAD) {
         snprintf(text,sizeof(text),"%d VAGUES TERMINEES / %d IMPACTS TETE / RECORD %d",g->completed_waves,g->actors[g->local_actor].run_headshots,app->best_score);
-        centered(m,283,1,orange,text);
+        centered(m,290,1,orange,text);
     }
-    else centered(m,283,1,muted,"FLECHES / SOURIS : CHOISIR - ENTREE / CLIC : VALIDER");
+    else centered(m,290,1,muted,"SLIDER : GLISSER / VALEUR : SAISIR / ENTREE : VALIDER");
     mesh_text(m,76,303,1,ink,"ZQSD / WASD : BOUGER   MAJ : SPRINT   ESPACE : SAUTER");
-    mesh_text(m,76,316,1,ink,"CLIC : TIR   DROIT : ESQUIVE   F : FRAPPE   1/2 : ARMES");
+    mesh_text(m,76,316,1,ink,"CLIC : TIR   DROIT : ESQUIVE   F : FRAPPE   1-4 : ARMES");
     centered(m,334,1,muted,"ECHAP : PAUSE / F2 : QUALITE / F4 : CAMERA / F5 : VISUEL");
 }

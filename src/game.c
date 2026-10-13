@@ -16,13 +16,14 @@ static void say(Game *g, const char *text, float duration) {
 
 void game_reset(Game *g, World *world, int limit) {
     memset(g, 0, sizeof(*g));
-    g->world = world;
+    g->world = world;world_set_map(world,0);g->map_id=0;g->lives=3;
     g->particle_limit = limit;
     g->motion = true;
     g->difficulty=1;
     g->shot_age = 10;
     g->player.body = (Body){{0, 0, 16}, {0, 0, 0}, true};
     g->player.health = 100;
+    for(int i=0;i<WEAPON_COUNT;i++)g->player.ammo[i]=(uint8_t)WEAPONS[i].magazine;
     g->wave_timer = 1.5f;
     g->pickups[0].position = (Vec3){-23, 0, -18};
     g->pickups[1].position = (Vec3){23, 0, -18};
@@ -41,8 +42,28 @@ void game_reset(Game *g, World *world, int limit) {
 
 static void start_wave(Game *g) {
     g->wave++;
+    int map=((g->wave-1)/5)%MAP_COUNT;
+    if(map!=g->map_id) {
+        world_set_map(g->world,map);g->map_id=map;
+        g->corpse_count=g->particle_count=g->projectile_count=0;g->nav_timer=0;
+        int original=g->current_actor;
+        for(int i=0;i<MAX_PLAYERS;i++)if(g->actors[i].active) {
+            game_actor_select(g,i);
+            g->player.body=(Body){{(float)i*1.7f,0,19},{0,0,0},true};
+            g->player.yaw=0;g->player.pitch=0;g->player.dash_timer=0;
+            game_actor_save(g);g->actors[i].invulnerable=2;
+        }
+        game_actor_select(g,original);
+        const Vec3 locations[MAP_COUNT][MAX_BARRELS]={
+            {{-6,0,-15},{-2,0,-15},{-20,0,2},{-20,0,6},{18,0,5},{18,0,9}},
+            {{-6,0,-18},{-2,0,-18},{-20,0,6},{-20,0,10},{20,0,6},{20,0,10}},
+            {{-6,0,-18},{-2,0,-18},{-23,0,3},{-23,0,7},{23,0,3},{23,0,7}}};
+        for(int i=0;i<g->barrel_count;i++)g->barrels[i]=(Barrel){.position=locations[map][i],.health=45,.owner=-1};
+        for(int i=0;i<g->pickup_count;i++)g->pickups[i].cooldown=0;
+        navigation_update(g->world,0,19);
+    }
     int players=0;for(int i=0;i<MAX_PLAYERS;i++)if(actor_alive(g,i))players++;
-    int count = 2 + g->wave * 2 + (players-1)*2 + (g->difficulty-1)*2;
+    int count = 3 + g->wave * 2 + (players-1)*2 + (g->difficulty-1)*2;
     if(count<2)count=2;
     if (count > MAX_ENEMIES) count = MAX_ENEMIES;
     int choices[8], n = 0;
@@ -72,9 +93,11 @@ static void start_wave(Game *g) {
         if (g->wave >= 6 && i == count - 3) e->type = ENEMY_BRUTE;
         e->elite=g->wave%5==0&&i==count-1;
         if(e->elite)e->type=ENEMY_BRUTE;
+        if(world_blocked(g->world,e->body.position,ENEMY_RADIUS*enemy_size(e),ENEMY_HEIGHT*enemy_size(e),-1))
+            e->body.position=g->world->spawns[choices[i%n]];
         e->max_health = e->type == ENEMY_BRUTE ? 260 : (e->type == ENEMY_CASTER ? 120 : 80);
         e->max_health*=(1+.15f*(float)(players-1))*(g->difficulty==0?.8f:(g->difficulty==2?1.25f:1));
-        e->max_health*=(1+fminf(2,(float)(g->wave-1)*.035f))*(e->elite?2.5f:1);e->health = e->max_health;
+        e->max_health*=(1+fminf(2,(float)(g->wave-1)*.045f))*(e->elite?2.5f:1);e->health = e->max_health;
         e->shot_timer = 1.5f + random01() * 1.4f;
         e->spawn_time = .5f;
         Vec3 delta = vsub(g->player.body.position, e->body.position);
@@ -85,7 +108,10 @@ static void start_wave(Game *g) {
     else if(g->wave==1)snprintf(message,sizeof(message),"VAGUE 01 - VISE LA TETE / BARILS ROUGES EXPLOSIFS");
     else if(g->wave==2)snprintf(message,sizeof(message),"VAGUE 02 - F : FRAPPE FATALE POUR RECUPERER DE LA SANTE");
     else snprintf(message, sizeof(message), g->wave == 3 ? "VAGUE %02d - ATTENTION AUX BRUTES" : "VAGUE %02d - %d CREATURES", g->wave, count);
-    say(g, message, 2.5f);
+    for(int i=1;i<WEAPON_COUNT;i++)if(g->wave==WEAPONS[i].unlock_wave)
+        snprintf(message,sizeof(message),"ARME DEBLOQUEE : %s / TOUCHE %d",WEAPONS[i].name,i+1);
+    if(g->wave>1&&g->wave%5==1)snprintf(message,sizeof(message),"NOUVELLE MAP : %s / VAGUE %02d",world_map_name(g->map_id),g->wave);
+    say(g, message, 3.5f);
     g->wave_timer = -1;
     for(int i=0;i<g->barrel_count;i++)if(g->barrels[i].health<=0) {
         bool safe=true;
@@ -122,14 +148,18 @@ static int nearest_actor(Game *g,Vec3 origin) {
 }
 static void hurt_actor(Game *g,int id,float damage,Vec3 source) {
     if(id<0||id>=MAX_PLAYERS||!actor_alive(g,id)||g->actors[id].invulnerable>0)return;
-    damage*=g->difficulty==0?.65f:(g->difficulty==2?1.35f:1);
+    damage*=g->difficulty==0?.65f:(g->difficulty==2?1.45f:1.1f);
     Player *p=actor_player(g,id);damage*=1-.06f*(float)p->upgrades[UPGRADE_ARMOR];
     p->health=fmaxf(0,p->health-damage);
     Vec3 direction=vsub(source,p->body.position);float yaw=atan2f(direction.x,-direction.z);
     g->actors[id].damage_yaw=yaw;if(id==g->current_actor)g->damage_yaw=yaw;
     if(id==g->current_actor){g->damage_time=.32f;g->dead=p->health==0;}
     else {g->actors[id].damage_time=.32f;g->actors[id].dead=p->health==0;}
-    if(p->health==0)g->actors[id].respawn_timer=5;
+    if(p->health==0) {
+        g->actors[id].respawn_timer=g->cooperative?5:3;
+        p->reload_timer=0;
+        if(!g->cooperative){g->lives--;if(g->lives<=0)g->round_over=true;}
+    }
     if(id==g->local_actor)audio_play(SOUND_HURT);
 }
 
@@ -240,13 +270,16 @@ static bool fire_ray(Game *g, Vec3 origin, Vec3 dir, float damage, bool trail) {
 
 void game_shoot(Game *g) {
     Player *p = &g->player;
-    if (p->weapon_switch > 0 || p->melee_timer > 0) return;
+    if (g->dead||g->round_over||p->upgrade_pending||p->weapon_switch>0||p->melee_timer>0||p->reload_timer>0) return;
+    if(!p->ammo[p->weapon]){game_reload(g);return;}
+    p->ammo[p->weapon]--;
     Vec3 origin = player_eye(p, g->motion);
     bool hit = false;
     if(g->prediction) {
         g->shot_cooldown=player_fire_interval(p);
         g->recoil=1;g->shot_age=0;
-        audio_play(p->weapon==0?SOUND_SHOT:SOUND_SHOTGUN);
+        audio_play(p->weapon==1?SOUND_SHOTGUN:SOUND_SHOT);
+        if(!p->ammo[p->weapon])game_reload(g);
         return;
     }
     g->actors[g->current_actor].shots++;
@@ -254,7 +287,7 @@ void game_shoot(Game *g) {
         hit = fire_ray(g, origin, look_direction(p->yaw, p->pitch), 34*player_damage_multiplier(p), true);
         g->shot_cooldown = player_fire_interval(p);
         audio_play(SOUND_SHOT);
-    } else {
+    } else if(p->weapon==1) {
         hit = fire_ray(g, origin, look_direction(p->yaw, p->pitch), 18*player_damage_multiplier(p), true);
         for (int i = 0; i < 8; i++) {
             float angle = (float)i * PI_F / 4;
@@ -263,9 +296,16 @@ void game_shoot(Game *g) {
         g->shot_cooldown = player_fire_interval(p);
         audio_play(SOUND_SHOTGUN);
     }
+    if(p->weapon>=2) {
+        float spread=p->weapon==2?.01f:0;
+        hit=fire_ray(g,origin,look_direction(p->yaw+(random01()-.5f)*spread,p->pitch+(random01()-.5f)*spread),
+            WEAPONS[p->weapon].damage*player_damage_multiplier(p),true);
+        g->shot_cooldown=player_fire_interval(p);audio_play(SOUND_SHOT);
+    }
     if (hit) audio_play(g->headshot_time==.28f?SOUND_HEADSHOT:SOUND_HIT);
     g->recoil = 1;
     g->shot_age = 0;
+    if(!p->ammo[p->weapon])game_reload(g);
     if(g->particle_count<g->particle_limit) {
         Vec3 right={cosf(p->yaw),0,sinf(p->yaw)};
         Vec3 shell=vadd(origin,vadd(vscale(look_direction(p->yaw,p->pitch),.5f),vscale(right,.35f)));
@@ -275,7 +315,7 @@ void game_shoot(Game *g) {
 
 void game_request_weapon(Game *g, int weapon) {
     Player *p = &g->player;
-    if (weapon < 0 || weapon > 1 || weapon == p->weapon || p->weapon_switch > 0) return;
+    if (weapon < 0 || weapon >= game_unlocked_weapons(g) || weapon == p->weapon || p->weapon_switch > 0 || p->reload_timer > 0 || g->dead || g->round_over || p->upgrade_pending) return;
     p->weapon_target = weapon;
     p->weapon_switch = WEAPON_SWITCH_TIME;
     audio_play(SOUND_SWITCH);
@@ -283,7 +323,7 @@ void game_request_weapon(Game *g, int weapon) {
 
 void game_melee(Game *g) {
     Player *p = &g->player;
-    if (p->melee_timer > 0 || p->weapon_switch > 0) return;
+    if (p->melee_timer > 0 || p->weapon_switch > 0 || p->reload_timer>0) return;
     p->melee_timer = MELEE_COOLDOWN;
     if(g->prediction){audio_play(SOUND_MELEE);return;}
     Vec3 origin = player_eye(p, g->motion), forward = look_direction(p->yaw, p->pitch);
@@ -328,7 +368,7 @@ static void attack_update(Game *g, Enemy *e, float dt) {
     if (e->type == ENEMY_CASTER) {
         if (g->projectile_count < MAX_PROJECTILES) {
             Vec3 origin = vadd(e->body.position,(Vec3){0,1.3f,0});
-            g->projectiles[g->projectile_count++] = (Projectile){origin,vscale(e->attack_direction,12),5,{.3f,1,.78f}};
+            g->projectiles[g->projectile_count++] = (Projectile){origin,vscale(e->attack_direction,14),5,{.3f,1,.78f}};
         }
         e->shot_timer = fmaxf(.9f,2.5f-(float)g->wave*.06f)+random01()*.5f;
     } else {
@@ -381,8 +421,8 @@ static void update_enemies(Game *g, float dt) {
             float turn = atan2f(sinf(desired_yaw-e->yaw),cosf(desired_yaw-e->yaw));
             e->yaw += turn*fminf(1,dt*8);
         }
-        float speed = e->type == ENEMY_BRUTE ? 2.4f : (e->type == ENEMY_CASTER ? 2.8f : 4.4f);
-        speed += fminf(1.4f,(float)(g->wave-1)*.1f);
+        float speed = e->type == ENEMY_BRUTE ? 2.6f : (e->type == ENEMY_CASTER ? 3.0f : 4.8f);
+        speed += fminf(2.2f,(float)(g->wave-1)*.12f);
         speed*=g->difficulty==0?.9f:(g->difficulty==2?1.12f:1);
         if (e->attack_timer>0 || e->stagger>0 || e->spawn_time>0) speed = 0;
         Vec3 desired = vadd(vscale(vnormalize(move),speed),e->knockback);
@@ -432,6 +472,7 @@ static void update_projectiles(Game *g, float dt) {
 }
 
 static void update_actor(Game *g,Input input,float dt) {
+    g->player.upgrade_lock=fmaxf(0,g->player.upgrade_lock-dt);
     if(input.upgrade)game_choose_upgrade(g,input.upgrade);
     if(g->dead)return;
     if(g->player.upgrade_pending){input.firing=false;input.melee=false;}
@@ -446,6 +487,10 @@ static void update_actor(Game *g,Input input,float dt) {
     float previous_age=g->shot_age; g->shot_age+=dt;
     if (g->player.weapon==1 && previous_age<.19f && g->shot_age>=.19f) audio_play(SOUND_PUMP);
     Player *p=&g->player;
+    float reload_before=p->reload_timer;
+    p->reload_timer=fmaxf(0,p->reload_timer-dt);
+    if(reload_before>0&&p->reload_timer==0){p->ammo[p->weapon]=(uint8_t)WEAPONS[p->weapon].magazine;audio_play(SOUND_PUMP);}
+    if(input.reload||(!p->ammo[p->weapon]&&p->reload_timer==0))game_reload(g);
     p->melee_timer=fmaxf(0,p->melee_timer-dt);
     float previous_switch=p->weapon_switch;
     p->weapon_switch=fmaxf(0,p->weapon_switch-dt);
@@ -466,8 +511,8 @@ static void update_actor(Game *g,Input input,float dt) {
         Pickup *pickup=&g->pickups[i];
         Vec3 delta=vsub(pickup->position,p->body.position);
         if (pickup->cooldown==0 && p->health<player_max_health(p) && p->body.position.y<1.2f && hypotf(delta.x,delta.z)<1.3f) {
-            p->health=fminf(player_max_health(p),p->health+30); pickup->cooldown=12;
-            audio_play(SOUND_PICKUP); say(g,"+30 SANTE",1);
+            p->health=fminf(player_max_health(p),p->health+25); pickup->cooldown=18;
+            audio_play(SOUND_PICKUP); say(g,"+25 SANTE",1);
         }
     }
     }
@@ -505,15 +550,15 @@ static void update_world(Game *g,float dt) {
     }
     int alive=0;
     for(int i=0;i<MAX_PLAYERS;i++)if(actor_alive(g,i))alive++;
-    if(alive==0){if(g->cooperative)g->round_over=true;return;}
+    if(alive==0){if(g->cooperative||g->lives<=0)g->round_over=true;return;}
     if(g->enemy_count==0) {
         if(g->wave_timer<0) {
             g->wave_timer=INTERMISSION_TIME;g->score+=250;g->completed_waves=g->wave;g->wave_clear_time=2.8f;
             g->projectile_count=0;game_offer_upgrades(g);
             for(int i=0;i<MAX_PLAYERS;i++)if(actor_alive(g,i)) {
-                Player *p=actor_player(g,i);p->health=fminf(player_max_health(p),p->health+15);
+                Player *p=actor_player(g,i);p->health=fminf(player_max_health(p),p->health+10);
             }
-            say(g,g->wave%5==0?"CHAMPION VAINCU - NOUVEAU SECTEUR DEBLOQUE":"VAGUE TERMINEE - MODULE DEBLOQUE / +15 SANTE",2.8f);
+            say(g,g->wave%5==0?"CHAMPION VAINCU - NOUVEAU SECTEUR DEBLOQUE":"VAGUE TERMINEE - MODULE DEBLOQUE / +10 SANTE",2.8f);
             audio_play(SOUND_UPGRADE);
         }
         bool pending=false;
@@ -571,11 +616,16 @@ static void respawn(Game *g,int id) {
     }
     a->player.body=(Body){position,{0,0,0},true};a->player.health=player_max_health(&a->player);
     a->dead=false;a->invulnerable=2;a->respawn_timer=0;
-    a->shot_cooldown=0;a->dash_pressed=false;a->melee_pressed=false;
+    a->shot_cooldown=0;a->dash_pressed=false;a->melee_pressed=false;a->shot_age=10;a->recoil=0;
+    a->player.reload_timer=a->player.weapon_switch=a->player.melee_timer=a->player.dash_timer=0;
+    a->player.weapon_target=a->player.weapon;
+    for(int i=0;i<WEAPON_COUNT;i++)a->player.ammo[i]=(uint8_t)WEAPONS[i].magazine;
 }
 void game_update_coop(Game *g,const Input inputs[MAX_PLAYERS],float dt) {
     if(g->round_over)return;
     game_actor_save(g);
+    bool alive=false;for(int i=0;i<MAX_PLAYERS;i++)if(actor_alive(g,i))alive=true;
+    if(!alive){g->round_over=true;return;}
     for(int i=0;i<MAX_PLAYERS;i++)if(g->actors[i].active) {
         game_actor_select(g,i);
         Actor *a=&g->actors[i];a->invulnerable=fmaxf(0,a->invulnerable-dt);
@@ -596,7 +646,16 @@ void game_predict(Game *g,Input input,float dt) {
     g->prediction=false;game_actor_save(g);
 }
 void game_update(Game *g,Input input,float dt) {
-    if(g->dead)return;
+    if(g->round_over)return;
+    if(g->dead) {
+        Actor *a=&g->actors[0];a->respawn_timer=fmaxf(0,a->respawn_timer-dt);
+        if(a->respawn_timer==0&&g->lives>0){
+            game_actor_save(g);respawn(g,0);g->current_actor=-1;game_actor_select(g,0);
+            say(g,"NOUVELLE VIE / 2 SECONDES DE PROTECTION",2);
+        }
+        return;
+    }
+    g->actors[0].invulnerable=fmaxf(0,g->actors[0].invulnerable-dt);
     audio_listener(player_eye(&g->player,g->motion),g->player.yaw);
     update_actor(g,input,dt);game_actor_save(g);
     update_world(g,dt);game_actor_save(g);

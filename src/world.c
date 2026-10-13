@@ -79,11 +79,24 @@ static void wall_panel(Mesh *m,Vec3 p,Vec3 size,Color color) {
         mesh_box(m,vadd(p,(Vec3){side*size.x*.6f,size.y-.15f,0}),(Vec3){.025f,.045f,size.z*.92f},(Color){.08f,.10f,.11f});
     }
 }
+const char *world_map_name(int id) {
+    static const char *names[MAP_COUNT]={"REACTEUR", "FONDERIE", "BASTION"};
+    return names[id>=0&&id<MAP_COUNT?id:0];
+}
 bool world_init(World *w) {
-    memset(w,0,sizeof(*w));if(!mesh_init(&w->mesh,50000))return false;
-    Mesh *m=&w->mesh;Color accent={.9f,.39f,.15f};
+    memset(w,0,sizeof(*w));if(!mesh_init(&w->mesh,60000))return false;
+    w->map_id=-1;world_set_map(w,0);return true;
+}
+void world_set_map(World *w,int id) {
+    if(id<0||id>=MAP_COUNT||id==w->map_id)return;
+    w->mesh.count=0;w->mesh.glow=0;w->solid_count=0;w->map_id=id;w->revision++;
+    Mesh *m=&w->mesh;
+    const Color accents[MAP_COUNT]={{.9f,.39f,.15f},{.63f,.3f,.93f},{.26f,.76f,.66f}};
+    Color accent=accents[id];
     for(int x=-28;x<28;x+=4)for(int z=-24;z<24;z+=4) {
         Color c=((x+z)/4)%2?(Color){.15f,.17f,.14f}:(Color){.19f,.21f,.18f};
+        if(id==1)c=(Color){c.r*.85f,c.g*.83f,c.b*1.25f};
+        if(id==2)c=(Color){c.r*.80f,c.g*1.15f,c.b*1.15f};
         mesh_quad(m,(Vec3){x,0,z+4},(Vec3){x+4,0,z+4},(Vec3){x+4,0,z},(Vec3){x,0,z},c,(Vec3){0,1,0});
     }
     solid(w,(Vec3){0,0,-24},(Vec3){56,7,1},(Color){.26f,.25f,.21f});
@@ -115,7 +128,7 @@ bool world_init(World *w) {
         mesh_box(m,(Vec3){sign*27.45f,5,0},(Vec3){.04f,.15f,47},accent);
         for(int x=-24;x<=24;x+=8)mesh_box(m,(Vec3){x,0,sign*23.45f},(Vec3){.14f,7,.05f},(Color){.36f,.34f,.26f});
     }
-    for(int x=-10;x<=10;x+=20)for(int z=-8;z<=8;z+=16) {
+    if(id==0)for(int x=-10;x<=10;x+=20)for(int z=-8;z<=8;z+=16) {
         solid(w,(Vec3){x,0,z},(Vec3){3.2f,4.2f,3.2f},(Color){.3f,.29f,.24f});
         mesh_box(m,(Vec3){x,4.2f,z},(Vec3){3.35f,.1f,3.35f},accent);
         mesh_box(m,(Vec3){x,.8f,z},(Vec3){3.28f,.14f,3.28f},(Color){.55f,.2f,.1f});
@@ -130,7 +143,7 @@ bool world_init(World *w) {
         solid(w,(Vec3){0,0,6.25f-i*.5f},(Vec3){3,.3f*(i+1),.5f},(Color){.28f,.29f,.25f});
         mesh_box(m,(Vec3){0,.3f*(i+1)+.005f,6.46f-i*.5f},(Vec3){3,.018f,.04f},accent);
     }
-    for(int x=-19;x<=19;x+=38)for(int z=-12;z<=12;z+=24) {
+    if(id==0)for(int x=-19;x<=19;x+=38)for(int z=-12;z<=12;z+=24) {
         solid(w,(Vec3){x,0,z},(Vec3){3,1.15f,2.5f},(Color){.32f,.35f,.25f});
         mesh_beveled_box(m,(Vec3){x,.025f,z},(Vec3){3.1f,.12f,2.6f},.1f,(Color){.12f,.16f,.16f});
         mesh_beveled_box(m,(Vec3){x,1.05f,z},(Vec3){3.07f,.15f,2.57f},.1f,(Color){.15f,.20f,.20f});
@@ -139,6 +152,31 @@ bool world_init(World *w) {
             mesh_box(m,(Vec3){x+side*.86f,.2f,z-1.27f},(Vec3){.10f,.73f,.06f},(Color){.14f,.18f,.19f});
         }
         mesh_beveled_box(m,(Vec3){x,.40f,z+1.3f},(Vec3){.6f,.3f,.07f},.03f,(Color){.71f,.58f,.22f});
+    }
+    if(id==1) {
+        /* Fonderie : deux lignes de machines, passages aux extrémités et au centre. */
+        for(int side=-1;side<=1;side+=2)for(int z=-11;z<=11;z+=22) {
+            Vec3 p={(float)side*11,0,(float)z};
+            solid(w,p,(Vec3){3,3.5f,10},(Color){.27f,.21f,.34f});
+            m->glow=.7f;mesh_box(m,vadd(p,(Vec3){0,3.5f,0}),(Vec3){3.1f,.09f,10.1f},accent);m->glow=0;
+            for(int k=-3;k<=3;k+=3)mesh_cylinder(m,vadd(p,(Vec3){0,3.6f,(float)k}),vadd(p,(Vec3){0,5,(float)k}),.5f,(Color){.20f,.17f,.24f},8);
+        }
+        for(int side=-1;side<=1;side+=2) {
+            solid(w,(Vec3){(float)side*20,0,0},(Vec3){4,1.2f,5},(Color){.35f,.25f,.31f});
+            solid(w,(Vec3){0,0,(float)side*13},(Vec3){7,1.1f,2},(Color){.31f,.22f,.35f});
+        }
+    }else if(id==2) {
+        /* Bastion : murs décalés, traversées latérales et couvertures basses. */
+        for(int side=-1;side<=1;side+=2) {
+            for(int lane=-1;lane<=1;lane+=2) {
+                Vec3 p={(float)side*13,0,(float)lane*10};
+                solid(w,p,(Vec3){11,2.7f,2},(Color){.19f,.32f,.31f});
+                mesh_box(m,vadd(p,(Vec3){0,2.7f,0}),(Vec3){11.1f,.08f,2.1f},accent);
+            }
+            solid(w,(Vec3){(float)side*8,0,0},(Vec3){2,4.5f,3},(Color){.24f,.36f,.33f});
+            solid(w,(Vec3){(float)side*19,0,0},(Vec3){3,1.1f,3},(Color){.23f,.29f,.27f});
+            solid(w,(Vec3){0,0,(float)side*15},(Vec3){5,1.1f,2},(Color){.22f,.32f,.28f});
+        }
     }
     for(int x=-15;x<=15;x+=30)mesh_box(m,(Vec3){x,.003f,0},(Vec3){.055f,.006f,41},(Color){.44f,.4f,.2f});
     for(int z=-17;z<=17;z+=34)mesh_box(m,(Vec3){0,.003f,z},(Vec3){45,.006f,.055f},(Color){.44f,.4f,.2f});
@@ -160,7 +198,7 @@ bool world_init(World *w) {
         mesh_cylinder(m,(Vec3){side*1.1f,2.08f,0},(Vec3){side*1.1f,3.05f,0},.12f,(Color){.24f,.33f,.35f},8);
         mesh_beveled_box(m,(Vec3){side*1.1f,2.95f,0},(Vec3){.38f,.15f,.44f},.05f,(Color){.13f,.19f,.22f});
     }
-    wall_label(m,"SECTEUR ZERO",(Vec3){0,6.1f,-23.43f},0,(Color){.95f,.58f,.25f},.13f);
+    wall_label(m,world_map_name(id),(Vec3){0,6.1f,-23.43f},0,(Color){.95f,.58f,.25f},.13f);
     wall_label(m,"SURVIE",(Vec3){0,6.1f,23.43f},PI_F,(Color){.35f,.75f,.9f},.15f);
     for(int side=-1;side<=1;side+=2) {
         for(int z=-18;z<=18;z+=36) {
@@ -183,5 +221,5 @@ bool world_init(World *w) {
         Vec3 p=nav_center(i);p.y=.35f;
         w->passable[i]=!world_blocked(w,p,.8f,ENEMY_HEIGHT,-1);w->distance[i]=-1;
     }
-    return true;
+
 }

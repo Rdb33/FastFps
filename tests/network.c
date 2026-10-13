@@ -32,7 +32,7 @@ static void protocol_test(World *world) {
     buffer[8]=0x7f;buffer[9]=0x80;buffer[10]=0;buffer[11]=0;
     assert(!protocol_command_read(&decoded,buffer,size));
     Game game;game_reset(&game,world,28);bool active[MAX_PLAYERS]={true,true,true,true};
-    game_start_coop(&game,active,0);game.wave=12;game.score=5678;game_actor_save(&game);
+    game_start_coop(&game,active,0);game.wave=12;game.map_id=2;world_set_map(world,2);game.score=5678;game_actor_save(&game);
     size=protocol_snapshot_write(buffer,sizeof(buffer),&game);assert(size>0&&size<NET_PACKET_MAX);
     Game copy;game_reset(&copy,world,28);copy.local_actor=2;
     assert(protocol_snapshot_read(&copy,buffer,size));
@@ -102,6 +102,21 @@ static void virtual_sessions(World *world) {
     for(int i=0;i<3;i++) {
         assert(games[i].actors[i+1].input_ack>200);
         assert(vlength(vsub(games[i].player.body.position,server.actors[i+1].player.body.position))<.05f);
+    }
+    /* Transition d'arène et rechargement propagés à trois invités. */
+    server.wave=5;server.completed_waves=4;server.enemy_count=0;server.projectile_count=0;server.wave_timer=.001f;
+    game_actor_save(&server);
+    for(int i=0;i<MAX_PLAYERS;i++){server.actors[i].player.upgrade_pending=false;server.actors[i].player.ammo[0]=17;}
+    server.current_actor=-1;game_actor_select(&server,0);
+    for(int i=0;i<3;i++) {
+        net_tick(clients[i],&games[i],(Command){.input={.reload=true}},FIXED_STEP,4.5);
+        transfer(clients[i],0,host,i+1,&server,4.5);
+    }
+    net_tick(host,&server,(Command){.input={.reload=true}},FIXED_STEP,4.5);
+    for(int i=0;i<3;i++) {
+        transfer(host,i+1,clients[i],0,&games[i],4.5);
+        assert(games[i].wave==6&&games[i].map_id==1&&games[i].world->map_id==1);
+        assert(games[i].player.ammo[0]==17&&games[i].player.reload_timer>1);
     }
     server.round_over=true;net_tick(host,&server,(Command){0},FIXED_STEP,5);
     for(int i=0;i<3;i++){transfer(host,i+1,clients[i],0,&games[i],5);assert(clients[i]->phase==ROOM_FINISHED);}
