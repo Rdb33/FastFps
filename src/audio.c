@@ -1,4 +1,5 @@
 #include "fastfps.h"
+#include "music.h"
 #include <math.h>
 #include <string.h>
 
@@ -16,8 +17,11 @@ static float listener_yaw;
 static void callback(void *userdata,Uint8 *stream,int length) {
     (void)userdata;float *output=(float *)stream;
     int samples=length/(2*(int)sizeof(float));
+    float duck=0;
+    for(int j=0;j<VOICES;j++)if(voices[j].active)duck+=voices[j].volume*1.4f;
+    music_render(output,samples,duck);
     for(int i=0;i<samples;i++) {
-        float left=0,right=0;
+        float left=output[i*2],right=output[i*2+1];
         for(int j=0;j<VOICES;j++)if(voices[j].active) {
             Voice *v=&voices[j];float t=(float)v->sample/AUDIO_RATE;
             if(t>=v->duration){v->active=false;continue;}
@@ -41,8 +45,10 @@ void audio_init(void) {
     SDL_AudioSpec want;SDL_zero(want);
     want.freq=AUDIO_RATE;want.format=AUDIO_F32SYS;want.channels=2;want.samples=512;want.callback=callback;
     device=SDL_OpenAudioDevice(NULL,0,&want,NULL,0);
-    if(device)SDL_PauseAudioDevice(device,0);else SDL_Log("Audio indisponible : %s",SDL_GetError());
+    if(device){music_init(device);SDL_PauseAudioDevice(device,0);}
+    else SDL_Log("Audio indisponible : %s",SDL_GetError());
 }
+void audio_music(float volume,bool gameplay,float focus){music_set(volume,gameplay,focus);}
 void audio_enabled(bool value) {
     enabled=value;
     if(device){SDL_LockAudioDevice(device);memset(voices,0,sizeof(voices));SDL_UnlockAudioDevice(device);}
@@ -89,4 +95,9 @@ void audio_play_at(Sound sound,Vec3 position) {
     float pan=distance>.001f?(delta.x*cosf(listener_yaw)+delta.z*sinf(listener_yaw))/distance:0;
     play(sound,1/(1+distance*.12f),clampf(pan,-1,1));
 }
-void audio_shutdown(void){if(device)SDL_CloseAudioDevice(device);device=0;}
+void audio_shutdown(void) {
+    if(device) {
+        music_fadeout();SDL_PauseAudioDevice(device,1);music_shutdown();SDL_CloseAudioDevice(device);
+    }
+    device=0;
+}

@@ -4,20 +4,45 @@
 #include <stdlib.h>
 #include <string.h>
 
+static void settings_path(char *out,size_t size) {
+    char *directory=SDL_GetPrefPath("fastfps","fastfps");
+    if(directory){snprintf(out,size,"%ssettings.txt",directory);SDL_free(directory);}else out[0]='\0';
+}
+void settings_read(App *app) {
+    char path[2048];settings_path(path,sizeof(path));if(!path[0])return;
+    FILE *file=fopen(path,"r");if(!file)return;
+    int quality=0,sound=1,best=0,motion=1,difficulty=1,modern=1;float sensitivity=1,brightness=1,music_volume=0;
+    if(fscanf(file,"%d %f %d %d %d %d %d %f %f",&quality,&sensitivity,&sound,&best,&motion,&difficulty,&modern,&brightness,&music_volume)>=4) {
+        app->quality=quality>=0&&quality<PRESET_COUNT?quality:0;
+        app->sensitivity=isfinite(sensitivity)?clampf(sensitivity,.3f,3):1;
+        app->sound=sound!=0;app->best_score=best>=0?best:0;
+        app->motion=motion!=0;
+        app->difficulty=difficulty>=0&&difficulty<=2?difficulty:1;
+        app->modern=modern!=0;app->brightness=isfinite(brightness)?clampf(brightness,.5f,2):1;
+        app->music_volume=isfinite(music_volume)?clampf(music_volume,0,1):0;
+    }
+    fclose(file);
+}
+void settings_write(const App *app) {
+    char path[2048];settings_path(path,sizeof(path));if(!path[0])return;
+    FILE *file=fopen(path,"w");if(!file)return;
+    fprintf(file,"%d %.2f %d %d %d %d %d %.2f %.2f\n",app->quality,app->sensitivity,app->sound,app->best_score,app->motion,app->difficulty,app->modern,app->brightness,app->music_volume);fclose(file);
+}
 /* Coordonnées communes à l'affichage et aux zones interactives du menu. */
 static bool coordinates(Renderer *r,int x,int y,float *px,float *py) {
     int w,h;SDL_GetWindowSize(r->window,&w,&h);if(w<=0||h<=0)return false;
     float dw=(float)w,dh=dw*9/16;if(dh>h){dh=(float)h;dw=dh*16/9;}
     *px=((float)x-((float)w-dw)/2)*640/dw;*py=((float)y-((float)h-dh)/2)*360/dh;return true;
 }
-static bool numeric_row(int row){return row==3||row==9;}
-static float value(const App *a,int row){return row==3?a->sensitivity:a->brightness*100;}
-static float minimum(int row){return row==3?.3f:50;}
-static float maximum(int row){return row==3?3:200;}
+static bool numeric_row(int row){return row==3||row==9||row==13;}
+static float value(const App *a,int row){return row==3?a->sensitivity:(row==9?a->brightness:a->music_volume)*100;}
+static float minimum(int row){return row==3?.3f:(row==9?50:0);}
+static float maximum(int row){return row==3?3:(row==9?200:100);}
 static void assign(App *a,int row,float n) {
     n=clampf(n,minimum(row),maximum(row));
     if(row==3)a->sensitivity=roundf(n*100)/100;
-    else a->brightness=roundf(n)/100;
+    else if(row==9)a->brightness=roundf(n)/100;
+    else a->music_volume=roundf(n)/100;
 }
 static void finish(App *a,bool commit) {
     if(a->numeric_edit<0)return;

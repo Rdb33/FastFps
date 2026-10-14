@@ -138,7 +138,7 @@ typedef struct {
     State state;
     bool running, fullscreen, sound, capture_error, motion, modern;
     int selected, quality, best_score, fps, difficulty;
-    float sensitivity, brightness;
+    float sensitivity, brightness, music_volume;
     int numeric_edit, slider_drag;
     char numeric_text[16];
     Uint32 upgrade_ready_at;
@@ -249,6 +249,7 @@ void upgrade_ui(Mesh *mesh, const Game *game, const App *app);
 /* audio.c */
 void audio_init(void);
 void audio_enabled(bool enabled);
+void audio_music(float volume, bool gameplay, float focus);
 void audio_suppressed(bool suppressed);
 void audio_play(Sound sound);
 void audio_listener(Vec3 position, float yaw);
@@ -273,6 +274,8 @@ int graphics_detail(int quality);
 
 /* ui.c */
 void ui_build(Mesh *mesh, const Game *game, const App *app);
+void settings_read(App *app);
+void settings_write(const App *app);
 bool settings_event(App *app, Renderer *renderer, const SDL_Event *event);
 void settings_controls(Mesh *mesh, const App *app, int row, float y);
 int menu_count(const App *app);

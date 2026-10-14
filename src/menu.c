@@ -3,11 +3,11 @@
 #include <stdio.h>
 #include <string.h>
 
-int menu_count(const App *a){return a->menu_page?9:4;}
+int menu_count(const App *a){return a->menu_page?10:4;}
 int menu_row_id(const App *a,int row) {
     static const int main_ids[4]={0,1,11,10};
     if(row<0||row>=menu_count(a))return -1;
-    return a->menu_page?(row<8?row+2:12):main_ids[row];
+    return a->menu_page?(row<8?row+2:(row==8?13:12)):main_ids[row];
 }
 void menu_move(App *a,int direction) {
     int count=menu_count(a),row=0;
@@ -72,18 +72,19 @@ void menu_build(Mesh *m,const Game *g,const App *a) {
         mesh_text(m,376,275,1,muted,"TAB : MODULES ET ARSENAL");
         center(m,312,1,muted,"FLECHES OU SOURIS / ENTREE POUR JOUER");
     }else {
-        for(int row=0;row<9;row++) {
+        for(int row=0;row<menu_count(a);row++) {
             int id=menu_row_id(a,row);float y=133+(float)row*18;bool selected=id==a->selected;
             if(selected)mesh_rect(m,64,y-5,512,17,(Color){.1f,.2f,.26f});
             switch(id) {
                 case 2:snprintf(text,sizeof(text),"RENDU : %s / %d X %d / %d FPS",PRESETS[a->quality].name,PRESETS[a->quality].width,PRESETS[a->quality].height,PRESETS[a->quality].fps);break;
                 case 3:snprintf(text,sizeof(text),"SENSIBILITE (0.30-3.00)");break;
-                case 4:snprintf(text,sizeof(text),"SON : %s",a->sound?"ACTIF":"COUPE");break;
+                case 4:snprintf(text,sizeof(text),"EFFETS SONORES : %s / F3",a->sound?"ACTIFS":"COUPES");break;
                 case 5:snprintf(text,sizeof(text),"PLEIN ECRAN : %s",a->fullscreen?"ACTIF":"NON");break;
                 case 6:snprintf(text,sizeof(text),"CAMERA : %s",a->motion?"ANIMEE":"MOUVEMENTS REDUITS");break;
                 case 7:{const char *names[]={"DETENTE","NORMAL","BRUTAL"};snprintf(text,sizeof(text),"DIFFICULTE%s : %s",g->cooperative?" DE L'HOTE":"",names[g->cooperative?g->difficulty:a->difficulty]);break;}
                 case 8:snprintf(text,sizeof(text),"VISUEL : %s / F5",a->modern?"MODERNE":"RETRO");break;
                 case 9:snprintf(text,sizeof(text),"LUMINOSITE (50-200%%)");break;
+                case 13:snprintf(text,sizeof(text),"MUSIQUE (0-100%%)");break;
                 default:snprintf(text,sizeof(text),"RETOUR");break;
             }
             mesh_text(m,74,y,1,selected?blue:muted,selected?">":" ");

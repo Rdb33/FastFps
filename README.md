@@ -1,10 +1,18 @@
 # FASTFPS — Secteur zéro
 
-**FPS 3D natif, style Doom, pensé pour le Raspberry Pi 4.** Base à améliorer progressivement : déplacement nerveux, quatre armes à débloquer et survie dans trois arènes industrielles. Version **0.8.0** : champions qui sautent, IA enrichie, réanimation des alliés, plateformes mobiles et événement roquettes.
+**FPS 3D natif, style Doom, pensé pour le Raspberry Pi 4.** Base à améliorer progressivement : déplacement nerveux, quatre armes à débloquer et survie dans trois arènes industrielles. Version **0.9.0** : musiques de menu et de combat, volume indépendant et transitions douces, en plus des nouveautés de la 0.8.
 
-Application en **C11**, **SDL2** (fenêtre, clavier, souris et son) et **OpenGL ES 2** (rendu 3D). Graphismes, police et sons sont générés localement.
+Application en **C11**, **SDL2** (fenêtre, clavier, souris et son) et **OpenGL ES 2** (rendu 3D). Graphismes, police et bruitages sont générés localement. Les musiques MP3 sont lues avec **mpg123**.
 
 Le mode solo fonctionne hors ligne. Pour jouer ensemble, sélectionne **Multijoueur** ; voir [MULTIJOUEUR.md](MULTIJOUEUR.md) pour la création, la connexion sur Internet et les limites de cette première version.
+
+## Musique — version 0.9.0
+
+- **Menu et salons : Blank Shell**, premier fichier du dossier Musique. **Combat : General Release**, deuxième fichier. Copies locales dans `assets/music/menu.mp3` et `assets/music/gameplay.mp3` ; les originaux restent dans le dossier Musique.
+- **Réglages → Musique** : volume de **0 à 100 %**, réglé sur **0 par défaut**, y compris lors de la migration des anciens réglages. Glisse le slider, clique sur la valeur pour la saisir, ou utilise les flèches gauche / droite. Le volume est conservé à la fermeture normale. Les bruitages et F3 restent indépendants ; `--mute` coupe tout l’audio.
+- Fondus de volume (0,4 s), transition entre morceaux (1,3 s), boucles avec bords adoucis et fondu de sortie (0,18 s). Pause et joueur à terre : musique assourdie et atténuée ; choix de modules : atténuation légère. Une petite queue d’écho accompagne les transitions, et les bruitages atténuent légèrement la musique pour rester audibles.
+- Lecture en continu sur un thread, deux buffers stéréo de taille fixe (environ 256 Ko au total), sans décodage ni accès disque dans le callback audio. Le morceau inactif et le volume à zéro suspendent la consommation des buffers. Si un fichier manque, le jeu et les bruitages restent utilisables.
+- Aucun changement du protocole réseau 7 : la musique et son volume sont locaux à chaque ordinateur.
 
 ## Nouveautés — version 0.8
 
@@ -122,7 +130,7 @@ Utilise **Raspberry Pi OS avec une session graphique**, un clavier et une souris
 
 ```bash
 sudo apt update
-sudo apt install build-essential pkg-config libsdl2-dev libgles-dev
+sudo apt install build-essential pkg-config libsdl2-dev libgles-dev libmpg123-dev
 ```
 
 Copie le dossier `fastfps` dans `~/Projets` sur le Pi, puis compile **sur le Pi** :
@@ -157,7 +165,8 @@ Le Pi 4 possède un GPU compatible OpenGL ES ([documentation Raspberry Pi](https
 | Plein écran | F11, ou le menu |
 | Afficher / masquer les FPS | F1 |
 | Changer le profil de rendu | F2, ou le menu |
-| Activer / couper le son | F3, ou le menu |
+| Activer / couper les bruitages | F3, ou le menu |
+| Volume de la musique | Réglages → Musique, slider ou saisie de 0 à 100 % |
 | Réduire les mouvements de caméra | F4, ou le menu |
 | Style Moderne / Rétro | F5, ou le menu |
 
@@ -267,7 +276,8 @@ make clean
 | `src/lobby.c` | Écrans de création, connexion et attente |
 | `src/mesh.c` | Maillages et police bitmap locale |
 | `src/ui.c` | Menu et interface de combat |
-| `src/audio.c` | Synthèse et mélange des sons |
+| `src/audio.c` | Synthèse et mélange des bruitages et de la musique |
+| `src/music.c` | Lecture MP3 en continu, fondus et effets de musique |
 | `src/math.c` | Vecteurs, matrices et intersections |
 
 Carte et paramètres sont actuellement dans les sources. Aucune option de compilation spécifique à x86 : les mêmes fichiers sont compilables sur ARM.

@@ -2,6 +2,13 @@
 
 Historique des contrôles sur la machine de développement, les 12 et 13 octobre 2026.
 
+## Version 0.9.0 — 14 octobre 2026
+
+- Compilation complète C11 avec `-O2 -Wall -Wextra -Wpedantic`, sans avertissement, avec SDL2 / OpenGL ES / mpg123.
+- Les deux MP3 du dossier Musique sont copiés sans conversion dans `assets/music` ; durées annoncées : 128 s et environ 130,4 s.
+- Lecture du code : aucune lecture de fichier, allocation ou prise de mutex dans le callback audio ; les buffers partagés sont protégés avec le verrou du périphérique SDL côté producteur et réglages. Les changements d’état du menu, de pause, de modules et de joueur à terre pilotent le mélange local.
+- Protocole réseau 7 et simulation inchangés. Les tests de la 0.8 ci-dessous décrivent cette base ; ils n’ont pas été relancés pour cet ajout audio. Écoute des transitions, nouvelle dépendance et coût sur Raspberry Pi restent à vérifier en jouant.
+
 ## Version 0.8 — 14 octobre 2026
 
 - Compilation C11 avec `-O2 -Wall -Wextra -Wpedantic`, sans avertissement.

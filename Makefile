@@ -1,9 +1,9 @@
 CC ?= cc
 PKG_CONFIG ?= pkg-config
-CPPFLAGS += $(shell $(PKG_CONFIG) --cflags sdl2 glesv2)
+CPPFLAGS += $(shell $(PKG_CONFIG) --cflags sdl2 glesv2 libmpg123)
 CFLAGS ?= -O2
 CFLAGS += -std=c11 -Wall -Wextra -Wpedantic
-LDLIBS += $(shell $(PKG_CONFIG) --libs sdl2 glesv2) -lm
+LDLIBS += $(shell $(PKG_CONFIG) --libs sdl2 glesv2 libmpg123) -lm
 SOURCES := $(wildcard src/*.c)
 OBJECTS := $(patsubst src/%.c,build/%.o,$(SOURCES))
 DEPS := $(OBJECTS:.o=.d)
@@ -12,7 +12,7 @@ DEPS := $(OBJECTS:.o=.d)
 all: build/fastfps
 
 check-deps:
-	@$(PKG_CONFIG) --exists sdl2 glesv2 || { echo "Bibliotheques manquantes : SDL2 et OpenGL ES."; echo "Installe : sudo apt install build-essential pkg-config libsdl2-dev libgles-dev"; exit 1; }
+	@$(PKG_CONFIG) --exists sdl2 glesv2 libmpg123 || { echo "Bibliotheques manquantes : SDL2, OpenGL ES ou mpg123 (musique MP3)."; echo "Installe : sudo apt install build-essential pkg-config libsdl2-dev libgles-dev libmpg123-dev"; exit 1; }
 
 build/fastfps: $(OBJECTS)
 	$(CC) $(CFLAGS) $(LDFLAGS) $(OBJECTS) $(LDLIBS) -o $@

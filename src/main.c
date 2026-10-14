@@ -6,29 +6,6 @@
 #include <string.h>
 #include <time.h>
 
-static void settings_path(char *out,size_t size) {
-    char *directory=SDL_GetPrefPath("fastfps","fastfps");
-    if(directory){snprintf(out,size,"%ssettings.txt",directory);SDL_free(directory);}else out[0]='\0';
-}
-static void settings_read(App *app) {
-    char path[2048];settings_path(path,sizeof(path));if(!path[0])return;
-    FILE *file=fopen(path,"r");if(!file)return;
-    int quality=0,sound=1,best=0,motion=1,difficulty=1,modern=1;float sensitivity=1,brightness=1;
-    if(fscanf(file,"%d %f %d %d %d %d %d %f",&quality,&sensitivity,&sound,&best,&motion,&difficulty,&modern,&brightness)>=4) {
-        app->quality=quality>=0&&quality<PRESET_COUNT?quality:0;
-        app->sensitivity=isfinite(sensitivity)?clampf(sensitivity,.3f,3):1;
-        app->sound=sound!=0;app->best_score=best>=0?best:0;
-        app->motion=motion!=0;
-        app->difficulty=difficulty>=0&&difficulty<=2?difficulty:1;
-        app->modern=modern!=0;app->brightness=isfinite(brightness)?clampf(brightness,.5f,2):1;
-    }
-    fclose(file);
-}
-static void settings_write(const App *app) {
-    char path[2048];settings_path(path,sizeof(path));if(!path[0])return;
-    FILE *file=fopen(path,"w");if(!file)return;
-    fprintf(file,"%d %.2f %d %d %d %d %d %.2f\n",app->quality,app->sensitivity,app->sound,app->best_score,app->motion,app->difficulty,app->modern,app->brightness);fclose(file);
-}
 static void network_preferences(App *app,bool write) {
     char path[2048];char *directory=SDL_GetPrefPath("fastfps","fastfps");
     if(!directory)return;
@@ -107,6 +84,7 @@ static void menu_action(App *app,Game *game,Renderer *renderer,int direction) {
         case 10:app->running=false;break;
         case 11:app->menu_page=1;app->selected=2;break;
         case 12:app->menu_page=0;app->selected=11;break;
+        case 13:app->music_volume=clampf(app->music_volume+.05f*(float)direction,0,1);break;
     }
 }
 static Input read_input(void) {
@@ -158,7 +136,7 @@ static void help(void) {
         "  --version                     Afficher la version\n");
 }
 int main(int argc,char **argv) {
-    App app={.state=STATE_MENU,.running=true,.sound=true,.motion=true,.modern=true,.sensitivity=1,.brightness=1,.difficulty=1,.numeric_edit=-1,.slider_drag=-1};
+    App app={.state=STATE_MENU,.running=true,.sound=true,.motion=true,.modern=true,.sensitivity=1,.brightness=1,.music_volume=0,.difficulty=1,.numeric_edit=-1,.slider_drag=-1};
     bool demo=false,cli_mute=false,cli_fullscreen=false;int cli_quality=-1,cli_difficulty=-1,cli_modern=-1,frame_limit=0;
     const char *screenshot=NULL,*join_address=NULL,*player_name=NULL;
     bool host=false,multiplayer=false;int room_port=0;
@@ -278,7 +256,7 @@ int main(int argc,char **argv) {
                     if(key==SDL_SCANCODE_UP)menu_move(&app,-1);
                     else if(key==SDL_SCANCODE_DOWN)menu_move(&app,1);
                     else if(key==SDL_SCANCODE_RETURN||key==SDL_SCANCODE_KP_ENTER||key==SDL_SCANCODE_SPACE)menu_action(&app,&game,&renderer,1);
-                    else if((key==SDL_SCANCODE_LEFT||key==SDL_SCANCODE_RIGHT)&&app.selected>=2&&app.selected<=9)
+                    else if((key==SDL_SCANCODE_LEFT||key==SDL_SCANCODE_RIGHT)&&((app.selected>=2&&app.selected<=9)||app.selected==13))
                         menu_action(&app,&game,&renderer,key==SDL_SCANCODE_LEFT?-1:1);
                 }else if(key==SDL_SCANCODE_TAB)app.show_build=!app.show_build;
                 else if(key==SDL_SCANCODE_1||key==SDL_SCANCODE_KP_1)game_request_weapon(&game,0);
@@ -314,6 +292,9 @@ int main(int argc,char **argv) {
             }
             if(steps==MAX_CATCHUP_STEPS)accumulator=0;
         }else accumulator=0;
+        bool gameplay_music=app.state==STATE_PLAYING||app.state==STATE_UPGRADE||app.state==STATE_PAUSED;
+        float music_focus=app.state==STATE_PAUSED?.15f:(gameplay_music&&game.dead?.1f:(app.state==STATE_UPGRADE?.6f:1));
+        audio_music(app.music_volume,gameplay_music,music_focus);
         double interval=1.0/((app.state==STATE_PLAYING||app.state==STATE_UPGRADE)?PRESETS[app.quality].fps:30);
         if(now-last_render>=interval-.0005) {
             last_render=now;

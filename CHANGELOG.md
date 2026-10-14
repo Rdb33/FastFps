@@ -1,3 +1,11 @@
+# Version 0.9.0
+
+- Blank Shell dans le menu / les salons et General Release en jeu, copiées depuis le dossier Musique du PC.
+- Volume musical indépendant de 0 à 100 %, slider, saisie numérique et clavier ; zéro par défaut et persistance compatible avec les anciens réglages.
+- Fondus, transition entre morceaux, boucles adoucies, filtre et atténuation en pause / à terre, léger écho et baisse sous les bruitages.
+- Lecture MP3 en continu avec mpg123, buffers fixes et décodage hors du callback SDL ; nouvelle dépendance `libmpg123-dev`.
+- Aucun changement de gameplay ou de protocole réseau (7).
+
 # Version 0.8.0
 
 - Champions : préparation annoncée, cible fixée, saut avec collisions, choc unique au sol et récupération. Murs et hauteur protègent du choc.
