@@ -34,7 +34,10 @@ static void pause_game(App *app) {
     app->state=STATE_PAUSED;app->selected=0;app->menu_page=0;SDL_SetRelativeMouseMode(SDL_FALSE);
 }
 static void start_game(App *app,Game *game,bool restart,bool demo) {
-    if(restart||app->state!=STATE_PAUSED){game_reset(game,game->world,PRESETS[app->quality].particles);app->show_build=false;}
+    if(restart||app->state!=STATE_PAUSED) {
+        game_reset(game,game->world,PRESETS[app->quality].particles);app->show_build=false;
+        app->music_notice_shown=false;app->music_notice_time=0;
+    }
     game->motion=app->motion;
     if(!game->cooperative||app->network->mode==NET_HOST)game->difficulty=app->difficulty;
     if(!demo&&SDL_SetRelativeMouseMode(SDL_TRUE)!=0) {
@@ -293,6 +296,15 @@ int main(int argc,char **argv) {
             if(steps==MAX_CATCHUP_STEPS)accumulator=0;
         }else accumulator=0;
         bool gameplay_music=app.state==STATE_PLAYING||app.state==STATE_UPGRADE||app.state==STATE_PAUSED;
+        if(!gameplay_music){app.music_notice_shown=false;app.music_notice_time=0;}
+        else if(cli_mute||demo||app.music_volume>0)app.music_notice_time=0;
+        else if(app.state==STATE_PLAYING) {
+            if(!app.music_notice_shown) {
+                app.music_notice_shown=true;app.music_notice_time=8;
+            }
+            if(!game.dead&&!app.show_build)
+                app.music_notice_time=fmaxf(0,app.music_notice_time-(float)elapsed);
+        }
         float music_focus=app.state==STATE_PAUSED?.15f:(gameplay_music&&game.dead?.1f:(app.state==STATE_UPGRADE?.6f:1));
         audio_music(app.music_volume,gameplay_music,music_focus);
         double interval=1.0/((app.state==STATE_PLAYING||app.state==STATE_UPGRADE)?PRESETS[app.quality].fps:30);

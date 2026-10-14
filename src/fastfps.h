@@ -145,10 +145,10 @@ typedef struct {
     bool upgrade_released, upgrade_confirm;
     struct Network *network;
     int editing;
-    bool select_all, network_help, show_build;
+    bool select_all, network_help, show_build, music_notice_shown;
     int upgrade_choice;
     int menu_page;
-    float ui_time;
+    float ui_time, music_notice_time;
 } App;
 typedef enum { SOUND_SHOT, SOUND_SHOTGUN, SOUND_HIT, SOUND_KILL,
     SOUND_HURT, SOUND_JUMP, SOUND_PICKUP, SOUND_WAVE,

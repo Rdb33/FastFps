@@ -2,6 +2,12 @@
 
 Historique des contrôles sur la machine de développement, les 12 et 13 octobre 2026.
 
+## Version 0.9.1 — 14 octobre 2026
+
+- Compilation C11 sans avertissement et contrôle du diff.
+- Rappel local de huit secondes, une seule fois par partie, réinitialisé pour une nouvelle partie solo ou un retour au salon. Son délai est suspendu pendant la pause, les modules, les joueurs à terre et le panneau de progression ; activer la musique le retire. Démo et `--mute` ne l’affichent pas.
+- Aucun changement de simulation ou de protocole réseau. Affichage en jeu non testé dans cette version.
+
 ## Version 0.9.0 — 14 octobre 2026
 
 - Compilation complète C11 avec `-O2 -Wall -Wextra -Wpedantic`, sans avertissement, avec SDL2 / OpenGL ES / mpg123.

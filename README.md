@@ -1,10 +1,14 @@
 # FASTFPS — Secteur zéro
 
-**FPS 3D natif, style Doom, pensé pour le Raspberry Pi 4.** Base à améliorer progressivement : déplacement nerveux, quatre armes à débloquer et survie dans trois arènes industrielles. Version **0.9.0** : musiques de menu et de combat, volume indépendant et transitions douces, en plus des nouveautés de la 0.8.
+**FPS 3D natif, style Doom, pensé pour le Raspberry Pi 4.** Base à améliorer progressivement : déplacement nerveux, quatre armes à débloquer et survie dans trois arènes industrielles. Version **0.9.1** : rappel pour activer la musique. La **0.9.0** apporte les musiques de menu et de combat, le volume indépendant et les transitions douces.
 
 Application en **C11**, **SDL2** (fenêtre, clavier, souris et son) et **OpenGL ES 2** (rendu 3D). Graphismes, police et bruitages sont générés localement. Les musiques MP3 sont lues avec **mpg123**.
 
 Le mode solo fonctionne hors ligne. Pour jouer ensemble, sélectionne **Multijoueur** ; voir [MULTIJOUEUR.md](MULTIJOUEUR.md) pour la création, la connexion sur Internet et les limites de cette première version.
+
+## Rappel — version 0.9.1
+
+- Si tu joues avec le volume musical à zéro, un petit rappel de huit secondes indique **« Tu joues sans musique / Échap > Réglages > Musique »**. Il apparaît une fois par partie, sans interrompre le combat, et disparaît dès que tu actives la musique. Il reste masqué pendant la pause, les modules et l’affichage de ta configuration ; pas de rappel en démo ou avec `--mute`.
 
 ## Musique — version 0.9.0
 

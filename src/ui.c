@@ -178,6 +178,15 @@ void ui_build(Mesh *m,const Game *g,const App *app) {
             mesh_text(m,410,241,1,orange,"LANCEUR PRETE POUR CE ROUND");
             mesh_text(m,410,255,1,muted,"TOUCHE 5 / DEGATS DE ZONE");
         }
+        if(app->state==STATE_PLAYING&&app->music_notice_time>0&&app->music_volume<=0&&!g->dead&&!app->show_build) {
+            float slide=clampf(fminf((8-app->music_notice_time)/.25f,app->music_notice_time/.25f),0,1);
+            slide=slide*slide*(3-2*slide);
+            float x=-228+240*slide;Color blue={.35f,.8f,1};
+            mesh_rect(m,x,108,228,43,(Color){.04f,.075f,.10f});
+            mesh_rect(m,x,108,3,43,blue);
+            mesh_text(m,x+12,119,1,blue,"TU JOUES SANS MUSIQUE");
+            mesh_text(m,x+12,135,1,ink,"ECHAP > REGLAGES > MUSIQUE");
+        }
         if(app->state==STATE_UPGRADE)upgrade_ui(m,g,app);
         return;
     }

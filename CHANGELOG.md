@@ -1,3 +1,8 @@
+# Version 0.9.1
+
+- Petit rappel non bloquant de huit secondes quand on joue avec le volume musical à zéro : « Tu joues sans musique / Échap > Réglages > Musique ». Une seule fois par partie, en solo comme en coopération ; masqué pendant la pause, le choix de modules et les écrans de progression, retiré dès que la musique est activée. Pas de rappel en démo ou avec `--mute`.
+- Volume musical inchangé ; aucun changement du protocole réseau 7.
+
 # Version 0.9.0
 
 - Blank Shell dans le menu / les salons et General Release en jeu, copiées depuis le dossier Musique du PC.
