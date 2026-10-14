@@ -1,10 +1,22 @@
 # FASTFPS — Secteur zéro
 
-**FPS 3D natif, style Doom, pensé pour le Raspberry Pi 4.** Base à améliorer progressivement : déplacement nerveux, quatre armes à débloquer et survie dans trois arènes industrielles. Version **0.9.3** : plateformes propres à chaque map, rechargements par étapes et animations enrichies du menu et du combat.
+**FPS 3D natif, style Doom, pensé pour le Raspberry Pi 4.** Base à améliorer progressivement : déplacement nerveux, quatre armes principales et survie dans trois arènes industrielles. Version **1.1.0** : bombardiers, progression des armes aux vagues 11 / 21 / 31, noms des alliés plus lisibles et attaques animées plus expressives.
 
 Application en **C11**, **SDL2** (fenêtre, clavier, souris et son) et **OpenGL ES 2** (rendu 3D). Graphismes, police et bruitages sont générés localement. Les musiques MP3 sont lues avec **mpg123**.
 
 Le mode solo fonctionne hors ligne. Pour jouer ensemble, sélectionne **Multijoueur** ; voir [MULTIJOUEUR.md](MULTIJOUEUR.md) pour la création, la connexion sur Internet et les limites de cette première version.
+
+## Nouveautés — version 1.1.0
+
+- **Armes permanentes** : fusil à pompe à la vague **11**, mitrailleuse à la **21**, lance rail à la **31**. Le Pulse reste disponible dès le début ; le lance roquettes reste lié à l'événement temporaire. La notification et le panneau de progression utilisent les mêmes seuils.
+- **Bombardier dès la vague 11** : trois par vague, contre deux brutes (dont le champion lorsqu'il est présent). Armure ambrée, visière lumineuse et générateurs sur les épaules ; **220 PV de base**, contre 260 pour la brute, avant les multiplicateurs de vague, difficulté et coopération.
+- **Bombes à longue portée** : une cible visible jusqu'à **48 m** ; la bombe apparaît au-dessus de sa position, puis explose **3 secondes** après le début de l'attaque. Le point visé reste fixe. Cercle orange de **3,5 m**, anneau de compte à rebours et alerte « Bombe / Esquive ! » permettent d'anticiper la chute. La hauteur tient compte du sol, des quais et des plafonds présents au lancement.
+- Le bombardier recharge pendant **5 secondes après la chute**, soit au minimum **8 secondes entre deux attaques**. Il cherche à garder ses distances pendant la recharge. Les dégâts de zone touchent les joueurs debout à portée, diminuent avec la distance et sont bloqués par les murs. Une bombe déjà lancée reste dangereuse si son créateur est éliminé ; terminer la vague supprime les bombes restantes.
+- **Vampirisme** : **+1 PV par élimination et par rang**, soit +5 PV au rang maximum. Le soin de frappe fatale reste à +10 PV.
+- **Alliés** : pseudo, numéro « J1 » à « J4 », couleur d'armure, fond contrasté et petite pointe au-dessus de la tête. Portée d'affichage augmentée à 48 m pour les coéquipiers visibles ; santé et progression de réanimation conservées.
+- **Animations des ennemis** : coudes et genoux articulés, balancement du torse, foulée propre aux silhouettes et pieds animés selon la distance réellement parcourue. Préparation, frappe et récupération sont séparées ; le geste de frappe atteint son maximum au moment des dégâts. Le bombardier lève les bras et charge ses générateurs pendant les trois secondes de chute.
+
+Tous les nouveaux textes du jeu sont en **français**. **Multijoueur : protocole 10, version 1.1.0 requise sur tous les ordinateurs.** L'hôte choisit les cibles, compte les délais et applique les dégâts ; les invités reçoivent les bombes et affichent leurs alertes. Les buffers graphiques, les cinq appels de dessin et les dépendances existants sont conservés. Voir [VALIDATION.md](VALIDATION.md) pour les contrôles effectués et les essais restant à faire.
 
 ## Nouveautés — version 0.9.3
 
@@ -62,7 +74,7 @@ Les plateformes font une pause à chaque palier ; sa durée dépend du trajet. R
 - **Événement rare : Roquettes !** À partir du round 3, l’hôte effectue un tirage de 8 % par round éligible, avec au moins cinq rounds entre événements. Chaque joueur, même à terre, reçoit un lance-roquettes temporaire pour ce round, automatiquement équipé. **5** ou la molette permet de le sélectionner ensuite. Trois roquettes par chargeur, recharge de 2,1 secondes, réserves illimitées pendant l’événement. Les roquettes infligent des dégâts de zone sur 6,5 mètres, avec diminution selon la distance et blocage par les murs. Les explosions ne font pas de tirs à la tête. Elles ne blessent pas directement les alliés ; le tireur peut subir ses propres dégâts et faire un **rocket jump**. Les barils restent dangereux pour toute l’équipe. À la fin du round, le lanceur est retiré et l’arme précédant l’événement est restaurée si nécessaire.
 - **Mobilité sur les trois maps** : deux plaques élévatrices montent jusqu’à 3,48 mètres et une navette se déplace horizontalement. Monte dessus à leur passage ou saute dessus, puis utilise-les pour atteindre les hauteurs. Les joueurs, ennemis et corps peuvent être transportés. Une plaque descendante dégage un personnage vers un côté libre plutôt que de l’enfermer. Positions et collisions sont calculées depuis le temps de simulation de l’hôte et rejouées pour la prédiction locale.
 
-La **0.8** utilisait le **protocole réseau 7** ; la **0.9.3** utilise le **protocole 9**. Mets à jour tous les ordinateurs avant une partie ; les salons des anciennes versions sont incompatibles. Les invitations LAN / Tailscale fonctionnent comme auparavant. Voir [VALIDATION.md](VALIDATION.md) pour les tests réalisés et les limites des mesures.
+La **0.8** utilisait le **protocole réseau 7** ; la **1.1.0** utilise le **protocole 10**. Mets à jour tous les ordinateurs avant une partie ; les salons des anciennes versions sont incompatibles. Les invitations LAN / Tailscale fonctionnent comme auparavant. Voir [VALIDATION.md](VALIDATION.md) pour les tests réalisés et les limites des mesures.
 
 ## Nouveautés — version 0.7
 
@@ -78,9 +90,9 @@ La **0.8** utilisait le **protocole réseau 7** ; la **0.9.3** utilise le **prot
 | Touche | Arme | Disponible à partir du round | Chargeur | Rechargement |
 | --- | --- | --- | --- | --- |
 | 1 | Pulse | 1 | 18 | 1,25 s |
-| 2 | Fusil à pompe | 10 | 6 | 1,85 s |
-| 3 | Mitrailleuse | 20 | 32 | 1,65 s |
-| 4 | Lance rail | 30 | 4 | 2,10 s |
+| 2 | Fusil à pompe | 11 | 6 | 1,85 s |
+| 3 | Mitrailleuse | 21 | 32 | 1,65 s |
+| 4 | Lance rail | 31 | 4 | 2,10 s |
 
 **R** recharge un chargeur partiellement utilisé. Un chargeur vide déclenche automatiquement le rechargement. Pendant ce geste, le tir, la frappe et le changement d’arme sont bloqués ; tu peux toujours courir, sauter et esquiver. Les réserves sont illimitées dans cette base : la contrainte est le chargeur et le temps nécessaire pour le remplir. Les chargeurs sont indépendants par arme et sont remplis lors d’une réapparition. Les déblocages sont limités à la partie actuelle.
 
@@ -119,7 +131,7 @@ Après chaque vague terminée, chaque joueur choisit un module parmi trois propo
 | Réflexes | −10 % de délai de recharge d’esquive, +3 % de vitesse |
 | Vitalité | +15 santé maximum et +15 santé à l’installation |
 | Blindage | −6 % de dégâts reçus |
-| Vampirisme | +2 santé par élimination |
+| Vampirisme | +1 santé par élimination et par rang |
 
 Chaque module a **cinq rangs**. Les bonus s’additionnent par rang ; tu peux ainsi orienter ton personnage vers les dégâts, la mobilité ou la survie. Le niveau du personnage augmente à chaque module installé. **Tab** affiche ta configuration actuelle. Les améliorations restent actives après une réanimation en coopération et sont remises à zéro au début d’une nouvelle partie.
 
@@ -215,8 +227,8 @@ Les déplacements utilisent les positions physiques du clavier : ZQSD sur AZERTY
 - Arène avec piliers, caisses, passages latéraux et plateforme accessible par des marches.
 - Pulse précis à tir continu, fusil à pompe à neuf plombs, mitrailleuse rapide et lance rail puissant. Chargeurs limités, rechargement obligatoire à vide et réserves illimitées.
 - Barils explosifs et tirs à la tête ; les explosions représentent un danger pour toute l'équipe.
-- Trois types d’ennemis avec silhouettes, couleurs et animations distinctes ; voir le tableau ci-dessous.
-- Vagues progressives : quatre ennemis au départ, douze maximum. Navigation en grille pour contourner les obstacles.
+- Quatre types d’ennemis avec silhouettes, couleurs et animations distinctes ; voir le tableau ci-dessous.
+- Vagues progressives : cinq ennemis au départ en Normal solo, dix-huit maximum. Navigation en grille pour contourner les obstacles.
 - Croix vertes : +25 santé, réapparition après 18 secondes. Terminer une vague : +10 santé.
 - Score, record et réglages persistants. Ils sont enregistrés à la fermeture d’une partie normale via `SDL_GetPrefPath`, généralement dans `~/.local/share/fastfps/fastfps/settings.txt` sous Linux.
 
@@ -227,6 +239,7 @@ Direction : **Doom moderne simplifié**, mouvement direct, sprint, combat à cou
 | Traqueur | Rouge, cornes, silhouette légère | Poursuit vite et prépare une frappe au contact |
 | Invocateur | Violet, silhouette étroite, coiffe pointue et énergie verte | Se déplace latéralement, charge une boule d’énergie avant de tirer |
 | Brute, à partir de la vague 3 | Vert olive, grandes épaulières dorées, corps plus massif | Avance lentement, résiste davantage et prépare une frappe plus longue et plus forte |
+| Bombardier, à partir de la vague 11 | Armure ambrée, visière orange et générateurs aux épaules | Garde ses distances, lance une bombe au-dessus d'une position fixe annoncée pendant 3 s, puis recharge 5 s |
 
 ![Les trois types d'ennemis dans une scène de présentation](docs/ennemis-v02.png)
 
@@ -327,7 +340,7 @@ Carte et paramètres sont actuellement dans les sources. Aucune option de compil
 
 Trois cartes et un mode survie solo ou coopératif, quatre armes permanentes par run, un lance-roquettes temporaire et un rechargement par chargeur. Collisions par boîtes, trajectoires parfois anguleuses. Pas encore de rampes, accroupissement, sauvegarde de partie ou manette.
 
-La coopération utilise un joueur hôte qui fait autorité sur le monde, un état d’entrée `Input`, des identifiants d’ennemis stables, une prédiction du déplacement et une interpolation à l’affichage. La connexion se fait par IPv4 et port TCP, sans service central dans le jeu. Tailscale utilise ses propres services de connexion et éventuellement de relais. La validation entre deux machines et sur Internet reste à faire : voir [VALIDATION.md](VALIDATION.md). La version 0.9.3 utilise le protocole 9, incompatible avec les versions précédentes. Tous les joueurs doivent avoir la même version de gameplay.
+La coopération utilise un joueur hôte qui fait autorité sur le monde, un état d’entrée `Input`, des identifiants d’ennemis stables, une prédiction du déplacement et une interpolation à l’affichage. La connexion se fait par IPv4 et port TCP, sans service central dans le jeu. Tailscale utilise ses propres services de connexion et éventuellement de relais. La validation entre deux machines et sur Internet reste à faire : voir [VALIDATION.md](VALIDATION.md). La version 1.1.0 utilise le protocole 10, incompatible avec les versions précédentes. Tous les joueurs doivent avoir la même version de gameplay.
 
 Voir [ROADMAP.md](ROADMAP.md). Le prototype navigateur est conservé dans `prototype-web/` comme archive ; le lanceur principal utilise **l’application native**.
 

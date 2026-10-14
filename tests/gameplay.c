@@ -89,7 +89,7 @@ static void modules_and_wipe(World *w) {
 }
 static void snapshots(World *w) {
     Game g;quiet(&g,w);bool active[MAX_PLAYERS]={true,true,true,true};game_start_coop(&g,active,0);
-    g.wave=30;g.map_id=2;world_set_map(w,2);
+    g.wave=41;g.map_id=2;world_set_map(w,2);
     for(int i=0;i<MAX_PLAYERS;i++){g.actors[i].player.weapon=g.actors[i].player.weapon_target=3;g.actors[i].player.ammo[3]=2;g.actors[i].player.reload_timer=1;g.actors[i].player.reload_duration=2.1f;}
     g.current_actor=-1;game_actor_select(&g,0);
     g.enemy_count=MAX_ENEMIES;g.corpse_count=MAX_CORPSES;

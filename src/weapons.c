@@ -2,9 +2,9 @@
 
 const Weapon WEAPONS[WEAPON_COUNT]={
     {"PULSE",18,1,.15f,1.25f,34,{.35f,.85f,1}},
-    {"FUSIL A POMPE",6,10,.72f,1.85f,18,{1,.64f,.25f}},
-    {"MITRAILLEUSE",32,20,.085f,1.65f,24,{.53f,1,.45f}},
-    {"LANCE RAIL",4,30,1.0f,2.1f,170,{.8f,.45f,1}},
+    {"FUSIL A POMPE",6,11,.72f,1.85f,18,{1,.64f,.25f}},
+    {"MITRAILLEUSE",32,21,.085f,1.65f,24,{.53f,1,.45f}},
+    {"LANCE RAIL",4,31,1.0f,2.1f,170,{.8f,.45f,1}},
     {"LANCE ROQUETTES",3,0,.8f,2.1f,180,{1,.4f,.12f}}
 };
 int game_unlocked_weapons(const Game *g) {

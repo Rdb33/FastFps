@@ -139,8 +139,13 @@ static void reconcile(Network *n,Game *g,const uint8_t *data,size_t size,double 
     for(int i=0;i<snapshot.enemy_count;i++) {
         const Enemy *e=&snapshot.enemies[i];
         for(int j=0;j<n->previous.enemy_count;j++)if(n->previous.enemies[j].id==e->id
-            &&e->attack_timer>n->previous.enemies[j].attack_timer+.04f)
+            &&e->attack_timer>n->previous.enemies[j].attack_timer+.04f&&e->type!=ENEMY_BOMBER)
             audio_play_at(e->type==ENEMY_CASTER?SOUND_CAST:SOUND_GROWL,e->body.position);
+    }
+    for(int i=0;i<snapshot.bomb_count;i++) {
+        const Bomb *b=&snapshot.bombs[i];bool seen=false;
+        for(int j=0;j<n->previous.bomb_count;j++)if(n->previous.bombs[j].source==b->source)seen=true;
+        if(!seen)audio_play_at(SOUND_CAST,b->target);
     }
     if(snapshot.wave>n->previous.wave)audio_play(snapshot.wave%5==0?SOUND_CHAMPION:SOUND_WAVE);
     if(snapshot.completed_waves>n->previous.completed_waves)audio_play(SOUND_UPGRADE);
@@ -398,6 +403,8 @@ void net_render(const Network *n,const Game *g,Game *view,double now) {
     if(n->mode!=NET_CLIENT||!n->has_snapshot)return;
     float age=clampf((float)(now-n->snapshot_time),0,.1f);
     view->time=n->current.time+age;
+    for(int i=0;i<view->bomb_count;i++)view->bombs[i].time=fmaxf(.001f,view->bombs[i].time-age);
+    for(int i=0;i<view->enemy_count;i++)view->enemies[i].attack_timer=fmaxf(0,view->enemies[i].attack_timer-age);
     for(int i=0;i<view->barrel_count;i++)view->barrels[i].explosion_time=fmaxf(0,view->barrels[i].explosion_time-age);
     for(int i=0;i<view->particle_count;i++) {
         Particle *p=&view->particles[i];p->life-=age;p->position=vadd(p->position,vscale(p->velocity,age));

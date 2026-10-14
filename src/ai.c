@@ -21,6 +21,10 @@ Vec3 ai_move(Game *g,Enemy *e,const Player *p,bool visible,float dt) {
     Vec3 forward=vnormalize(delta),side={-forward.z,0,forward.x};
     float sign=e->id%2?1:-1;
     if(!visible)target=navigation_for_actor(g->world,e->target_actor,e->body.position.x,e->body.position.z);
+    else if(e->type==ENEMY_BOMBER) {
+        if(distance<15)target=vadd(e->body.position,vadd(vscale(forward,-4),vscale(side,sign*2)));
+        else if(distance<30)target=vadd(e->body.position,vscale(side,sign*2));
+    }
     else if(e->type==ENEMY_CASTER) {
         if(distance<7)target=vadd(e->body.position,vadd(vscale(forward,-3),vscale(side,sign*2)));
         else if(distance<14)target=vadd(e->body.position,vscale(side,sign*3));

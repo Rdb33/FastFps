@@ -100,7 +100,7 @@ static void enemy_read(Reader *r,Enemy *e) {
     uint8_t elite=r8(r);e->elite=elite!=0;if(elite>1)r->ok=false;
     e->slam_state=r8(r);e->slam_timer=rf(r);e->slam_flash=rf(r);e->slam_target=rv(r);
     if(e->slam_state>3||e->slam_timer<0||e->slam_timer>3.01f||e->slam_flash<0||e->slam_flash>.81f||(!e->elite&&e->slam_state))r->ok=false;
-    if(e->type>ENEMY_BRUTE||fired>1||e->target_actor>=MAX_PLAYERS||e->attack_timer<0
+    if(e->type>ENEMY_BOMBER||fired>1||e->target_actor>=MAX_PLAYERS||e->attack_timer<0
         ||(e->attack_timer>0&&e->attack_duration<=0)||e->max_health<0||e->max_health>10000)r->ok=false;
 }
 
@@ -124,7 +124,7 @@ bool protocol_command_read(Command *c,const uint8_t *data,size_t size) {
 size_t protocol_snapshot_write(uint8_t *data,size_t capacity,const Game *g) {
     if(g->enemy_count<0||g->enemy_count>MAX_ENEMIES||g->corpse_count<0||g->corpse_count>MAX_CORPSES
         ||g->projectile_count<0||g->projectile_count>MAX_PROJECTILES||g->pickup_count<0||g->pickup_count>MAX_PICKUPS
-        ||g->blast_count<0||g->blast_count>MAX_BLASTS
+        ||g->blast_count<0||g->blast_count>MAX_BLASTS||g->bomb_count<0||g->bomb_count>MAX_BOMBS
         ||g->barrel_count<0||g->barrel_count>MAX_BARRELS||g->particle_count<0||g->particle_count>MAX_PARTICLES)return 0;
     Writer w={data,capacity,0,true};w8(&w,NET_PROTOCOL);w8(&w,(uint8_t)g->difficulty);w32(&w,g->tick);
     w8(&w,(uint8_t)g->map_id);w8(&w,(uint8_t)g->lives);w8(&w,g->round_over);w32(&w,(uint32_t)g->wave);w32(&w,(uint32_t)g->score);w32(&w,(uint32_t)g->kills);
@@ -134,6 +134,11 @@ size_t protocol_snapshot_write(uint8_t *data,size_t capacity,const Game *g) {
     w8(&w,(uint8_t)g->unlock_weapon);wf(&w,g->unlock_time);
     w8(&w,(uint8_t)g->blast_count);
     for(int i=0;i<g->blast_count;i++){wv(&w,g->blasts[i].position);wf(&w,g->blasts[i].time);wf(&w,g->blasts[i].radius);}
+    w8(&w,(uint8_t)g->bomb_count);
+    for(int i=0;i<g->bomb_count;i++) {
+        const Bomb *b=&g->bombs[i];wv(&w,b->target);wf(&w,b->height);wf(&w,b->time);
+        w32(&w,(uint32_t)b->source);w8(&w,(uint8_t)b->target_actor);
+    }
     for(int i=0;i<MAX_PLAYERS;i++)actor_write(&w,&g->actors[i]);
     w8(&w,(uint8_t)g->enemy_count);for(int i=0;i<g->enemy_count;i++)enemy_write(&w,&g->enemies[i]);
     w8(&w,(uint8_t)g->corpse_count);for(int i=0;i<g->corpse_count;i++)enemy_write(&w,&g->corpses[i]);
@@ -173,6 +178,14 @@ bool protocol_snapshot_read(Game *g,const uint8_t *data,size_t size) {
     for(int i=0;i<out.blast_count;i++) {
         Blast *b=&out.blasts[i];b->position=rv(&r);b->time=rf(&r);b->radius=rf(&r);
         if(b->time<0||b->time>.81f||b->radius<=0||b->radius>6.6f)r.ok=false;
+    }
+    out.bomb_count=r8(&r);if(out.bomb_count>MAX_BOMBS)return false;
+    for(int i=0;i<out.bomb_count;i++) {
+        Bomb *b=&out.bombs[i];b->target=rv(&r);b->height=rf(&r);b->time=rf(&r);
+        uint32_t source=r32(&r);b->source=(int)(source&2147483647u);b->target_actor=r8(&r);
+        if(source>2147483647u||b->target_actor>=MAX_PLAYERS||b->height<.3f||b->height>6.01f
+            ||b->time<=0||b->time>BOMB_FALL_TIME+.01f||b->target.y<0)r.ok=false;
+        for(int j=0;j<i;j++)if(out.bombs[j].source==b->source)r.ok=false;
     }
     for(int i=0;i<MAX_PLAYERS;i++)actor_read(&r,&out.actors[i]);
     out.enemy_count=r8(&r);if(out.enemy_count>MAX_ENEMIES)return false;

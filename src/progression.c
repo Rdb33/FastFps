@@ -8,7 +8,7 @@ float player_damage_multiplier(const Player *p){return 1+.12f*(float)p->upgrades
 float player_fire_interval(const Player *p){return WEAPONS[p->weapon].interval/(1+.10f*(float)p->upgrades[UPGRADE_HASTE]);}
 float player_dash_cooldown(const Player *p){return DASH_COOLDOWN*(1-.10f*(float)p->upgrades[UPGRADE_MOBILITY]);}
 int player_level(const Player *p){int level=1;for(int i=0;i<UPGRADE_COUNT;i++)level+=p->upgrades[i];return level;}
-float enemy_size(const Enemy *e){return (e->type==ENEMY_BRUTE?1.3f:1)*(e->elite?1.22f:1);}
+float enemy_size(const Enemy *e){return (e->type==ENEMY_BRUTE?1.3f:(e->type==ENEMY_BOMBER?1.15f:1))*(e->elite?1.22f:1);}
 
 const char *upgrade_name(int id) {
     static const char *names[]={"SURCHARGE","CADENCE","REFLEXES","VITALITE","BLINDAGE","VAMPIRISME"};
@@ -16,7 +16,7 @@ const char *upgrade_name(int id) {
 }
 const char *upgrade_description(int id) {
     static const char *text[]={"DEGATS DES ARMES +12%","CADENCE DE TIR +10%","ESQUIVE -10% / VITESSE +3%",
-        "SANTE MAX +15 / SOIN +15","DEGATS RECUS -6%","ELIMINATION : +2 SANTE"};
+        "SANTE MAX +15 / SOIN +15","DEGATS RECUS -6%","ELIMINATION : +1 SANTE"};
     return id>=0&&id<UPGRADE_COUNT?text[id]:"";
 }
 Color upgrade_color(int id) {

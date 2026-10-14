@@ -50,7 +50,7 @@ static void start_wave(Game *g) {
     int map=((g->wave-1)/5)%MAP_COUNT;
     if(map!=g->map_id) {
         world_set_map(g->world,map);world_platforms_update(g->world,g->time);g->map_id=map;
-        g->corpse_count=g->particle_count=g->projectile_count=0;g->nav_timer=0;
+        g->corpse_count=g->particle_count=g->projectile_count=g->bomb_count=0;g->nav_timer=0;
         int original=g->current_actor;
         for(int i=0;i<MAX_PLAYERS;i++)if(g->actors[i].active) {
             game_actor_select(g,i);
@@ -98,11 +98,13 @@ static void start_wave(Game *g) {
         e->type = i % 3 == 0 ? ENEMY_CASTER : ENEMY_RUNNER;
         if (g->wave >= 3 && i == count - 1) e->type = ENEMY_BRUTE;
         if (g->wave >= 6 && i == count - 3) e->type = ENEMY_BRUTE;
+        /* Trois bombardiers pour deux brutes, dès la vague 11. */
+        if(g->wave>=11&&(i==count-2||i==count-4||i==count-5))e->type=ENEMY_BOMBER;
         e->elite=g->wave%5==0&&i==count-1;
         if(e->elite)e->type=ENEMY_BRUTE;
         if(world_blocked(g->world,e->body.position,ENEMY_RADIUS*enemy_size(e),ENEMY_HEIGHT*enemy_size(e),-1))
             e->body.position=g->world->spawns[choices[i%n]];
-        e->max_health = e->type == ENEMY_BRUTE ? 260 : (e->type == ENEMY_CASTER ? 120 : 80);
+        e->max_health = e->type == ENEMY_BRUTE ? 260 : (e->type == ENEMY_BOMBER ? 220 : (e->type == ENEMY_CASTER ? 120 : 80));
         e->max_health*=(1+.15f*(float)(players-1))*(g->difficulty==0?.8f:(g->difficulty==2?1.25f:1));
         e->max_health*=(1+fminf(2,(float)(g->wave-1)*.045f))*(e->elite?2.5f:1);e->health = e->max_health;
         e->shot_timer = 1.5f + random01() * 1.4f;
@@ -121,7 +123,8 @@ static void start_wave(Game *g) {
     }
     game_roll_event(g);
     if(g->wave>1&&g->wave%5==1)snprintf(message,sizeof(message),"NOUVELLE MAP : %s / VAGUE %02d",world_map_name(g->map_id),g->wave);
-    say(g, message, 3.5f);
+    if(g->wave==11)snprintf(message,sizeof(message),"VAGUE 11 - BOMBARDIERS : QUITTE LES CERCLES ORANGE !");
+    say(g, message, g->wave==11?6:3.5f);
     g->wave_timer = -1;
     for(int i=0;i<g->barrel_count;i++)if(g->barrels[i].health<=0) {
         bool safe=true;
@@ -207,7 +210,7 @@ static void damage_enemy(Game *g, Enemy *e, float damage, Vec3 dir) {
     g->kills++;
     g->kill_time=.3f;
     g->actors[g->current_actor].run_kills++;
-    if(!g->dead)g->player.health=fminf(player_max_health(&g->player),g->player.health+2*(float)g->player.upgrades[UPGRADE_VAMPIRE]);
+    if(!g->dead)g->player.health=fminf(player_max_health(&g->player),g->player.health+(float)g->player.upgrades[UPGRADE_VAMPIRE]);
     add_corpse(g, e);
     game_burst(g, vadd(e->body.position, (Vec3){0, .8f, 0}), (Color){.9f, .26f, .08f}, 8);
     audio_play_at(SOUND_KILL,e->body.position);
@@ -377,8 +380,45 @@ static void begin_attack(Enemy *e, Vec3 direction, int target) {
     audio_play_at(e->type == ENEMY_CASTER ? SOUND_CAST : SOUND_GROWL,e->body.position);
 }
 
+/* La position visée reste fixe : l'esquive est possible durant toute la chute.
+   L'hôte crée et résout les bombes ; les invités affichent leurs délais reçus. */
+static void begin_bomb(Game *g,Enemy *e,int target) {
+    Player *p=actor_player(g,target);
+    Vec3 floor=vadd(p->body.position,(Vec3){0,.08f,0});
+    floor.y=fmaxf(0,floor.y-world_ray(g->world,floor,(Vec3){0,-1,0},16));
+    Vec3 above=vadd(floor,(Vec3){0,.15f,0});
+    float height=fmaxf(.3f,world_ray(g->world,above,(Vec3){0,1,0},6)-.2f);
+    g->bombs[g->bomb_count++]=(Bomb){.target=floor,.height=height,
+        .time=BOMB_FALL_TIME,.source=e->id,.target_actor=target};
+    e->attack_duration=e->attack_timer=BOMB_FALL_TIME;e->attack_fired=false;
+    e->attack_direction=vnormalize(vsub(player_eye(p,false),e->body.position));
+    e->target_actor=target;e->shot_timer=BOMB_FALL_TIME+BOMB_RELOAD_TIME;
+    audio_play_at(SOUND_CAST,floor);
+}
+
+static void update_bombs(Game *g,float dt) {
+    for(int i=0;i<g->bomb_count;) {
+        Bomb *b=&g->bombs[i];b->time=fmaxf(0,b->time-dt);
+        if(b->time>0){i++;continue;}
+        Vec3 point=vadd(b->target,(Vec3){0,.25f,0});
+        if(g->blast_count<MAX_BLASTS)g->blasts[g->blast_count++]=(Blast){b->target,.8f,BOMB_RADIUS};
+        else g->blasts[0]=(Blast){b->target,.8f,BOMB_RADIUS};
+        game_burst(g,point,(Color){1,.55f,.13f},18);audio_play_at(SOUND_EXPLOSION,point);
+        for(int id=0;id<MAX_PLAYERS;id++)if(actor_alive(g,id)) {
+            Vec3 center=vadd(actor_player(g,id)->body.position,(Vec3){0,.65f,0});
+            Vec3 delta=vsub(center,point);float distance=vlength(delta);
+            if(distance<BOMB_RADIUS&&world_ray(g->world,point,vnormalize(delta),distance)>=distance-.05f)
+                hurt_actor(g,id,42*(1-.6f*distance/BOMB_RADIUS),point);
+        }
+        g->bombs[i]=g->bombs[--g->bomb_count];
+    }
+}
+
 static void attack_update(Game *g, Enemy *e, float dt) {
     e->attack_timer = fmaxf(0, e->attack_timer-dt);
+    if(e->type==ENEMY_BOMBER) {
+        e->attack_fired=e->attack_timer==0;return;
+    }
     float progress = 1-e->attack_timer/e->attack_duration;
     if (progress < .62f || e->attack_fired) return;
     e->attack_fired = true;
@@ -463,7 +503,7 @@ static void update_enemies(Game *g, float dt) {
         Vec3 delta = vsub(p,origin), dir = vnormalize(delta);
         float distance = vlength(delta), horizontal = hypotf(delta.x,delta.z);
         bool visible = world_ray(g->world,origin,dir,distance) >= distance-.05f;
-        e->target_actor=target_id;
+        if(e->attack_timer==0)e->target_actor=target_id;
         if(e->elite&&e->body.grounded&&e->spawn_time==0&&e->touch_timer==0&&visible&&horizontal<14) {
             begin_slam(g,e,actor_player(g,target_id),target_id);continue;
         }
@@ -474,7 +514,9 @@ static void update_enemies(Game *g, float dt) {
                 Vec3 aim=vadd(p,vscale(victim->body.velocity,lead));
                 begin_attack(e,vnormalize(vsub(aim,origin)),target_id);
             }
-            else if (!e->elite&&e->type != ENEMY_CASTER && horizontal<(e->type == ENEMY_BRUTE ? 2.5f : 1.6f)
+            else if(e->type==ENEMY_BOMBER&&distance<BOMBER_RANGE&&e->shot_timer<=0&&g->bomb_count<MAX_BOMBS)
+                begin_bomb(g,e,target_id);
+            else if (!e->elite&&(e->type==ENEMY_RUNNER||e->type==ENEMY_BRUTE) && horizontal<(e->type == ENEMY_BRUTE ? 2.5f : 1.6f)
                 && fabsf(delta.y)<1.7f && e->touch_timer==0) begin_attack(e,dir,target_id);
         }
         float desired_yaw = atan2f(delta.x,-delta.z);
@@ -482,7 +524,7 @@ static void update_enemies(Game *g, float dt) {
             float turn = atan2f(sinf(desired_yaw-e->yaw),cosf(desired_yaw-e->yaw));
             e->yaw += turn*fminf(1,dt*8);
         }
-        float speed = e->type == ENEMY_BRUTE ? 2.6f : (e->type == ENEMY_CASTER ? 3.0f : 4.8f);
+        float speed = e->type == ENEMY_BRUTE ? 2.6f : (e->type == ENEMY_BOMBER ? 2.8f : (e->type == ENEMY_CASTER ? 3.0f : 4.8f));
         speed += fminf(2.2f,(float)(g->wave-1)*.12f);
         speed*=g->difficulty==0?.9f:(g->difficulty==2?1.12f:1);
         if (e->attack_timer>0 || e->stagger>0 || e->spawn_time>0) speed = 0;
@@ -495,10 +537,10 @@ static void update_enemies(Game *g, float dt) {
         move_vertical(g->world,&e->body,dt,ENEMY_RADIUS*scale,ENEMY_HEIGHT*scale);
         float moved=hypotf(e->body.position.x-before.x,e->body.position.z-before.z);
         if(speed>1&&moved<speed*dt*.15f)e->stuck_time+=dt;else e->stuck_time=fmaxf(0,e->stuck_time-dt*2);
-        float moving = hypotf(e->body.velocity.x,e->body.velocity.z);
-        e->walk_phase += moving*dt*(e->type == ENEMY_BRUTE ? 1.8f : 2.8f);
+        float moving = e->body.grounded&&dt>0?moved/dt:0;
+        e->walk_phase += moving*dt*(e->type == ENEMY_BRUTE ? 1.8f : (e->type==ENEMY_BOMBER?2.1f:2.8f));
         e->movement_blend += (clampf(moving/4,0,1)-e->movement_blend)*fminf(1,dt*12);
-        if (e->attack_timer>0 && e->stagger==0) attack_update(g,e,dt);
+        if (e->attack_timer>0 && (e->stagger==0||e->type==ENEMY_BOMBER)) attack_update(g,e,dt);
     }
     for (int i=0;i<g->enemy_count;i++) for (int j=i+1;j<g->enemy_count;j++) {
         Enemy *a=&g->enemies[i], *b=&g->enemies[j];
@@ -697,7 +739,7 @@ static void update_world(Game *g,float dt) {
     }
     for(int i=0;i<g->pickup_count;i++)g->pickups[i].cooldown=fmaxf(0,g->pickups[i].cooldown-dt);
     for(int i=0;i<g->barrel_count;i++)g->barrels[i].explosion_time=fmaxf(0,g->barrels[i].explosion_time-dt);
-    update_enemies(g,dt);update_projectiles(g,dt);
+    update_bombs(g,dt);update_enemies(g,dt);update_projectiles(g,dt);
     for (int i=0;i<g->particle_count;) {
         Particle *particle=&g->particles[i]; particle->life-=dt;
         particle->position=vadd(particle->position,vscale(particle->velocity,dt));
@@ -719,7 +761,7 @@ static void update_world(Game *g,float dt) {
     if(g->enemy_count==0) {
         if(g->wave_timer<0) {
             g->wave_timer=INTERMISSION_TIME;g->score+=250;g->completed_waves=g->wave;g->wave_clear_time=2.8f;
-            g->projectile_count=0;game_end_rocket_event(g);game_offer_upgrades(g);
+            g->projectile_count=g->bomb_count=0;game_end_rocket_event(g);game_offer_upgrades(g);
             for(int i=0;i<MAX_PLAYERS;i++)if(actor_alive(g,i)) {
                 Player *p=actor_player(g,i);p->health=fminf(player_max_health(p),p->health+10);
             }

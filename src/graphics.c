@@ -96,6 +96,20 @@ void animate_arena(Mesh *m,const Game *g,const App *app) {
         }
         m->glow=0;
     }
+    for(int k=0;k<g->bomb_count;k++) {
+        const Bomb *b=&g->bombs[k];float age=1-clampf(b->time/BOMB_FALL_TIME,0,1);
+        Vec3 center=vadd(b->target,(Vec3){0,.055f,0});
+        Vec3 shell=vadd(b->target,(Vec3){0,.15f+b->height*(1-age*age),0});
+        Color danger={1,.33f+.18f*sinf(time*(8+age*12)),.06f};
+        m->glow=1;
+        mesh_ring(m,center,BOMB_RADIUS,.10f,danger,24);
+        mesh_ring(m,vadd(center,(Vec3){0,.012f,0}),fmaxf(.18f,BOMB_RADIUS*(1-age)),.065f,danger,20);
+        mesh_box(m,vadd(center,(Vec3){0,.01f,0}),(Vec3){.55f,.035f,.065f},danger);
+        mesh_box(m,vadd(center,(Vec3){0,.01f,0}),(Vec3){.065f,.035f,.55f},danger);
+        mesh_diamond(m,shell,.23f,(Color){1,.64f,.14f});m->glow=0;
+        mesh_beveled_box(m,vadd(shell,(Vec3){0,-.16f,0}),(Vec3){.34f,.33f,.34f},.045f,(Color){.23f,.19f,.13f});
+        m->glow=1;mesh_diamond(m,vadd(shell,(Vec3){0,.26f,0}),.08f,danger);m->glow=0;
+    }
     for(int k=0;k<g->blast_count;k++) {
         const Blast *b=&g->blasts[k];float life=b->time/.8f,age=1-life;
         m->glow=1;Color fire={life,life*.5f,life*.13f};

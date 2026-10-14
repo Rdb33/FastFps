@@ -1,6 +1,16 @@
 # Contrôles de FASTFPS
 
-Historique des contrôles sur la machine de développement, les 12 et 13 octobre 2026.
+Historique des contrôles sur la machine de développement, du 12 au 14 octobre 2026.
+
+## Version 1.1.0 — 14 octobre 2026
+
+- Compilation C11 avec `-O2 -Wall -Wextra -Wpedantic`, sans avertissement, et contrôle du diff.
+- Revue des seuils de déblocage : table unique des armes aux vagues 11 / 21 / 31, utilisée par les tirs, changements d'arme, notifications, HUD et validation réseau. Fixture existante des snapshots déplacée à la vague 41 pour conserver le lance rail et la transition vers Bastion.
+- Revue de la composition des vagues : trois bombardiers dès la vague 11, sans remplacer les deux brutes ou le champion. Santé de base 220 / 260 avant les multiplicateurs existants. Vampirisme utilise +1 PV par rang dans les dégâts autoritaires et son descriptif français.
+- Les bombes sont créées et résolues uniquement dans la simulation du monde de l'hôte. La prédiction locale ne crée pas d'explosions. Position fixe, chute de 3 s et recharge de 5 s ; dégâts appliqués à chaque joueur debout à portée, avec protection et armure conservées. Suppression des bombes lors de la fin de vague et du changement de map.
+- Protocole porté à 10 avec encodage explicite des bombes, limite de 12, bornes de durée / hauteur / cible / identifiant et contrôle des doublons. Les nouvelles alertes sonores et les délais d'affichage des invités dérivent des snapshots ; les maillages utilisent les buffers existants.
+- Étiquettes d'alliés projetées avec la matrice du monde et masquées par les obstacles. Phases de frappe calées sur le seuil existant de 62 % ; marche calculée selon le déplacement réellement parcouru plutôt que la vitesse souhaitée contre un mur.
+- **Aucun test exécuté pour cette version.** À vérifier en jouant : timing et esquive des bombes au sol et sur les plateformes, couvertures, lisibilité des animations / pseudos, dégâts et réanimations entre plusieurs machines. Aucune nouvelle mesure de FPS ou de latence sur Raspberry Pi ; les résultats ci-dessous concernent les versions indiquées.
 
 ## Version 0.9.3 — 14 octobre 2026
 

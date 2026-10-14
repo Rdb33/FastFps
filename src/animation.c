@@ -12,11 +12,16 @@ void animate_creature(Mesh *mesh, const Enemy *e, float time) {
     int first=mesh->count;
     bool dead=e->death_time>0;
     float blend=dead?0:e->movement_blend;
-    float stride=sinf(e->walk_phase)*.52f*blend;
-    float bounce=fabsf(cosf(e->walk_phase))*.035f*blend;
+    float gait=e->type==ENEMY_BRUTE?.38f:(e->type==ENEMY_BOMBER?.40f:.58f);
+    float stride=sinf(e->walk_phase)*gait*blend;
+    float bounce=(1-cosf(e->walk_phase*2))*.019f*blend;
     float breath=dead?0:sinf(time*2.6f+(float)e->id)*.013f;
     float progress=e->attack_timer>0?1-e->attack_timer/e->attack_duration:0;
-    float strike=e->attack_timer>0?sinf(smooth(clampf((progress-.25f)/.5f,0,1))*PI_F):0;
+    bool attacking=!dead&&e->attack_timer>0;
+    float release=attacking?smooth((progress-.52f)/.10f):0;
+    float windup=attacking?smooth(progress/.52f)*(1-release):0;
+    float strike=release*(1-smooth((progress-.62f)/.38f));
+    float attack_side=e->id%2?1:-1;
     float shoulder=bounce+breath;
     if(!dead&&e->slam_state==1)shoulder-=.15f*(1-e->slam_timer/.75f);
     if(!dead&&e->slam_state==3)shoulder-=e->slam_timer/.85f*.17f;
@@ -26,6 +31,8 @@ void animate_creature(Mesh *mesh, const Enemy *e, float time) {
         skin=(Color){.40f,.25f,.66f};armor=(Color){.18f,.13f,.31f};eye=(Color){.3f,1,.81f};width=.59f;
     } else if(e->type==ENEMY_BRUTE) {
         skin=(Color){.39f,.46f,.24f};armor=(Color){.61f,.52f,.24f};eye=(Color){1,.35f,.1f};width=.94f;
+    } else if(e->type==ENEMY_BOMBER) {
+        skin=(Color){.48f,.33f,.12f};armor=(Color){.24f,.20f,.15f};eye=(Color){1,.68f,.16f};width=.85f;
     }
     if(e->flash>0)skin=(Color){1,.88f,.67f};
     if(e->elite){armor=(Color){.88f,.59f,.18f};eye=(Color){1,.87f,.36f};skin=(Color){.37f,.26f,.16f};}
@@ -48,10 +55,23 @@ void animate_creature(Mesh *mesh, const Enemy *e, float time) {
         mesh_beveled_box(mesh,(Vec3){.55f,1.02f+shoulder,0},(Vec3){.35f,.27f,.68f},.06f,armor);
         mesh_diamond(mesh,(Vec3){-.34f,1.68f+shoulder,0},.20f,armor);
         mesh_diamond(mesh,(Vec3){.34f,1.68f+shoulder,0},.20f,armor);
+    } else if(e->type==ENEMY_BOMBER) {
+        for(int side=-1;side<=1;side+=2) {
+            mesh_beveled_box(mesh,(Vec3){side*.49f,1.03f+shoulder,.18f},(Vec3){.30f,.44f,.40f},.05f,armor);
+            mesh->glow=dead?0:.9f;
+            mesh_diamond(mesh,(Vec3){side*.49f,1.49f+shoulder,.20f},.12f,eye);mesh->glow=0;
+        }
+        mesh_beveled_box(mesh,(Vec3){0,.77f+shoulder,.38f},(Vec3){.59f,.56f,.28f},.045f,armor);
+        mesh->glow=dead?0:1;
+        mesh_box(mesh,(Vec3){0,1.39f+shoulder,-.28f},(Vec3){.40f,.08f,.06f},eye);mesh->glow=0;
     } else {
         mesh_diamond(mesh,(Vec3){-.30f,1.66f+shoulder,0},.16f,(Color){.78f,.68f,.44f});
         mesh_diamond(mesh,(Vec3){.30f,1.66f+shoulder,0},.16f,(Color){.78f,.68f,.44f});
     }
+    float lean=dead?0:-blend*.075f-strike*.09f+windup*.05f;
+    if(attacking&&e->type==ENEMY_BOMBER)lean=.045f*smooth(progress);
+    float twist=attacking&&(e->type==ENEMY_RUNNER||e->type==ENEMY_BRUTE)?attack_side*(strike*.18f-windup*.14f):0;
+    mesh_rotate(mesh,first,(Vec3){0,.55f+shoulder,0},lean,twist,dead?0:sinf(e->walk_phase)*blend*.025f);
     for(int side=-1;side<=1;side+=2) {
         float leg_angle=stride*(float)side;
         Vec3 hip={side*.22f,.57f+shoulder,0};
@@ -60,16 +80,26 @@ void animate_creature(Mesh *mesh, const Enemy *e, float time) {
         int shin=mesh->count;
         mesh_beveled_box(mesh,(Vec3){hip.x,.09f+shoulder,0},(Vec3){.21f,.24f,.23f},.025f,skin);
         mesh_beveled_box(mesh,(Vec3){hip.x,.025f+shoulder,-.07f},(Vec3){.27f,.15f,.37f},.03f,armor);
-        float knee=dead?.08f:fmaxf(0,-leg_angle)*.45f;
+        float knee=dead?.08f:fmaxf(0,-leg_angle)*1.15f;
         if(!dead&&e->slam_state==2)knee=.55f;
         mesh_rotate(mesh,shin,(Vec3){hip.x,.33f+shoulder,0},knee,0,0);
         mesh_rotate(mesh,leg,hip,leg_angle,0,0);
         float arm_angle=-leg_angle*.75f;
         if(!dead&&e->slam_state)arm_angle=e->slam_state==2?1.8f:(e->slam_state==1?-.5f:1.2f);
-        if(e->attack_timer>0)arm_angle=e->type==ENEMY_CASTER?.55f+strike*.65f:-.42f+strike*1.75f;
-        Vec3 pivot={side*(width/2+.12f),1.1f+shoulder,0};
-        mesh_joint_box(mesh,(Vec3){pivot.x,.62f+shoulder,0},(Vec3){.20f,.48f,.25f},pivot,arm_angle,skin);
-        mesh_joint_box(mesh,(Vec3){pivot.x,.49f+shoulder,-.035f},(Vec3){.25f,.17f,.30f},pivot,arm_angle,armor);
+        float elbow=.12f+fmaxf(0,leg_angle)*.35f;
+        if(attacking) {
+            if(e->type==ENEMY_BOMBER){arm_angle=1.0f+smooth(progress)*1.25f;elbow=.4f;}
+            else if(e->type==ENEMY_CASTER){arm_angle=.55f+windup*.25f+strike*1.0f;elbow=.65f*(1-strike);}
+            else if((float)side==attack_side){arm_angle=-windup*.95f+strike*1.65f;elbow=windup*.75f+strike*.10f;}
+            else {arm_angle=windup*.25f+strike*.4f;elbow=.25f;}
+        }
+        Vec3 pivot={side*(width/2+.12f),1.1f+shoulder,0};int arm=mesh->count;
+        mesh_beveled_box(mesh,(Vec3){pivot.x,.80f+shoulder,0},(Vec3){.20f,.30f,.24f},.025f,skin);
+        int forearm=mesh->count;
+        mesh_beveled_box(mesh,(Vec3){pivot.x,.54f+shoulder,-.025f},(Vec3){.21f,.25f,.24f},.025f,skin);
+        mesh_beveled_box(mesh,(Vec3){pivot.x,.42f+shoulder,-.045f},(Vec3){.25f,.17f,.30f},.025f,armor);
+        mesh_rotate(mesh,forearm,(Vec3){pivot.x,.66f+shoulder,0},elbow,0,0);
+        mesh_rotate(mesh,arm,pivot,arm_angle,0,(float)side*(attacking&&e->type==ENEMY_BOMBER?.12f:.025f));
     }
     if(!dead&&e->type==ENEMY_CASTER&&e->attack_timer>0&&!e->attack_fired) {
         mesh->glow=1;
@@ -79,6 +109,16 @@ void animate_creature(Mesh *mesh, const Enemy *e, float time) {
         for(int i=0;i<3;i++) {
             float angle=time*9+(float)i*2*PI_F/3;
             mesh_diamond(mesh,(Vec3){sinf(angle)*.24f,1.2f+cosf(angle)*.24f,-.67f},.035f,(Color){.42f,1,.82f});
+        }
+        mesh->glow=0;
+    }
+    if(attacking&&e->type==ENEMY_BOMBER) {
+        mesh->glow=1;
+        float charge=smooth(progress);
+        mesh_diamond(mesh,(Vec3){0,1.95f+shoulder,.05f},.09f+.13f*charge,eye);
+        for(int i=0;i<3;i++) {
+            float angle=time*5+(float)i*2*PI_F/3;
+            mesh_diamond(mesh,(Vec3){sinf(angle)*.28f,1.95f+shoulder,cosf(angle)*.28f},.04f,eye);
         }
         mesh->glow=0;
     }

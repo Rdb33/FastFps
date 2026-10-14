@@ -1,3 +1,14 @@
+# Version 1.1.0
+
+- Fusil à pompe à la vague 11, mitrailleuse à la 21 et lance rail à la 31 ; notifications et disponibilité partagées avec la coopération.
+- Bombardier dès la vague 11 : trois par vague contre deux brutes, 220 PV de base contre 260, silhouette ambrée avec visière et générateurs lumineux.
+- Bombes à portée de 48 m, cible visible et position fixe ; chute de 3 s, puis recharge de 5 s. Cercle de danger de 3,5 m, compte à rebours, alerte en français, explosion avec dégâts de zone diminuant selon la distance et bloqués par les murs.
+- Vampirisme réduit de +2 à +1 PV par élimination et par rang, en solo comme en coopération.
+- Étiquettes des alliés plus contrastées, numéro J1–J4, pseudo, couleur et pointe au-dessus de la tête ; portée de visibilité augmentée à 48 m, occlusion conservée.
+- Marche fondée sur le déplacement réel, foulées par silhouette, coudes / genoux articulés et mouvement du torse. Préparation / frappe / récupération calées sur le moment des dégâts ; charge spécifique du bombardier.
+- Protocole 10 : bombes, positions, cibles et délais répliqués. Décisions et dégâts uniquement sur l'hôte ; mise à jour de tous les joueurs nécessaire. Aucune nouvelle dépendance ou passe de rendu.
+- Compilation C11 et revue de code. Fixture de snapshot des armes adaptée ; tests, partie réelle et mesures Raspberry Pi non exécutés pour cette version.
+
 # Version 0.9.3
 
 - Trajets et quais spécifiques : traversée latérale du Réacteur ; ascenseurs nord / sud et convoyeur longitudinal de la Fonderie ; accès inclinés et navette en arc du Bastion. Hauteurs, pauses, phases de départ, repères et soins adaptés à chaque map.

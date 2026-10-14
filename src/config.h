@@ -2,7 +2,7 @@
 #define FASTFPS_CONFIG_H
 
 /* Réglages de la première base : gameplay proche d'un Doom moderne. */
-#define GAME_VERSION "0.9.3"
+#define GAME_VERSION "1.1.0"
 #define MAP_COUNT 3
 #define STANDARD_WEAPONS 4
 #define WEAPON_ROCKET 4
@@ -10,6 +10,11 @@
 #define MAX_PLATFORMS 3
 #define MAX_DECKS 2
 #define MAX_BLASTS 8
+#define MAX_BOMBS 12
+#define BOMB_FALL_TIME 3.0f
+#define BOMB_RELOAD_TIME 5.0f
+#define BOMB_RADIUS 3.5f
+#define BOMBER_RANGE 48.0f
 #define REVIVE_TIME 2.5f
 #define REVIVE_RANGE 2.8f
 #define PRESET_COUNT 4

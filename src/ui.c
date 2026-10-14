@@ -116,12 +116,26 @@ void ui_build(Mesh *m,const Game *g,const App *app) {
             snprintf(text,sizeof(text),"SERIE %02d / X%d",g->combo,multiplier);
             centered(m,44,1,orange,text);
         }
+        float bomb_time=BOMB_FALL_TIME+1;
+        for(int i=0;i<g->bomb_count;i++) {
+            const Bomb *b=&g->bombs[i];Vec3 delta=vsub(g->player.body.position,b->target);
+            Vec3 source=vadd(b->target,(Vec3){0,.25f,0}),center=vadd(g->player.body.position,(Vec3){0,.65f,0});
+            Vec3 ray=vsub(center,source);float length=vlength(ray);
+            if(hypotf(delta.x,delta.z)<BOMB_RADIUS+1&&fabsf(delta.y)<BOMB_RADIUS
+                &&world_ray(g->world,source,vnormalize(ray),length)>=length-.05f)bomb_time=fminf(bomb_time,b->time);
+        }
+        if(bomb_time<=BOMB_FALL_TIME&&!g->dead) {
+            mesh_rect(m,219,213,202,20,(Color){.19f,.055f,.025f});
+            snprintf(text,sizeof(text),"BOMBE : %.1f S / ESQUIVE !",bomb_time);
+            centered(m,220,1,(Color){1,.72f,.3f},text);
+            mesh_rect(m,219,232,202*(1-bomb_time/BOMB_FALL_TIME),2,orange);
+        }
         const Enemy *target=aim_target(g);
         if(target) {
             Color color=target->type==ENEMY_CASTER?(Color){.67f,.43f,1}:
-                (target->type==ENEMY_BRUTE?(Color){.78f,.83f,.32f}:orange);
+                (target->type==ENEMY_BRUTE?(Color){.78f,.83f,.32f}:(target->type==ENEMY_BOMBER?(Color){1,.75f,.24f}:orange));
             if(target->elite)color=(Color){1,.76f,.25f};
-            centered(m,86,1,color,target->elite?"CHAMPION":(target->type==ENEMY_CASTER?"INVOCATEUR":(target->type==ENEMY_BRUTE?"BRUTE":"TRAQUEUR")));
+            centered(m,86,1,color,target->elite?"CHAMPION":(target->type==ENEMY_CASTER?"INVOCATEUR":(target->type==ENEMY_BRUTE?"BRUTE":(target->type==ENEMY_BOMBER?"BOMBARDIER":"TRAQUEUR"))));
             mesh_rect(m,270,98,100,3,(Color){.16f,.15f,.12f});
             mesh_rect(m,270,98,100*clampf(target->health/fmaxf(1,target->max_health),0,1),3,color);
         }
@@ -208,15 +222,15 @@ void ui_teammates(Mesh *m,const Game *g,const App *app,Mat4 matrix) {
     for(int id=0;id<MAX_PLAYERS;id++)if(id!=g->local_actor&&g->actors[id].active) {
         const Actor *a=&g->actors[id];Vec3 head=vadd(a->player.body.position,(Vec3){0,a->dead?.38f:1.48f,0});
         Vec3 delta=vsub(head,eye);float distance=vlength(delta);
-        if(distance<.8f||distance>25||world_ray(g->world,eye,vscale(delta,1/distance),distance)<distance-.05f)continue;
-        Vec3 label=vadd(a->player.body.position,(Vec3){0,a->dead?.95f:1.93f,0});
+        if(distance<.8f||distance>48||world_ray(g->world,eye,vscale(delta,1/distance),distance)<distance-.05f)continue;
+        Vec3 label=vadd(a->player.body.position,(Vec3){0,a->dead?1.02f:2.12f,0});
         float w=matrix.m[3]*label.x+matrix.m[7]*label.y+matrix.m[11]*label.z+matrix.m[15];
         if(w<=.2f)continue;
         float x=(matrix.m[0]*label.x+matrix.m[4]*label.y+matrix.m[8]*label.z+matrix.m[12])/w;
         float y=(matrix.m[1]*label.x+matrix.m[5]*label.y+matrix.m[9]*label.z+matrix.m[13])/w;
         if(fabsf(x)>.96f||fabsf(y)>.85f)continue;
-        x=(x*.5f+.5f)*640;y=(.5f-y*.5f)*360-14;
-        char name[PLAYER_NAME_LENGTH+8];snprintf(name,sizeof(name),"%d %s",id+1,a->name);
+        x=(x*.5f+.5f)*640;y=(.5f-y*.5f)*360-18;
+        char name[PLAYER_NAME_LENGTH+8];snprintf(name,sizeof(name),"J%d %s",id+1,a->name[0]?a->name:"ALLIE");
         float width=(float)strlen(name)*6+12,height=a->dead?27:17;
         x=clampf(x,width/2+8,632-width/2);
         for(int attempt=0;attempt<MAX_PLAYERS;attempt++) {
@@ -229,7 +243,12 @@ void ui_teammates(Mesh *m,const Game *g,const App *app,Mat4 matrix) {
         }
         if(y<44||y+height>286)continue;
         Color color=a->dead?orange:teammate_color(id);
+        mesh_rect(m,x-width/2-1,y-4,width+2,height+2,(Color){.015f,.022f,.03f});
         mesh_rect(m,x-width/2,y-3,width,height,(Color){.04f,.065f,.09f});
+        /* Pointe vers le coéquipier ; la couleur correspond à son armure. */
+        mesh_rect(m,x-3,y+height-2,6,2,color);
+        mesh_rect(m,x-2,y+height,4,2,color);
+        mesh_rect(m,x-1,y+height+2,2,2,color);
         mesh_rect(m,x-width/2,y-3,2,height,color);
         mesh_text(m,x-width/2+6,y,1,color,name);
         float progress=clampf(a->dead?a->revive_progress/REVIVE_TIME:a->player.health/player_max_health(&a->player),0,1);

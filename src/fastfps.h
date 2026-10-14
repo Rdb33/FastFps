@@ -13,6 +13,7 @@ typedef struct { Vec3 min, max; } Box;
 typedef struct { Vec3 base, size, travel; float period; int solid; Vec3 arc; float dwell, offset; } Platform;
 typedef struct { Vec3 base, size, pickup; float yaw, gate; } Deck;
 typedef struct { Vec3 position; float time, radius; } Blast;
+typedef struct { Vec3 target; float height, time; int source, target_actor; } Bomb;
 typedef struct { float m[16]; } Mat4;
 typedef struct { Vec3 position; Color color; Vec3 normal; float glow; } Vertex;
 typedef struct { Vertex *data; int count, capacity; float glow; } Mesh;
@@ -63,7 +64,7 @@ typedef struct {
     bool active, dead, dash_pressed, melee_pressed;
     char name[PLAYER_NAME_LENGTH+1];
 } Actor;
-typedef enum { ENEMY_RUNNER, ENEMY_CASTER, ENEMY_BRUTE } EnemyType;
+typedef enum { ENEMY_RUNNER, ENEMY_CASTER, ENEMY_BRUTE, ENEMY_BOMBER } EnemyType;
 typedef struct {
     Body body;
     int id, type;
@@ -92,6 +93,7 @@ typedef struct {
     Pickup pickups[MAX_PICKUPS]; int pickup_count;
     Barrel barrels[MAX_BARRELS]; int barrel_count;
     Blast blasts[MAX_BLASTS]; int blast_count;
+    Bomb bombs[MAX_BOMBS]; int bomb_count;
     bool rocket_event;
     int event_last_wave, unlock_weapon;
     uint32_t event_rng, event_serial;
