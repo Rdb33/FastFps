@@ -93,6 +93,18 @@ void mesh_rect(Mesh *m,float x,float y,float w,float h,Color c) {
     mesh_quad(m,(Vec3){x,y,0},(Vec3){x+w,y,0},(Vec3){x+w,y+h,0},(Vec3){x,y+h,0},c,(Vec3){0,1,0});
 }
 
+void mesh_rotate(Mesh *m,int first,Vec3 pivot,float pitch,float yaw,float roll) {
+    float cp=cosf(pitch),sp=sinf(pitch),cy=cosf(yaw),sy=sinf(yaw),cr=cosf(roll),sr=sinf(roll);
+    for(int i=first;i<m->count;i++) {
+        Vertex *v=&m->data[i];
+        Vec3 p=vsub(v->position,pivot),n=v->normal;
+        float y=p.y*cp-p.z*sp,z=p.y*sp+p.z*cp,x=p.x*cy-z*sy;
+        z=p.x*sy+z*cy;v->position=vadd(pivot,(Vec3){x*cr-y*sr,x*sr+y*cr,z});
+        y=n.y*cp-n.z*sp;z=n.y*sp+n.z*cp;x=n.x*cy-z*sy;
+        z=n.x*sy+z*cy;v->normal=(Vec3){x*cr-y*sr,x*sr+y*cr,z};
+    }
+}
+
 void mesh_ring(Mesh *m,Vec3 p,float radius,float width,Color color,int segments) {
     if(radius<=0||width<=0||segments<3)return;
     float inner=fmaxf(0,radius-width);

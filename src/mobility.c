@@ -1,16 +1,19 @@
 #include "fastfps.h"
 #include <math.h>
 
-Box platform_box(const Platform *p,float time) {
-    /* Stop at each dock for 16% of the cycle, with smooth acceleration. */
-    float phase=fmodf(time/p->period,1);if(phase<0)phase+=1;
+Vec3 platform_position(const Platform *p,float time) {
+    float dwell=clampf(p->dwell,0,.4f),duration=.5f-dwell;
+    float phase=fmodf(time/p->period+p->offset,1);if(phase<0)phase+=1;
     float amount;
-    if(phase<.16f)amount=0;
-    else if(phase<.5f)amount=(phase-.16f)/.34f;
-    else if(phase<.66f)amount=1;
-    else amount=1-(phase-.66f)/.34f;
+    if(phase<dwell)amount=0;
+    else if(phase<.5f)amount=(phase-dwell)/duration;
+    else if(phase<.5f+dwell)amount=1;
+    else amount=1-(phase-.5f-dwell)/duration;
     amount=amount*amount*(3-2*amount);
-    Vec3 center=vadd(p->base,vscale(p->travel,amount));
+    return vadd(vadd(p->base,vscale(p->travel,amount)),vscale(p->arc,4*amount*(1-amount)));
+}
+Box platform_box(const Platform *p,float time) {
+    Vec3 center=platform_position(p,time);
     return (Box){{center.x-p->size.x/2,center.y,center.z-p->size.z/2},
         {center.x+p->size.x/2,center.y+p->size.y,center.z+p->size.z/2}};
 }

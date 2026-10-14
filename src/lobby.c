@@ -207,7 +207,13 @@ void lobby_build(Mesh *m,const Game *g,const App *app) {
         return;
     }
     snprintf(text,sizeof(text),"CHEZ %s / %s",n->members[0].name,n->mode==NET_HOST?"TU HEBERGES":"TU ES INVITE");centered(m,82,1,blue,text);
-    if(n->connecting)centered(m,143,2,ink,"CONNEXION...");
+    if(n->connecting) {
+        centered(m,143,2,ink,"CONNEXION...");
+        for(int dot=0;dot<3;dot++) {
+            float light=.35f+.65f*(.5f+.5f*sinf(app->ui_time*4-(float)dot));
+            mesh_rect(m,303+(float)dot*14,169,6,6,(Color){blue.r*light,blue.g*light,blue.b*light});
+        }
+    }
     else for(int i=0;i<MAX_PLAYERS;i++) {
         float y=106+(float)i*23;mesh_rect(m,84,y-4,472,20,(Color){.10f,.13f,.105f});
         snprintf(text,sizeof(text),"%d  %-16s  %s%s",i+1,n->members[i].present?n->members[i].name:"PLACE LIBRE",

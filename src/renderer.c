@@ -187,6 +187,11 @@ void renderer_draw(Renderer *r,const Game *g,const App *app) {
     float fov=(87+(app->motion?speed*.2f:0))*PI_F/180;
     Mat4 projection=perspective(fov,(float)r->width/(float)r->height,.05f,100);
     Mat4 view=view_matrix(player_eye(p,app->motion),p->yaw,p->pitch);
+    if(app->motion) {
+        float angle=p->strafe_blend*.009f+(p->body.grounded?sinf(p->bob)*p->movement_blend*.0025f:0);
+        float c=cosf(angle),s=sinf(angle);
+        Mat4 roll={{c,s,0,0,-s,c,0,0,0,0,1,0,0,0,0,1}};view=mat_multiply(roll,view);
+    }
     Mat4 matrix=mat_multiply(projection,view);
     glBindFramebuffer(GL_FRAMEBUFFER,r->framebuffer);glViewport(0,0,r->width,r->height);
     glEnable(GL_DEPTH_TEST);glEnable(GL_CULL_FACE);glDisable(GL_BLEND);
@@ -224,8 +229,17 @@ void renderer_draw(Renderer *r,const Game *g,const App *app) {
     for(int i=0;i<g->barrel_count;i++)animate_barrel(m,&g->barrels[i],g->time);
     for(int i=0;i<g->enemy_count;i++)animate_creature(m,&g->enemies[i],g->time);
     for(int i=0;i<g->corpse_count;i++)animate_creature(m,&g->corpses[i],g->time);
+    float pose_dt=app->ui_time-r->pose_time;if(pose_dt<0)pose_dt+=600;
+    pose_dt=clampf(pose_dt,0,.1f);r->pose_time=app->ui_time;
+    if(g->tick<r->pose_tick||app->state==STATE_MENU||!g->cooperative)memset(r->down_blend,0,sizeof(r->down_blend));
+    r->pose_tick=g->tick;
+    for(int i=0;i<MAX_PLAYERS;i++) {
+        float target=g->actors[i].active&&g->actors[i].dead?1:0;
+        if(target>r->down_blend[i])r->down_blend[i]=fminf(target,r->down_blend[i]+pose_dt/.40f);
+        else r->down_blend[i]=fmaxf(target,r->down_blend[i]-pose_dt/.35f);
+    }
     if(g->cooperative)for(int i=0;i<MAX_PLAYERS;i++)if(g->actors[i].active&&i!=g->local_actor)
-        animate_teammate(m,&g->actors[i],i,g->time,r->detail_level);
+        animate_teammate(m,&g->actors[i],i,g->time,r->detail_level,r->down_blend[i]);
     for(int i=0;i<g->projectile_count;i++) {
         const Projectile *bolt=&g->projectiles[i];
         m->glow=1;
@@ -258,6 +272,7 @@ void renderer_draw(Renderer *r,const Game *g,const App *app) {
             mesh_box(m,vadd(base,(Vec3){0,.04f,.8f}),(Vec3){1.4f*progress+.01f,.03f,.08f},(Color){.25f,.7f,.4f});
             continue;
         }
+        mesh_ring(m,vadd(g->pickups[i].position,(Vec3){0,.025f,0}),.65f+.05f*sinf(g->time*2),.045f,(Color){.2f,.65f,.32f},12);
         int first=m->count;
         m->glow=.65f;
         Vec3 base=g->pickups[i].position;base.y+=.45f+sinf(g->time*2+base.x)*.1f;

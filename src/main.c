@@ -307,6 +307,7 @@ int main(int argc,char **argv) {
         }
         float music_focus=app.state==STATE_PAUSED?.15f:(gameplay_music&&game.dead?.1f:(app.state==STATE_UPGRADE?.6f:1));
         audio_music(app.music_volume,gameplay_music,music_focus);
+        menu_animate(&app,(float)elapsed);
         double interval=1.0/((app.state==STATE_PLAYING||app.state==STATE_UPGRADE)?PRESETS[app.quality].fps:30);
         if(now-last_render>=interval-.0005) {
             last_render=now;

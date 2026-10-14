@@ -8,14 +8,7 @@ Color teammate_color(int id) {
 /* Rotate a body section around its joint; positions and normals stay in the
  * existing dynamic mesh. No textures, extra buffers or drawing passes. */
 static void joint_pose(Mesh *m,int first,Vec3 pivot,float pitch,float roll) {
-    float cp=cosf(pitch),sp=sinf(pitch),cr=cosf(roll),sr=sinf(roll);
-    for(int i=first;i<m->count;i++) {
-        Vertex *v=&m->data[i];Vec3 p=vsub(v->position,pivot),n=v->normal;
-        float y=p.y*cp-p.z*sp,z=p.y*sp+p.z*cp;
-        v->position=vadd(pivot,(Vec3){p.x*cr-y*sr,p.x*sr+y*cr,z});
-        y=n.y*cp-n.z*sp;z=n.y*sp+n.z*cp;
-        v->normal=(Vec3){n.x*cr-y*sr,n.x*sr+y*cr,z};
-    }
+    mesh_rotate(m,first,pivot,pitch,0,roll);
 }
 static void badge(Mesh *m,int id,Vec3 position,float yaw,Color color) {
     int first=m->count;char text[2]={(char)('1'+id),0};
@@ -24,7 +17,7 @@ static void badge(Mesh *m,int id,Vec3 position,float yaw,Color color) {
     for(int i=first;i+2<m->count;i+=3){Vertex swap=m->data[i+1];m->data[i+1]=m->data[i+2];m->data[i+2]=swap;}
     mesh_pose(m,first,position,yaw,0,.018f);m->glow=glow;
 }
-static float held_weapon(Mesh *m,int weapon,int sides,Color accent) {
+static float held_weapon(Mesh *m,int weapon,int sides,Color accent,ReloadPose reload) {
     Color dark={.10f,.15f,.18f},metal={.46f,.52f,.54f};
     mesh_beveled_box(m,(Vec3){0,-.04f,0},(Vec3){.22f,.17f,.35f},.035f,dark);
     mesh_box(m,(Vec3){0,-.16f,.09f},(Vec3){.11f,.16f,.13f},dark);
@@ -43,7 +36,7 @@ static float held_weapon(Mesh *m,int weapon,int sides,Color accent) {
         mesh_box(m,(Vec3){0,-.07f,-.31f},(Vec3){.21f,.11f,.20f},dark);muzzle=.63f;
     }else if(weapon==2||weapon==3) {
         bool rail=weapon==3;
-        mesh_box(m,(Vec3){0,-.19f,.0f},(Vec3){.14f,.24f,.18f},metal);
+        mesh_box(m,(Vec3){-reload.extract*.12f,-.19f-reload.extract*.22f,.10f*reload.extract},(Vec3){.14f,.24f,.18f},metal);
         mesh_cylinder(m,(Vec3){0,.015f,-.14f},(Vec3){0,.015f,rail?-.80f:-.66f},rail?.065f:.044f,metal,sides);
         if(rail) {
             m->glow=.65f;
@@ -58,7 +51,7 @@ static float held_weapon(Mesh *m,int weapon,int sides,Color accent) {
     }
     return muzzle;
 }
-void animate_teammate(Mesh *m,const Actor *actor,int id,float time,int detail) {
+void animate_teammate(Mesh *m,const Actor *actor,int id,float time,int detail,float down_blend) {
     const Player *p=&actor->player;int first=m->count;
     Color armor=teammate_color(id),dark={.10f,.16f,.21f},metal={.34f,.41f,.45f},trim={.76f,.84f,.88f};
     bool dead=actor->dead,helping=!dead&&actor->revive_held&&actor->revive_target>=0;
@@ -110,13 +103,14 @@ void animate_teammate(Mesh *m,const Actor *actor,int id,float time,int detail) {
     if(detail)for(int slot=-1;slot<=1;slot++)
         mesh_box(m,(Vec3){(float)slot*.095f,.95f+settle,.372f},(Vec3){.035f,.025f,.02f},trim);
     int arms=m->count;
-    float reload=p->reload_duration>0&&p->reload_timer>0?sinf((1-p->reload_timer/p->reload_duration)*PI_F):0;
+    ReloadPose gesture=helping?(ReloadPose){0}:weapon_reload_pose(p);
+    float reload=gesture.lower;
     float switching=clampf(p->weapon_switch/WEAPON_SWITCH_TIME,0,1);
     float punch=!dead&&p->melee_timer>0?sinf((1-p->melee_timer/MELEE_COOLDOWN)*PI_F):0;
     for(int side=-1;side<=1;side+=2) {
         Vec3 shoulder={(float)side*.34f,1.17f+settle,0};
         Vec3 elbow={(float)side*.34f,.95f+settle,-.12f};
-        Vec3 hand={side>0?.22f:-.07f,1.07f+settle-(side<0?reload*.16f:0),side>0?-.25f:-.56f};
+        Vec3 hand={side>0?.22f:-.07f,1.07f+settle-(side<0?gesture.extract*.21f-gesture.rack*.12f:0),side>0?-.25f:-.56f};
         if(dead){elbow.z=.02f;hand=(Vec3){(float)side*.33f,.79f+settle,-.05f};}
         else if(helping)hand=(Vec3){(float)side*.20f,.71f+settle,-.37f};
         else if(side>0)hand.z-=punch*.32f;
@@ -126,7 +120,7 @@ void animate_teammate(Mesh *m,const Actor *actor,int id,float time,int detail) {
     }
     if(!dead) {
         int gun=m->count;
-        Color accent=WEAPONS[p->weapon].color;float muzzle=held_weapon(m,p->weapon,sides,accent);
+        Color accent=WEAPONS[p->weapon].color;float muzzle=held_weapon(m,p->weapon,sides,accent,gesture);
         if(actor->shot_age<.06f&&p->reload_timer<=0&&p->weapon_switch<=0&&!helping) {
             float size=.10f*(1-actor->shot_age/.06f);m->glow=1;
             mesh_diamond(m,(Vec3){0,.03f,-muzzle},size,(Color){1,.79f,.35f});
@@ -134,10 +128,13 @@ void animate_teammate(Mesh *m,const Actor *actor,int id,float time,int detail) {
         }
         mesh_pose(m,gun,(Vec3){.22f,1.09f+settle,-.31f+recoil*.06f},0,0,1);
     }
-    joint_pose(m,arms,(Vec3){0,1.17f+settle,0},dead?0:(helping?-.3f:p->pitch*.9f-reload*.48f-switching*.55f-punch*.3f),0);
+    joint_pose(m,arms,(Vec3){0,1.17f+settle,0},dead?0:(helping?-.3f:p->pitch*.9f-reload*.40f+gesture.rack*.08f-switching*.55f-punch*.3f),0);
     joint_pose(m,upper,chest,dead?0:(helping?-.16f:p->pitch*.1f-(p->dash_timer>0?.12f:0)),dead?0:-p->strafe_blend*.065f);
     Vec3 position=p->body.position;
-    if(dead)position=vadd(position,(Vec3){sinf(p->yaw)*.8f,.28f,-cosf(p->yaw)*.8f});
-    mesh_pose(m,first,position,p->yaw,dead?PI_F*.5f:0,1);
+    float fall=clampf(down_blend,0,1);fall=fall*fall*(3-2*fall);
+    position=vadd(position,(Vec3){sinf(p->yaw)*.8f*fall,.28f*fall,-cosf(p->yaw)*.8f*fall});
+    mesh_pose(m,first,position,p->yaw,PI_F*.5f*fall,1);
+    if(fall>.01f||p->body.grounded)for(int i=first;i<m->count;i++)
+        m->data[i].position.y=fmaxf(m->data[i].position.y,p->body.position.y+.012f);
     m->glow=0;
 }

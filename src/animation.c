@@ -55,8 +55,15 @@ void animate_creature(Mesh *mesh, const Enemy *e, float time) {
     for(int side=-1;side<=1;side+=2) {
         float leg_angle=stride*(float)side;
         Vec3 hip={side*.22f,.57f+shoulder,0};
-        mesh_joint_box(mesh,(Vec3){hip.x,.13f+shoulder,0},(Vec3){.23f,.44f,.25f},hip,leg_angle,skin);
-        mesh_joint_box(mesh,(Vec3){hip.x,.025f+shoulder,-.07f},(Vec3){.27f,.15f,.37f},hip,leg_angle,armor);
+        int leg=mesh->count;
+        mesh_beveled_box(mesh,(Vec3){hip.x,.32f+shoulder,0},(Vec3){.23f,.25f,.25f},.025f,skin);
+        int shin=mesh->count;
+        mesh_beveled_box(mesh,(Vec3){hip.x,.09f+shoulder,0},(Vec3){.21f,.24f,.23f},.025f,skin);
+        mesh_beveled_box(mesh,(Vec3){hip.x,.025f+shoulder,-.07f},(Vec3){.27f,.15f,.37f},.03f,armor);
+        float knee=dead?.08f:fmaxf(0,-leg_angle)*.45f;
+        if(!dead&&e->slam_state==2)knee=.55f;
+        mesh_rotate(mesh,shin,(Vec3){hip.x,.33f+shoulder,0},knee,0,0);
+        mesh_rotate(mesh,leg,hip,leg_angle,0,0);
         float arm_angle=-leg_angle*.75f;
         if(!dead&&e->slam_state)arm_angle=e->slam_state==2?1.8f:(e->slam_state==1?-.5f:1.2f);
         if(e->attack_timer>0)arm_angle=e->type==ENEMY_CASTER?.55f+strike*.65f:-.42f+strike*1.75f;
@@ -91,8 +98,10 @@ void animate_creature(Mesh *mesh, const Enemy *e, float time) {
         fall=smooth(e->death_time/.55f)*PI_F*.49f;
         scale*=1-smooth((e->death_time-3.15f)/.85f);
         position.y+=sinf(fall)*.30f*scale;
-    } else scale*=.68f+.32f*(1-e->spawn_time/.5f);
+    } else scale*=.68f+.32f*smooth(1-e->spawn_time/.5f);
     mesh_pose(mesh,first,position,e->yaw,fall,scale);
+    if(!dead&&e->body.grounded)for(int i=first;i<mesh->count;i++)
+        mesh->data[i].position.y=fmaxf(mesh->data[i].position.y,e->body.position.y+.007f);
     if(dead)for(int i=first;i<mesh->count;i++)
         mesh->data[i].position.y=fmaxf(mesh->data[i].position.y,e->body.position.y+.012f);
     if(!dead&&e->spawn_time>0)mesh_ring(mesh,vadd(position,(Vec3){0,.035f,0}),
@@ -116,18 +125,23 @@ void animate_weapon(Mesh *mesh, const Game *g, const App *app) {
     if(g->dead)return;
     const Player *p=&g->player;
     float motion=app->motion?1:0;
-    float blend=p->movement_blend;
-    float sway=sinf(p->bob)*blend*.022f*motion;
-    float vertical=(fabsf(cosf(p->bob))*blend*.012f+sinf(g->time*2.1f)*.003f*(1-blend))*motion;
-    float lower=p->weapon_switch>0?sinf(p->weapon_switch/WEAPON_SWITCH_TIME*PI_F)*.40f:0;
-    float reload=p->reload_timer>0?1-p->reload_timer/p->reload_duration:0;
-    float reload_pose=p->reload_timer>0?sinf(reload*PI_F):0;
-    lower+=reload_pose*.10f;
-    bool helping=g->cooperative&&g->actors[g->local_actor].revive_target>=0;
+    float blend=p->movement_blend*(p->body.grounded?1:.2f);
+    float hurry=clampf((hypotf(p->body.velocity.x,p->body.velocity.z)-PLAYER_SPEED*(1+.03f*p->upgrades[UPGRADE_MOBILITY]))/4,0,1);
+    float sway=(sinf(p->bob)*.020f+sinf(p->bob*.5f)*.006f)*blend*motion;
+    float vertical=(cosf(p->bob*2)*blend*.009f+sinf(g->time*2.1f)*.003f)*motion;
+    float switching=0;
+    if(p->weapon_switch>0) {
+        float t=1-p->weapon_switch/WEAPON_SWITCH_TIME;
+        switching=t<.5f?smooth(t*2):1-smooth((t-.5f)*2);
+    }
+    bool helping=g->cooperative&&g->actors[g->local_actor].revive_held&&g->actors[g->local_actor].revive_target>=0;
+    ReloadPose gesture=helping?(ReloadPose){0}:weapon_reload_pose(p);
+    float reload=gesture.progress,reload_pose=gesture.lower;
+    float lower=switching*.36f+reload_pose*.10f+hurry*.035f*motion;
     if(helping)lower+=.30f;
     float melee_age=MELEE_COOLDOWN-p->melee_timer;
     float punch=p->melee_timer>0&&melee_age<.30f?sinf(melee_age/.30f*PI_F):0;
-    Vec3 base={sway-p->sway_x*motion,-.39f-vertical-lower-g->recoil*.035f+p->landing*.4f*motion,
+    Vec3 base={sway-p->sway_x*motion-p->strafe_blend*.014f*motion,-.39f-vertical-lower-g->recoil*.035f+(p->landing*.6f+p->sway_y)*motion,
         -.62f+g->recoil*.10f};
     if(punch>0)base.y-=punch*.22f;
     base.y-=p->dash_timer/DASH_DURATION*.06f*motion;
@@ -167,8 +181,10 @@ void animate_weapon(Mesh *mesh, const Game *g, const App *app) {
         }
         mesh_box(mesh,vadd(base,(Vec3){0,-.11f,.18f}),(Vec3){.23f,.14f,.22f},dark);
         mesh_box(mesh,vadd(base,(Vec3){0,-.045f,-.14f+pump}),(Vec3){.32f,.09f,.17f},dark);
-        mesh_box(mesh,vadd(base,(Vec3){-.10f,-.10f,-.12f+pump}),(Vec3){.18f,.12f,.22f},glove);
-        mesh_box(mesh,vadd(base,(Vec3){-.18f,-.20f,.09f+pump}),(Vec3){.13f,.14f,.32f},skin);
+        if(!gesture.active&&!helping) {
+            mesh_box(mesh,vadd(base,(Vec3){-.10f,-.10f,-.12f+pump}),(Vec3){.18f,.12f,.22f},glove);
+            mesh_box(mesh,vadd(base,(Vec3){-.18f,-.20f,.09f+pump}),(Vec3){.13f,.14f,.32f},skin);
+        }
         mesh_box(mesh,vadd(base,(Vec3){.12f,-.08f,.21f}),(Vec3){.15f,.13f,.22f},glove);
         mesh_box(mesh,vadd(base,(Vec3){0,.235f,-.30f}),(Vec3){.028f,.04f,.055f},accent);
         for(int i=0;i<3;i++)mesh_box(mesh,vadd(base,(Vec3){.16f,.09f,-.09f-(float)i*.07f}),(Vec3){.017f,.045f,.035f},metal);
@@ -186,7 +202,7 @@ void animate_weapon(Mesh *mesh, const Game *g, const App *app) {
         mesh_box(mesh,vadd(base,(Vec3){0,-.08f,.12f}),(Vec3){.14f,.17f,.15f},dark);
         mesh_beveled_box(mesh,vadd(base,(Vec3){.1f,-.1f,.16f}),(Vec3){.14f,.13f,.2f},.025f,glove);
         mesh_box(mesh,vadd(base,(Vec3){.16f,-.20f,.30f}),(Vec3){.12f,.15f,.28f},skin);
-        mesh_box(mesh,vadd(base,(Vec3){-.12f,-.08f,-.22f}),(Vec3){.14f,.13f,.2f},glove);
+        if(!gesture.active&&!helping)mesh_box(mesh,vadd(base,(Vec3){-.12f,-.08f,-.22f}),(Vec3){.14f,.13f,.2f},glove);
         if(rail) {
             mesh_cylinder(mesh,vadd(base,(Vec3){0,.32f,.02f}),vadd(base,(Vec3){0,.32f,-.12f}),.07f,dark,sides);
             mesh->glow=.8f;
@@ -216,17 +232,40 @@ void animate_weapon(Mesh *mesh, const Game *g, const App *app) {
         mesh_box(mesh,vadd(palm,(Vec3){-.04f,-.12f,.20f}),(Vec3){.13f,.18f,.29f},skin);
         mesh->glow=.8f;mesh_diamond(mesh,vadd(palm,(Vec3){0,.10f,0}),.055f,(Color){.4f,1,.7f});mesh->glow=0;
     }
-    /* Chargeur retiré puis remis en place, et main gauche qui accompagne le geste. */
-    if(p->weapon!=1) {
-        float lift=reload_pose*.18f;
-        mesh_beveled_box(mesh,vadd(base,(Vec3){-reload_pose*.18f,-.16f+lift,.02f}),(Vec3){.12f,.20f,.14f},.02f,dark);
-        mesh->glow=.5f;mesh_box(mesh,vadd(base,(Vec3){.065f-reload_pose*.18f,-.12f+lift,.02f}),(Vec3){.008f,.1f,.08f},accent);mesh->glow=0;
+    /* Weapon-specific reload: remove, feed, seat, then operate the action. */
+    Vec3 magazine=vadd(base,(Vec3){-gesture.extract*.18f,-.16f-gesture.extract*.28f+gesture.seat*.03f,.02f+gesture.extract*.13f});
+    if(p->weapon!=1&&p->weapon!=WEAPON_ROCKET) {
+        if(p->weapon==3) {
+            mesh_cylinder(mesh,magazine,vadd(magazine,(Vec3){0,.20f,0}),.065f,dark,6);
+            mesh->glow=.65f;mesh_cylinder(mesh,vadd(magazine,(Vec3){0,.04f,0}),vadd(magazine,(Vec3){0,.16f,0}),.067f,accent,6);mesh->glow=0;
+        }else {
+            mesh_beveled_box(mesh,magazine,(Vec3){.12f,.20f,.14f},.02f,dark);
+            mesh->glow=.5f;mesh_box(mesh,vadd(magazine,(Vec3){.065f,.04f,0}),(Vec3){.008f,.1f,.08f},accent);mesh->glow=0;
+        }
     }
-    if(p->reload_timer>0) {
-        Vec3 hand=vadd(base,(Vec3){-.12f-reload_pose*.08f,-.04f+reload_pose*.12f,-.07f});
+    mesh_box(mesh,vadd(base,(Vec3){.10f,.16f,.03f+gesture.rack*.07f}),(Vec3){.065f,.045f,.12f},metal);
+    if(gesture.active) {
+        Vec3 hand=vadd(magazine,(Vec3){-.09f,.02f,.08f});
+        hand.y+=gesture.rack*.23f;hand.z-=gesture.rack*.14f;
+        if(p->weapon==1) {
+            float feed=clampf((reload-.18f)/.58f,0,1),cycle=fmodf(feed*3,1);
+            float push=smooth(cycle/.60f);
+            hand=vadd(base,(Vec3){-.15f,-.13f+.08f*push,-.05f-.055f*push});
+            if(reload>.18f&&reload<.76f)for(int shell=0;shell<2;shell++) {
+                Vec3 tip=vadd(hand,(Vec3){.01f+(float)shell*.07f,.10f,-.06f});
+                mesh_cylinder(mesh,tip,vadd(tip,(Vec3){0,0,-.10f}),.027f,(Color){.76f,.52f,.16f},6);
+            }
+        }else if(p->weapon==WEAPON_ROCKET) {
+            float feed=smooth((reload-.36f)/.35f);
+            hand=vadd(base,(Vec3){-.16f+feed*.12f,.02f,-.77f+feed*.34f});
+            if(reload>.20f&&reload<.74f) {
+                Vec3 nose=vadd(base,(Vec3){-.12f*(1-feed),.12f,-.96f+feed*.4f});
+                mesh_cylinder(mesh,nose,vadd(nose,(Vec3){0,0,.28f}),.06f,(Color){.49f,.54f,.48f},6);
+                mesh_diamond(mesh,nose,.074f,accent);
+            }
+        }
         mesh_beveled_box(mesh,hand,(Vec3){.16f,.13f,.18f},.025f,glove);
         mesh_box(mesh,vadd(hand,(Vec3){-.06f,-.10f,.16f}),(Vec3){.13f,.17f,.28f},skin);
-        if(p->weapon==1)mesh_cylinder(mesh,vadd(hand,(Vec3){.03f,.08f,-.13f}),vadd(hand,(Vec3){.03f,.08f,-.20f}),.032f,accent,6);
     }
     if(g->shot_age<.055f&&p->weapon_switch==0) {
         mesh->glow=1;
@@ -237,8 +276,10 @@ void animate_weapon(Mesh *mesh, const Game *g, const App *app) {
         }
         mesh->glow=0;
     }
-    mesh_pose(mesh,0,(Vec3){-p->strafe_blend*.014f*motion,p->sway_y*motion,0},
-        reload_pose*.13f,g->recoil*(p->weapon==1?.12f:.08f)+reload_pose*.16f,1);
+    float air=motion&&!p->body.grounded?clampf(-p->body.velocity.y*.002f,-.03f,.03f):0;
+    mesh_rotate(mesh,0,vadd(base,(Vec3){0,.08f,.15f}),
+        g->recoil*(p->weapon==1?.12f:.08f)+reload_pose*.14f+gesture.rack*.04f+hurry*.025f*motion+air,
+        reload_pose*.08f-switching*.10f,reload_pose*.23f-gesture.seat*.035f-p->strafe_blend*.025f*motion);
     if(punch>0) {
         Vec3 fist={-.18f+punch*.13f,-.39f+punch*.16f,-.36f-punch*.42f};
         mesh_box(mesh,fist,(Vec3){.20f,.19f,.23f},glove);

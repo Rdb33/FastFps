@@ -31,8 +31,8 @@ void game_reset(Game *g, World *world, int limit) {
     g->pickups[1].position = (Vec3){23, 0, -18};
     g->pickups[2].position = (Vec3){-23, 0, 18};
     g->pickups[3].position = (Vec3){23, 0, 18};
-    g->pickups[4].position = (Vec3){-22, UPPER_DECK_HEIGHT, 2};
-    g->pickups[5].position = (Vec3){22, UPPER_DECK_HEIGHT, 2};
+    g->pickups[4].position = world->decks[0].pickup;
+    g->pickups[5].position = world->decks[1].pickup;
     g->pickup_count = 6;
     const Vec3 barrels[MAX_BARRELS]={{-6,0,-15},{-2,0,-15},{-20,0,2},{-20,0,6},{18,0,5},{18,0,9}};
     g->barrel_count=MAX_BARRELS;
@@ -65,6 +65,7 @@ static void start_wave(Game *g) {
             {{-6,0,-18},{-2,0,-18},{-20,0,6},{-20,0,10},{20,0,6},{20,0,10}},
             {{-6,0,-18},{-2,0,-18},{-23,0,3},{-23,0,7},{23,0,3},{23,0,7}}};
         for(int i=0;i<g->barrel_count;i++)g->barrels[i]=(Barrel){.position=locations[map][i],.health=45,.owner=-1};
+        for(int k=0;k<MAX_DECKS;k++)g->pickups[4+k].position=g->world->decks[k].pickup;
         for(int i=0;i<g->pickup_count;i++)g->pickups[i].cooldown=0;
         navigation_update(g->world,0,19);
     }
@@ -602,6 +603,13 @@ static void update_actor(Game *g,Input input,float dt) {
     float reload_before=p->reload_timer;
     p->reload_timer=fmaxf(0,p->reload_timer-dt);
     if(reload_before>0&&p->reload_timer==0){p->ammo[p->weapon]=(uint8_t)WEAPONS[p->weapon].magazine;audio_play(SOUND_PUMP);}
+    if(reload_before>0&&p->reload_timer>0&&p->reload_duration>0) {
+        float before=1-reload_before/p->reload_duration,now=1-p->reload_timer/p->reload_duration;
+        const float magazine_clicks[]={.24f,.66f,.86f},shell_clicks[]={.28f,.47f,.66f,.86f};
+        const float *clicks=p->weapon==1?shell_clicks:magazine_clicks;int count=p->weapon==1?4:3;
+        for(int phase=0;phase<count;phase++)if(before<clicks[phase]&&now>=clicks[phase])
+            audio_play(phase==count-1?SOUND_PUMP:SOUND_SWITCH);
+    }
     if(input.reload||(!p->ammo[p->weapon]&&p->reload_timer==0))game_reload(g);
     p->melee_timer=fmaxf(0,p->melee_timer-dt);
     float previous_switch=p->weapon_switch;

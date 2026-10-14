@@ -2,6 +2,15 @@
 
 Historique des contrôles sur la machine de développement, les 12 et 13 octobre 2026.
 
+## Version 0.9.3 — 14 octobre 2026
+
+- Compilation C11 avec `-O2 -Wall -Wextra -Wpedantic`, sans avertissement, et contrôle du diff.
+- Revue des définitions propres aux maps : positions des quais et soins partagées avec la construction de la carte ; arrivée des plaques à la hauteur des quais, arrêts aux extrémités et arc nul aux paliers. Cadence et déphasages définis dans `src/routes.c`.
+- Protocole porté à 9 pour exclure les anciennes trajectoires / collisions. Format des états de gameplay conservé. La position des passagers affichés est calculée par rapport à la plaque rendue ; l’état simulé de l’hôte reste intact.
+- Phases de recharge dérivées du délai existant, sans changement du remplissage des chargeurs. Clics déclenchés au passage de seuils, pas à chaque image. Chute / relèvement des alliés calculés uniquement pour le rendu.
+- Réemploi des buffers et des cinq appels de dessin. Zones de clic du menu et des modules fixes ; les déplacements de présentation concernent les titres, les surbrillances et les notifications.
+- **Aucun test exécuté pour cette version**. Essais en partie sur les trois maps, paliers, sauts, chargements, connexion réelle et performances Raspberry Pi restent à faire. Les résultats ci-dessous sont ceux des versions indiquées.
+
 ## Version 0.9.2 — 14 octobre 2026
 
 - Compilation C11 avec les avertissements habituels et revue des changements ; aucune dépendance ajoutée.

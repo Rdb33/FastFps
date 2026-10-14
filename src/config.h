@@ -2,12 +2,13 @@
 #define FASTFPS_CONFIG_H
 
 /* Réglages de la première base : gameplay proche d'un Doom moderne. */
-#define GAME_VERSION "0.9.2"
+#define GAME_VERSION "0.9.3"
 #define MAP_COUNT 3
 #define STANDARD_WEAPONS 4
 #define WEAPON_ROCKET 4
 #define WEAPON_COUNT 5
 #define MAX_PLATFORMS 3
+#define MAX_DECKS 2
 #define MAX_BLASTS 8
 #define REVIVE_TIME 2.5f
 #define REVIVE_RANGE 2.8f

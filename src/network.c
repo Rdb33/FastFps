@@ -376,6 +376,23 @@ void net_tick(Network *n,Game *g,Command local,float dt,double now) {
 bool net_connected(const Network *n){return n->mode!=NET_OFF&&!n->connecting;}
 static float angle_lerp(float a,float b,float t){return a+atan2f(sinf(b-a),cosf(b-a))*t;}
 static Vec3 position_lerp(Vec3 a,Vec3 b,float t){return vadd(a,vscale(vsub(b,a),t));}
+static bool riding(const Body *body,Box platform) {
+    Vec3 p=body->position;
+    return body->grounded&&fabsf(p.y-platform.max.y)<.065f&&p.x>=platform.min.x&&p.x<=platform.max.x
+        &&p.z>=platform.min.z&&p.z<=platform.max.z;
+}
+static Vec3 rider_position(const World *world,const Body *previous,const Body *latest,
+        float from,float to,float alpha,Vec3 fallback) {
+    for(int k=0;k<world->platform_count;k++) {
+        const Platform *p=&world->platforms[k];Box b=platform_box(p,to);
+        if(!riding(latest,b))continue;
+        Vec3 offset=vsub(latest->position,b.min);Box a=platform_box(p,from);
+        if(previous&&riding(previous,a))offset=position_lerp(vsub(previous->position,a.min),offset,alpha);
+        Box rendered=world->solids[p->solid];Vec3 position=vadd(rendered.min,offset);position.y=rendered.max.y;
+        return position;
+    }
+    return fallback;
+}
 void net_render(const Network *n,const Game *g,Game *view,double now) {
     *view=*g;
     if(n->mode!=NET_CLIENT||!n->has_snapshot)return;
@@ -403,11 +420,16 @@ void net_render(const Network *n,const Game *g,Game *view,double now) {
         if(b->player.weapon_switch>0)view->actors[i].player.weapon_switch=fmaxf(0,b->player.weapon_switch-age);
         if(b->player.melee_timer>0)view->actors[i].player.melee_timer=fmaxf(0,b->player.melee_timer-age);
         view->actors[i].shot_age=b->shot_age+age;
+        /* Interpolate relative to the deck currently rendered. */
+        view->actors[i].player.body.position=rider_position(g->world,a->active?&a->player.body:NULL,&b->player.body,
+            n->previous.time,n->current.time,alpha,view->actors[i].player.body.position);
     }
     for(int i=0;i<view->enemy_count;i++)for(int j=0;j<n->previous.enemy_count;j++) {
         const Enemy *a=&n->previous.enemies[j];Enemy *b=&view->enemies[i];
         if(a->id!=b->id)continue;
-        b->body.position=position_lerp(a->body.position,b->body.position,alpha);
+        Body latest=b->body;
+        b->body.position=rider_position(g->world,&a->body,&latest,n->previous.time,n->current.time,alpha,
+            position_lerp(a->body.position,b->body.position,alpha));
         b->yaw=angle_lerp(a->yaw,b->yaw,alpha);b->walk_phase=a->walk_phase+(b->walk_phase-a->walk_phase)*alpha;
         break;
     }

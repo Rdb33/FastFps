@@ -1,8 +1,8 @@
-# Salons coopératifs — version 0.9.2
+# Salons coopératifs — version 0.9.3
 
 Un joueur héberge un salon sur son ordinateur ; jusqu’à trois amis le rejoignent. L’hôte lance la partie quand les joueurs sont prêts. Le jeu utilise une **adresse IPv4 et un port TCP**, sans service central ni frais d’hébergement.
 
-Les joueurs doivent utiliser la même version du jeu et la même carte. **Tous les ordinateurs doivent être en 0.9.2** pour les nouveaux balcons, ascenseurs et navettes. Le mouvement des plaques et l’élan au saut restent simulés par l’hôte puis prédits localement. Les couleurs, numéros, armes, poses et étiquettes des alliés sont dérivés des états répliqués.
+Les joueurs doivent utiliser la même version du jeu et la même carte. **Tous les ordinateurs doivent être en 0.9.3** pour les trajets et les quais propres à chaque map. Le mouvement des plaques et l’élan au saut restent simulés par l’hôte puis prédits localement. Les couleurs, numéros, armes, poses et étiquettes des alliés sont dérivés des états répliqués.
 
 ## Depuis le menu
 
@@ -111,7 +111,7 @@ Les états du monde sont transmis environ **20 fois par seconde**. L’encodage 
 
 Cette première version utilise **TCP**, avec des sockets non bloquantes et `TCP_NODELAY`, pour garder un transport simple et fiable. Les pertes de paquets peuvent toutefois provoquer des retards de livraison : le passage à UDP avec des messages fiables ciblés sera à étudier si les parties réelles le demandent. Voir les références [TCP](https://man7.org/linux/man-pages/man7/tcp.7.html) et [connexion non bloquante](https://man7.org/linux/man-pages/man2/connect.2.html).
 
-Il reste à mesurer la latence réelle, le débit et la charge sur le Pi 4, surtout lorsqu’il héberge et affiche le jeu simultanément. Les effets de particules des tirs et explosions sont répliqués, en respectant la limite du profil graphique de chaque invité. Les dégâts et éliminations sont décidés par l’hôte. Le ping affiché mesure l’aller-retour TCP, avec un léger lissage. La version 0.9.2 utilise le protocole 8, incompatible avec toutes les versions précédentes : mets à jour chaque ordinateur. Les profils graphiques peuvent différer entre les joueurs.
+Il reste à mesurer la latence réelle, le débit et la charge sur le Pi 4, surtout lorsqu’il héberge et affiche le jeu simultanément. Les effets de particules des tirs et explosions sont répliqués, en respectant la limite du profil graphique de chaque invité. Les dégâts et éliminations sont décidés par l’hôte. Le ping affiché mesure l’aller-retour TCP, avec un léger lissage. La version 0.9.3 utilise le protocole 9, incompatible avec toutes les versions précédentes : mets à jour chaque ordinateur. Les profils graphiques peuvent différer entre les joueurs.
 
 ## Contrôles disponibles
 

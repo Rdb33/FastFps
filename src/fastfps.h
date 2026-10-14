@@ -10,7 +10,8 @@
 typedef struct { float x, y, z; } Vec3;
 typedef struct { float r, g, b; } Color;
 typedef struct { Vec3 min, max; } Box;
-typedef struct { Vec3 base, size, travel; float period; int solid; } Platform;
+typedef struct { Vec3 base, size, travel; float period; int solid; Vec3 arc; float dwell, offset; } Platform;
+typedef struct { Vec3 base, size, pickup; float yaw, gate; } Deck;
 typedef struct { Vec3 position; float time, radius; } Blast;
 typedef struct { float m[16]; } Mat4;
 typedef struct { Vec3 position; Color color; Vec3 normal; float glow; } Vertex;
@@ -28,6 +29,7 @@ typedef struct {
     int16_t distance[NAV_W * NAV_H];
     int16_t routes[MAX_PLAYERS][NAV_W * NAV_H];
     Platform platforms[MAX_PLATFORMS];
+    Deck decks[MAX_DECKS];
     int platform_count;
     float platform_time;
 } World;
@@ -113,6 +115,7 @@ typedef struct {
 typedef struct { float forward, right; bool jump, sprint, firing, dash, melee, reload, revive; int upgrade; } Input;
 typedef struct { const char *name; int magazine, unlock_wave; float interval, reload, damage; Color color; } Weapon;
 extern const Weapon WEAPONS[WEAPON_COUNT];
+typedef struct { float progress, lower, extract, seat, rack; bool active; } ReloadPose;
 typedef struct { int width, height, fps, particles; const char *name; } Preset;
 typedef struct {
     SDL_Window *window; SDL_GLContext context;
@@ -131,6 +134,8 @@ typedef struct {
     int world_vertices, width, height;
     int detail_level;
     bool modern;
+    float pose_time, down_blend[MAX_PLAYERS];
+    uint32_t pose_tick;
 } Renderer;
 typedef enum { STATE_MENU, STATE_PLAYING, STATE_PAUSED, STATE_DEAD, STATE_NETWORK, STATE_LOBBY, STATE_UPGRADE } State;
 struct Network;
@@ -148,7 +153,9 @@ typedef struct {
     bool select_all, network_help, show_build, music_notice_shown;
     int upgrade_choice;
     int menu_page;
-    float ui_time, music_notice_time;
+    float ui_time, music_notice_time, menu_age, menu_highlight;
+    int menu_visual_page;
+    State menu_visual_state;
 } App;
 typedef enum { SOUND_SHOT, SOUND_SHOTGUN, SOUND_HIT, SOUND_KILL,
     SOUND_HURT, SOUND_JUMP, SOUND_PICKUP, SOUND_WAVE,
@@ -182,6 +189,7 @@ void mesh_cylinder(Mesh *mesh, Vec3 start, Vec3 end, float radius, Color color, 
 void mesh_diamond(Mesh *mesh, Vec3 center, float radius, Color color);
 void mesh_joint_box(Mesh *mesh, Vec3 base, Vec3 size, Vec3 pivot, float angle, Color color);
 void mesh_pose(Mesh *mesh, int first, Vec3 position, float yaw, float pitch, float scale);
+void mesh_rotate(Mesh *mesh, int first, Vec3 pivot, float pitch, float yaw, float roll);
 void mesh_rect(Mesh *mesh, float x, float y, float w, float h, Color color);
 void mesh_text(Mesh *mesh, float x, float y, int scale, Color color, const char *text);
 void mesh_ring(Mesh *mesh, Vec3 center, float radius, float width, Color color, int segments);
@@ -198,7 +206,10 @@ void navigation_actor(World *world, int actor, Vec3 target);
 Vec3 navigation_for_actor(const World *world, int actor, float x, float z);
 void world_platforms_update(World *world, float time);
 Box platform_box(const Platform *platform, float time);
+Vec3 platform_position(const Platform *platform, float time);
 Vec3 platform_velocity(const Platform *platform, float time);
+void world_routes(World *world);
+const char *world_route_name(int map);
 void game_prepare_mobility(Game *game, float dt);
 int ai_target(Game *game, const Enemy *enemy);
 Vec3 ai_move(Game *game, Enemy *enemy, const Player *target, bool visible, float dt);
@@ -268,7 +279,8 @@ bool renderer_screenshot(Renderer *renderer, const char *path);
 void animate_creature(Mesh *mesh, const Enemy *enemy, float time);
 void animate_weapon(Mesh *mesh, const Game *game, const App *app);
 Color teammate_color(int id);
-void animate_teammate(Mesh *mesh, const Actor *actor, int id, float time, int detail);
+void animate_teammate(Mesh *mesh, const Actor *actor, int id, float time, int detail, float down_blend);
+ReloadPose weapon_reload_pose(const Player *player);
 void animate_barrel(Mesh *mesh, const Barrel *barrel, float time);
 void animate_arena(Mesh *mesh, const Game *game, const App *app);
 Color sector_theme(int wave);
@@ -284,6 +296,7 @@ void settings_controls(Mesh *mesh, const App *app, int row, float y);
 int menu_count(const App *app);
 int menu_row_id(const App *app, int row);
 void menu_move(App *app, int direction);
+void menu_animate(App *app, float dt);
 int menu_hit(const App *app, Renderer *renderer, int x, int y);
 void menu_build(Mesh *mesh, const Game *game, const App *app);
 

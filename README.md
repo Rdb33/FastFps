@@ -1,10 +1,32 @@
 # FASTFPS — Secteur zéro
 
-**FPS 3D natif, style Doom, pensé pour le Raspberry Pi 4.** Base à améliorer progressivement : déplacement nerveux, quatre armes à débloquer et survie dans trois arènes industrielles. Version **0.9.2** : plateformes qui desservent des postes en hauteur, soins sur les balcons et coéquipiers plus détaillés.
+**FPS 3D natif, style Doom, pensé pour le Raspberry Pi 4.** Base à améliorer progressivement : déplacement nerveux, quatre armes à débloquer et survie dans trois arènes industrielles. Version **0.9.3** : plateformes propres à chaque map, rechargements par étapes et animations enrichies du menu et du combat.
 
 Application en **C11**, **SDL2** (fenêtre, clavier, souris et son) et **OpenGL ES 2** (rendu 3D). Graphismes, police et bruitages sont générés localement. Les musiques MP3 sont lues avec **mpg123**.
 
 Le mode solo fonctionne hors ligne. Pour jouer ensemble, sélectionne **Multijoueur** ; voir [MULTIJOUEUR.md](MULTIJOUEUR.md) pour la création, la connexion sur Internet et les limites de cette première version.
+
+## Nouveautés — version 0.9.3
+
+### Des déplacements propres à chaque map
+
+| Map | Accès aux hauteurs | Navette et paliers |
+| --- | --- | --- |
+| Réacteur | Ascenseurs verticaux, à gauche au nord et à droite au sud | Traversée latérale de 31 m, deux balcons à 3,48 m ; cycles de 8 / 9 / 12 s |
+| Fonderie | Ascenseurs près des quais nord et sud, avec rythmes et départs décalés | Convoyeur longitudinal de 29 m à 3,80 m, décalé à l’est du réacteur ; cycles de 9 / 7 / 12 s |
+| Bastion | Deux accès inclinés, avec déplacement horizontal pendant la montée | Traversée diagonale qui décrit un arc au-dessus des obstacles, entre un balcon à 3,48 m et un autre à 4,28 m ; cycles de 10 / 11 / 14 s |
+
+Les plateformes font une pause à chaque palier ; sa durée dépend du trajet. Repère les bordures **bleues** pour les ascenseurs et **orange** pour les navettes. Les couvertures, les ouvertures de quai et les deux soins en hauteur changent de position avec la map. Les soins donnent toujours 25 PV et reviennent après 30 s. Le mouvement suit le temps de l’hôte, avec prédiction locale et conservation de l’élan au saut. L’affichage des coéquipiers embarqués suit la position de la plateforme pour réduire le décalage visuel entre leurs pieds et la plaque.
+
+### Animations
+
+- Menu : entrée progressive, titres légèrement décalés à l’ouverture, sélection qui glisse entre les lignes, éclairage des cartes, motif de réacteur animé et balayage discret. Les zones cliquables restent fixes. Indicateur animé pendant la connexion à un salon.
+- Recharge : présentation de l’arme, retrait / insertion du chargeur ou de la cellule, main gauche qui accompagne le geste et action finale de réarmement. Le fusil montre trois insertions de deux cartouches ; le lance-roquettes montre une munition insérée dans le tube. Des clics mécaniques accompagnent les étapes, sans changer les durées ni la quantité de munitions restaurée.
+- Arme à la première personne : transitions de changement plus douces, mouvement adapté à la course et au saut, inclinaison de recharge autour de la poignée. Un léger roulis accompagne les déplacements ; **F4** coupe les nouveaux mouvements de caméra et réduit les animations décoratives du menu.
+- Personnages : genoux articulés, pose aérienne des champions, apparition adoucie et pieds maintenus au niveau du sol. Les coéquipiers tombent et se relèvent progressivement ; leurs gestes de recharge utilisent les mêmes phases que l’arme à la première personne. Ces poses sont visuelles et ne changent pas les collisions.
+- Notifications d’arme et d’événement : entrée / sortie glissées. Cartes de modules immobiles pour garder les clics précis, emblèmes animés et barre indiquant le délai avant le choix. Les soins disponibles ont un anneau pulsant.
+
+**Multijoueur : protocole 9, mise à jour de tous les joueurs en 0.9.3 requise.** Les nouvelles trajectoires et collisions sont différentes de la 0.9.2. Les états de gameplay transmis sont conservés ; aucune nouvelle dépendance, texture ou passe de rendu. Voir [VALIDATION.md](VALIDATION.md) pour ce qui a été vérifié.
 
 ## Nouveautés — version 0.9.2
 
@@ -40,7 +62,7 @@ Le mode solo fonctionne hors ligne. Pour jouer ensemble, sélectionne **Multijou
 - **Événement rare : Roquettes !** À partir du round 3, l’hôte effectue un tirage de 8 % par round éligible, avec au moins cinq rounds entre événements. Chaque joueur, même à terre, reçoit un lance-roquettes temporaire pour ce round, automatiquement équipé. **5** ou la molette permet de le sélectionner ensuite. Trois roquettes par chargeur, recharge de 2,1 secondes, réserves illimitées pendant l’événement. Les roquettes infligent des dégâts de zone sur 6,5 mètres, avec diminution selon la distance et blocage par les murs. Les explosions ne font pas de tirs à la tête. Elles ne blessent pas directement les alliés ; le tireur peut subir ses propres dégâts et faire un **rocket jump**. Les barils restent dangereux pour toute l’équipe. À la fin du round, le lanceur est retiré et l’arme précédant l’événement est restaurée si nécessaire.
 - **Mobilité sur les trois maps** : deux plaques élévatrices montent jusqu’à 3,48 mètres et une navette se déplace horizontalement. Monte dessus à leur passage ou saute dessus, puis utilise-les pour atteindre les hauteurs. Les joueurs, ennemis et corps peuvent être transportés. Une plaque descendante dégage un personnage vers un côté libre plutôt que de l’enfermer. Positions et collisions sont calculées depuis le temps de simulation de l’hôte et rejouées pour la prédiction locale.
 
-La **0.8** utilisait le **protocole réseau 7** ; la **0.9.2** utilise le **protocole 8**. Mets à jour tous les ordinateurs avant une partie ; les salons des anciennes versions sont incompatibles. Les invitations LAN / Tailscale fonctionnent comme auparavant. Voir [VALIDATION.md](VALIDATION.md) pour les tests réalisés et les limites des mesures.
+La **0.8** utilisait le **protocole réseau 7** ; la **0.9.3** utilise le **protocole 9**. Mets à jour tous les ordinateurs avant une partie ; les salons des anciennes versions sont incompatibles. Les invitations LAN / Tailscale fonctionnent comme auparavant. Voir [VALIDATION.md](VALIDATION.md) pour les tests réalisés et les limites des mesures.
 
 ## Nouveautés — version 0.7
 
@@ -279,6 +301,8 @@ make clean
 | `src/weapons.c` | Arsenal, chargeurs et événement roquettes |
 | `src/ai.c` | Choix de cible, contournement, séparation et stratégies des ennemis |
 | `src/mobility.c` | Plateformes mobiles, transport et sécurité des collisions |
+| `src/routes.c` | Trajets, quais et soins propres aux trois maps |
+| `src/poses.c` | Phases de recharge communes à l’arme et aux alliés |
 | `src/menu.c` | Écrans principaux, navigation et menu de réglages |
 | `src/presets.c` | Profils graphiques partagés |
 | `src/settings.c` | Sliders et saisie numérique des réglages |
@@ -303,7 +327,7 @@ Carte et paramètres sont actuellement dans les sources. Aucune option de compil
 
 Trois cartes et un mode survie solo ou coopératif, quatre armes permanentes par run, un lance-roquettes temporaire et un rechargement par chargeur. Collisions par boîtes, trajectoires parfois anguleuses. Pas encore de rampes, accroupissement, sauvegarde de partie ou manette.
 
-La coopération utilise un joueur hôte qui fait autorité sur le monde, un état d’entrée `Input`, des identifiants d’ennemis stables, une prédiction du déplacement et une interpolation à l’affichage. La connexion se fait par IPv4 et port TCP, sans service central dans le jeu. Tailscale utilise ses propres services de connexion et éventuellement de relais. La validation entre deux machines et sur Internet reste à faire : voir [VALIDATION.md](VALIDATION.md). La version 0.9.2 utilise le protocole 8, incompatible avec les versions précédentes. Tous les joueurs doivent avoir la même version de gameplay.
+La coopération utilise un joueur hôte qui fait autorité sur le monde, un état d’entrée `Input`, des identifiants d’ennemis stables, une prédiction du déplacement et une interpolation à l’affichage. La connexion se fait par IPv4 et port TCP, sans service central dans le jeu. Tailscale utilise ses propres services de connexion et éventuellement de relais. La validation entre deux machines et sur Internet reste à faire : voir [VALIDATION.md](VALIDATION.md). La version 0.9.3 utilise le protocole 9, incompatible avec les versions précédentes. Tous les joueurs doivent avoir la même version de gameplay.
 
 Voir [ROADMAP.md](ROADMAP.md). Le prototype navigateur est conservé dans `prototype-web/` comme archive ; le lanceur principal utilise **l’application native**.
 

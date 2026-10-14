@@ -8,6 +8,18 @@ static void solid(World *w,Vec3 p,Vec3 size,Color color) {
         {p.x-size.x/2,p.y,p.z-size.z/2},{p.x+size.x/2,p.y+size.y,p.z+size.z/2}};
     mesh_beveled_box(&w->mesh,p,size,.06f,color);
 }
+static Vec3 deck_point(const Deck *d,Vec3 p) {
+    float c=cosf(d->yaw),s=sinf(d->yaw);
+    return vadd(d->base,(Vec3){p.x*c-p.z*s,p.y,p.x*s+p.z*c});
+}
+static Vec3 deck_size(const Deck *d,Vec3 size) {
+    float c=fabsf(cosf(d->yaw)),s=fabsf(sinf(d->yaw));
+    return (Vec3){size.x*c+size.z*s,size.y,size.x*s+size.z*c};
+}
+static void deck_box(World *w,const Deck *d,Vec3 p,Vec3 size,Color color,bool collision) {
+    if(collision)solid(w,deck_point(d,p),deck_size(d,size),color);
+    else mesh_box(&w->mesh,deck_point(d,p),deck_size(d,size),color);
+}
 bool world_blocked(const World *w,Vec3 p,float r,float h,int ignore) {
     for(int i=0;i<w->solid_count;i++) {
         const Box *b=&w->solids[i];
@@ -102,6 +114,7 @@ bool world_init(World *w) {
 void world_set_map(World *w,int id) {
     if(id<0||id>=MAP_COUNT||id==w->map_id)return;
     w->mesh.count=0;w->mesh.glow=0;w->solid_count=0;w->platform_count=0;w->map_id=id;w->revision++;
+    world_routes(w);
     Mesh *m=&w->mesh;
     const Color accents[MAP_COUNT]={{.9f,.39f,.15f},{.63f,.3f,.93f},{.26f,.76f,.66f}};
     Color accent=accents[id];
@@ -227,28 +240,32 @@ void world_set_map(World *w,int id) {
             mesh_box(m,(Vec3){side*25.65f,5.04f,z},(Vec3){.04f,.25f,1.55f},(Color){.67f,.77f,.57f});
         }
     }
-    /* Upper firing decks: open inner edge for the shuttle, sheltered health
-       stations, and enough headroom to keep the ground routes passable. */
-    for(int side=-1;side<=1;side+=2) {
-        float x=(float)side*21;
-        solid(w,(Vec3){x,UPPER_DECK_HEIGHT-.28f,0},(Vec3){7,.28f,12},(Color){.20f,.29f,.33f});
-        for(int end=-1;end<=1;end+=2) {
-            solid(w,(Vec3){(float)side*24,0,(float)end*5.4f},(Vec3){.30f,3.2f,.30f},(Color){.13f,.19f,.23f});
-            mesh_box(m,(Vec3){x,UPPER_DECK_HEIGHT+.005f,(float)end*5.94f},(Vec3){6.85f,.015f,.09f},(Color){.35f,.8f,1});
+    /* Each deck is oriented toward its map's shuttle lane. */
+    for(int k=0;k<MAX_DECKS;k++) {
+        const Deck *d=&w->decks[k];float hx=d->size.x/2,hz=d->size.z/2;
+        deck_box(w,d,(Vec3){0,0,0},d->size,(Color){.20f,.29f,.33f},true);
+        for(int side=-1;side<=1;side+=2) {
+            deck_box(w,d,(Vec3){(float)side*(hx-.6f),-d->base.y,hz-.5f},
+                (Vec3){.3f,d->base.y,.3f},(Color){.13f,.19f,.23f},true);
+            deck_box(w,d,(Vec3){0,d->size.y+.005f,(float)side*(hz-.06f)},
+                (Vec3){d->size.x-.15f,.015f,.09f},(Color){.35f,.8f,1},false);
         }
-        solid(w,(Vec3){(float)side*24.3f,UPPER_DECK_HEIGHT,0},(Vec3){.24f,.75f,10.8f},(Color){.13f,.20f,.25f});
+        deck_box(w,d,(Vec3){0,d->size.y,hz-.2f},(Vec3){d->size.x-.4f,.75f,.24f},(Color){.13f,.20f,.25f},true);
         for(int cover=0;cover<2;cover++) {
-            float z=.7f+(float)cover*3.7f;
-            solid(w,(Vec3){(float)side*17.85f,UPPER_DECK_HEIGHT,z},(Vec3){.65f,.90f,2.1f},(Color){.22f,.30f,.34f});
-            mesh_box(m,(Vec3){(float)side*17.85f,UPPER_DECK_HEIGHT+.9f,z},(Vec3){.72f,.04f,2.15f},accent);
+            float x=(d->gate<0?1:-1)*(.7f+(float)cover*3.7f);
+            deck_box(w,d,(Vec3){x,d->size.y,-hz+.35f},(Vec3){2.1f,.9f,.65f},(Color){.22f,.30f,.34f},true);
+            deck_box(w,d,(Vec3){x,d->size.y+.9f,-hz+.35f},(Vec3){2.15f,.04f,.72f},accent,false);
         }
         m->glow=.65f;
-        mesh_box(m,(Vec3){(float)side*17.57f,UPPER_DECK_HEIGHT+.014f,-4},(Vec3){.08f,.02f,3.2f},(Color){1,.72f,.26f});
-        mesh_ring(m,(Vec3){(float)side*22,UPPER_DECK_HEIGHT+.02f,2},1,.065f,(Color){.3f,.8f,.45f},16);
-        m->glow=0;
-        float lift_z=side<0?-7.75f:7.75f;
-        mesh_beveled_box(m,(Vec3){(float)side*23.35f,.55f,lift_z},(Vec3){.13f,.90f,.95f},.025f,(Color){.10f,.18f,.23f});
-        wall_label(m,"LIFT",(Vec3){(float)side*23.27f,1.18f,lift_z},side<0?-PI_F*.5f:PI_F*.5f,(Color){.35f,.8f,1},.035f);
+        deck_box(w,d,(Vec3){d->gate,d->size.y+.014f,-hz+.07f},(Vec3){3.2f,.02f,.08f},(Color){1,.72f,.26f},false);
+        mesh_ring(m,vadd(d->pickup,(Vec3){0,.02f,0}),1,.065f,(Color){.3f,.8f,.45f},16);m->glow=0;
+        const Platform *lift=&w->platforms[k];Vec3 end=vadd(lift->base,lift->travel);
+        Vec3 direction=vnormalize((Vec3){d->base.x-end.x,0,d->base.z-end.z});
+        Vec3 side={direction.z,0,-direction.x};Vec3 panel=vadd(lift->base,vscale(side,2.35f));panel.y=.55f;
+        mesh_beveled_box(m,panel,(Vec3){fabsf(side.x)*.13f+fabsf(direction.x)*.95f,.9f,
+            fabsf(side.z)*.13f+fabsf(direction.z)*.95f},.025f,(Color){.10f,.18f,.23f});
+        Vec3 label=vsub(panel,vscale(side,.08f));label.y=1.18f;
+        wall_label(m,"LIFT",label,atan2f(side.x,-side.z),(Color){.35f,.8f,1},.035f);
     }
     Vec3 spawns[8]={{-21,0,-17},{21,0,-17},{-21,0,17},{21,0,17},{0,0,-19},{23,0,0},{-23,0,0},{0,0,19}};
     memcpy(w->spawns,spawns,sizeof(spawns));
@@ -258,14 +275,7 @@ void world_set_map(World *w,int id) {
     }
 
     memset(w->routes,0xff,sizeof(w->routes));
-    const Platform lifts[MAX_PLATFORMS]={
-        {{-21,0,-7.75f},{3.4f,.28f,3.4f},{0,3.2f,0},8,0},
-        {{21,0,7.75f},{3.4f,.28f,3.4f},{0,3.2f,0},9,0},
-        {{-15.3f,3.2f,-4},{4.2f,.28f,3.2f},{30.6f,0,0},12,0}};
-    for(int k=0;k<MAX_PLATFORMS;k++) {
-        w->platforms[k]=lifts[k];w->platforms[k].solid=w->solid_count++;
-        w->platform_count++;
-    }
+    for(int k=0;k<w->platform_count;k++)w->platforms[k].solid=w->solid_count++;
     world_platforms_update(w,0);
 
 }

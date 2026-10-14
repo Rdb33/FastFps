@@ -1,3 +1,15 @@
+# Version 0.9.3
+
+- Trajets et quais spécifiques : traversée latérale du Réacteur ; ascenseurs nord / sud et convoyeur longitudinal de la Fonderie ; accès inclinés et navette en arc du Bastion. Hauteurs, pauses, phases de départ, repères et soins adaptés à chaque map.
+- Définition partagée des trajectoires entre collisions, prédiction et affichage. Coéquipiers embarqués interpolés par rapport à la plateforme pour rester visuellement dessus.
+- Menu : entrée progressive, sélection fluide, éclairage des cartes et réacteur animé ; indicateur de connexion. Zones d’interaction fixes.
+- Recharge par étapes et selon l’arme : chargeur / cellule, paires de cartouches, roquette, mains et réarmement. Clics mécaniques synchronisés, durées et munitions inchangées.
+- Mouvement d’arme adapté à la course / au saut, changement adouci, roulis de caméra léger désactivable avec F4.
+- Genoux des ennemis articulés, apparitions adoucies, pieds au niveau du sol ; chute et relèvement progressifs des alliés et phases de recharge communes.
+- Notifications glissées, cartes de modules stables avec barre de déverrouillage et anneaux de soins pulsants.
+- Protocole 9 : mise à jour de tous les joueurs requise. Format de gameplay conservé ; buffers, cinq appels de dessin et dépendances existants conservés.
+- Compilation C11 et revue de code ; tests, rendu en partie et mesures Pi non exécutés pour cette version.
+
 # Version 0.9.2
 
 - Deux balcons avec couverts sur chaque map, desservis par les ascenseurs ; navette élevée reliant les balcons sur environ 31 mètres. Arrêts aux paliers, mouvement adouci, repères bleus / orange et sens de circulation.

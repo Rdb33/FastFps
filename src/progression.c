@@ -130,13 +130,13 @@ void upgrade_ui(Mesh *m,const Game *g,const App *app) {
     for(int i=0;i<UPGRADE_CHOICES;i++) {
         int id=p->offers[i];Color c=upgrade_color(id);float x=42+(float)i*188;
         bool selected=app->selected==i;
-        float y=125+(selected?sinf(app->ui_time*4)*1.5f:0);
+        float y=125;
         mesh_rect(m,x,y,180,121,selected?(Color){.13f,.20f,.25f}:(Color){.075f,.11f,.14f});
         mesh_rect(m,x,y,180,3,c);
         if(selected){mesh_rect(m,x,y,2,121,c);mesh_rect(m,x+178,y,2,121,c);}
         snprintf(text,sizeof(text),"[%d]",i+1);mesh_text(m,x+10,y+12,1,c,text);
         /* Emblème géométrique animé au-dessus du nom du module. */
-        float glow=.75f+.25f*sinf(app->ui_time*5+(float)i);
+        float glow=app->motion?.75f+.25f*sinf(app->ui_time*5+(float)i):1;
         Color bright={c.r*glow,c.g*glow,c.b*glow};
         mesh_triangle(m,(Vec3){x+90,y+18,0},(Vec3){x+107,y+35,0},(Vec3){x+90,y+52,0},bright,(Vec3){0,0,1});
         mesh_triangle(m,(Vec3){x+90,y+18,0},(Vec3){x+90,y+52,0},(Vec3){x+73,y+35,0},bright,(Vec3){0,0,1});
@@ -146,8 +146,14 @@ void upgrade_ui(Mesh *m,const Game *g,const App *app) {
         const char *description=upgrade_description(id);
         mesh_text(m,x+(180-(float)strlen(description)*6)/2,y+101,1,(Color){.69f,.77f,.8f},description);
     }
-    if(!SDL_TICKS_PASSED(SDL_GetTicks(),app->upgrade_ready_at)||g->player.upgrade_lock>0)
+    if(!SDL_TICKS_PASSED(SDL_GetTicks(),app->upgrade_ready_at)||g->player.upgrade_lock>0) {
+        Uint32 now=SDL_GetTicks();
+        float remaining=SDL_TICKS_PASSED(now,app->upgrade_ready_at)?0:(float)(app->upgrade_ready_at-now)/1000;
+        remaining=fmaxf(remaining,g->player.upgrade_lock);
+        mesh_rect(m,42,249,556,2,(Color){.16f,.21f,.24f});
+        mesh_rect(m,42,249,556*clampf(1-remaining/UPGRADE_LOCK_TIME,0,1),2,(Color){1,.78f,.3f});
         centered(m,264,1,(Color){1,.78f,.3f},"UN INSTANT... RELACHE LE TIR POUR CHOISIR");
+    }
     else if(app->upgrade_choice)centered(m,264,1,(Color){.55f,.9f,1},"CHOIX ENVOYE...");
     else if(app->upgrade_confirm) {
         mesh_rect(m,220,257,200,20,(Color){.15f,.30f,.37f});

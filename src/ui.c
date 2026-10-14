@@ -8,6 +8,11 @@ static const Color ink={.92f,.9f,.79f},muted={.51f,.55f,.45f},orange={1,.48f,.18
 static void centered(Mesh *m,float y,int scale,Color color,const char *text) {
     mesh_text(m,(640-(float)strlen(text)*6*(float)scale)/2,y,scale,color,text);
 }
+static float notice_offset(const App *app,float remaining,float duration) {
+    if(!app->motion)return 0;
+    float t=clampf(fminf((duration-remaining)/.32f,remaining/.32f),0,1);
+    return 244*(1-t*t*(3-2*t));
+}
 static const Enemy *aim_target(const Game *g) {
     Vec3 origin=player_eye(&g->player,g->motion),dir=look_direction(g->player.yaw,g->player.pitch);
     float distance=world_ray(g->world,origin,dir,SHOT_RANGE);
@@ -165,21 +170,22 @@ void ui_build(Mesh *m,const Game *g,const App *app) {
         }
         if(g->rocket_event)mesh_text(m,486,82,1,orange,"EVENEMENT ROQUETTES");
         if(g->unlock_time>0&&g->unlock_weapon>=1&&g->unlock_weapon<STANDARD_WEAPONS) {
-            Color c=WEAPONS[g->unlock_weapon].color;
-            mesh_rect(m,398,106,232,73,(Color){.045f,.085f,.12f});mesh_rect(m,398,106,232,3,c);
-            mesh_text(m,410,119,1,c,"NOUVELLE ARME DEBLOQUEE");
-            mesh_text(m,410,136,2,ink,WEAPONS[g->unlock_weapon].name);
-            snprintf(text,sizeof(text),"TOUCHE %d OU MOLETTE POUR L'EQUIPER",g->unlock_weapon+1);mesh_text(m,410,161,1,c,text);
+            Color c=WEAPONS[g->unlock_weapon].color;float dx=notice_offset(app,g->unlock_time,6);
+            mesh_rect(m,398+dx,106,232,73,(Color){.045f,.085f,.12f});mesh_rect(m,398+dx,106,232,3,c);
+            mesh_text(m,410+dx,119,1,c,"NOUVELLE ARME DEBLOQUEE");
+            mesh_text(m,410+dx,136,2,ink,WEAPONS[g->unlock_weapon].name);
+            snprintf(text,sizeof(text),"TOUCHE %d OU MOLETTE POUR L'EQUIPER",g->unlock_weapon+1);mesh_text(m,410+dx,161,1,c,text);
         }
         if(g->event_notice_time>0) {
-            mesh_rect(m,398,188,232,80,(Color){.12f,.065f,.04f});mesh_rect(m,398,188,232,3,orange);
-            mesh_text(m,410,201,1,orange,"EVENEMENT RARE / TOUTE L'EQUIPE");
-            mesh_text(m,410,218,2,ink,"ROQUETTES !");
-            mesh_text(m,410,241,1,orange,"LANCEUR PRETE POUR CE ROUND");
-            mesh_text(m,410,255,1,muted,"TOUCHE 5 / DEGATS DE ZONE");
+            float dx=notice_offset(app,g->event_notice_time,6);
+            mesh_rect(m,398+dx,188,232,80,(Color){.12f,.065f,.04f});mesh_rect(m,398+dx,188,232,3,orange);
+            mesh_text(m,410+dx,201,1,orange,"EVENEMENT RARE / TOUTE L'EQUIPE");
+            mesh_text(m,410+dx,218,2,ink,"ROQUETTES !");
+            mesh_text(m,410+dx,241,1,orange,"LANCEUR PRETE POUR CE ROUND");
+            mesh_text(m,410+dx,255,1,muted,"TOUCHE 5 / DEGATS DE ZONE");
         }
         if(app->state==STATE_PLAYING&&app->music_notice_time>0&&app->music_volume<=0&&!g->dead&&!app->show_build) {
-            float slide=clampf(fminf((8-app->music_notice_time)/.25f,app->music_notice_time/.25f),0,1);
+            float slide=app->motion?clampf(fminf((8-app->music_notice_time)/.25f,app->music_notice_time/.25f),0,1):1;
             slide=slide*slide*(3-2*slide);
             float x=-228+240*slide;Color blue={.35f,.8f,1};
             mesh_rect(m,x,108,228,43,(Color){.04f,.075f,.10f});

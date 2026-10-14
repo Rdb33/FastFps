@@ -157,7 +157,7 @@ static void snapshot_tests(World *w) {
     assert(copy.projectiles[0].kind==1&&copy.projectiles[0].damage==180&&copy.blast_count==MAX_BLASTS&&copy.unlock_time==5);
     uint32_t revision=other.revision;int map=other.map_id;
     data[6]=255;assert(!protocol_snapshot_read(&copy,data,len));assert(other.revision==revision&&other.map_id==map);
-    printf("Etat 0.9.2 maximal : %zu / %d octets\n",len,NET_PACKET_MAX);mesh_free(&other.mesh);
+    printf("Etat maximal : %zu / %d octets\n",len,NET_PACKET_MAX);mesh_free(&other.mesh);
 }
 int main(void) {
     assert(SDL_Init(SDL_INIT_TIMER)==0);srand(1);World w;assert(world_init(&w));

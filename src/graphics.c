@@ -47,7 +47,7 @@ void animate_arena(Mesh *m,const Game *g,const App *app) {
     for(int k=0;k<g->world->platform_count;k++) {
         const Platform *platform=&g->world->platforms[k];Box box=g->world->solids[platform->solid];
         Vec3 base={(box.min.x+box.max.x)/2,box.min.y,(box.min.z+box.max.z)/2};
-        bool lift=platform->travel.y>0;Color route=lift?(Color){.35f,.8f,1}:(Color){1,.72f,.26f};
+        bool lift=k<MAX_DECKS;Color route=lift?(Color){.35f,.8f,1}:(Color){1,.72f,.26f};
         float hx=platform->size.x/2,hz=platform->size.z/2;
         m->glow=0;mesh_beveled_box(m,base,platform->size,.08f,(Color){.18f,.26f,.3f});
         for(int strip=-1;strip<=1;strip++)mesh_box(m,vadd(base,(Vec3){(float)strip*.65f,.282f,0}),
@@ -60,30 +60,38 @@ void animate_arena(Mesh *m,const Game *g,const App *app) {
         if(lift) {
             mesh_ring(m,vadd(platform->base,(Vec3){0,.035f,0}),2.1f,.08f,route,16);
             mesh_box(m,vadd(platform->base,(Vec3){0,.015f,0}),(Vec3){2.6f,.015f,.12f},route);
-            /* Three chevrons on the deck point to the upper landing. */
-            float direction=k==0?1:-1;
-            for(int step=0;step<3;step++) {
-                float z=(float)step*.5f-.5f;
-                mesh_triangle(m,vadd(base,(Vec3){-.30f,.316f,z}),vadd(base,(Vec3){0,.316f,z+direction*.22f}),
-                    vadd(base,(Vec3){.30f,.316f,z}),route,(Vec3){0,1,0});
-                mesh_triangle(m,vadd(base,(Vec3){.30f,.316f,z}),vadd(base,(Vec3){0,.316f,z+direction*.22f}),
-                    vadd(base,(Vec3){-.30f,.316f,z}),route,(Vec3){0,1,0});
-            }
-            m->glow=0;
-            for(int side=-1;side<=1;side+=2) {
-                Vec3 post=vadd(platform->base,(Vec3){(float)side*(hx+.18f),0,0});
-                mesh_box(m,post,(Vec3){.14f,3.48f,.18f},(Color){.12f,.19f,.23f});
-                m->glow=.6f;mesh_box(m,vadd(post,(Vec3){0,.04f,0}),(Vec3){.17f,base.y+.12f,.055f},route);m->glow=0;
-            }
+        }
+        Vec3 direction;
+        if(lift) {
+            Vec3 end=vadd(platform->base,platform->travel);
+            direction=vnormalize((Vec3){g->world->decks[k].base.x-end.x,0,g->world->decks[k].base.z-end.z});
         }else {
-            mesh_box(m,(Vec3){0,.025f,-4},(Vec3){35,.02f,.06f},route);
-            Vec3 velocity=platform_velocity(platform,g->time);float direction=velocity.x<0?-1:1;
-            for(int arrow=0;arrow<2;arrow++) {
-                float x=(float)arrow*.7f-.35f;
-                mesh_triangle(m,vadd(base,(Vec3){x,.316f,-.22f}),vadd(base,(Vec3){x+direction*.30f,.316f,0}),
-                    vadd(base,(Vec3){x,.316f,.22f}),route,(Vec3){0,1,0});
-                mesh_triangle(m,vadd(base,(Vec3){x,.316f,.22f}),vadd(base,(Vec3){x+direction*.30f,.316f,0}),
-                    vadd(base,(Vec3){x,.316f,-.22f}),route,(Vec3){0,1,0});
+            Vec3 velocity=platform_velocity(platform,g->world->platform_time);
+            direction=vnormalize((Vec3){velocity.x,0,velocity.z});
+            if(vlength(direction)<.01f) {
+                Vec3 end=vadd(platform->base,platform->travel);
+                Vec3 target=vlength(vsub(base,platform->base))<vlength(vsub(base,end))?end:platform->base;
+                direction=vnormalize((Vec3){target.x-base.x,0,target.z-base.z});
+            }
+            Vec3 a=platform->base,b=vadd(a,platform->travel);a.y=b.y=.03f;
+            mesh_cylinder(m,a,b,.025f,(Color){.52f,.35f,.15f},4);
+        }
+        Vec3 across={direction.z,0,-direction.x};
+        for(int step=0;step<3;step++) {
+            Vec3 center=vadd(base,vscale(direction,(float)step*.42f-.42f));center.y=base.y+.316f;
+            Vec3 a=vadd(center,vscale(across,-.26f)),b=vadd(center,vscale(direction,.24f)),c=vadd(center,vscale(across,.26f));
+            mesh_triangle(m,a,b,c,route,(Vec3){0,1,0});mesh_triangle(m,c,b,a,route,(Vec3){0,1,0});
+        }
+        if(lift) {
+            bool vertical=hypotf(platform->travel.x,platform->travel.z)<.1f;
+            for(int side=-1;side<=1;side+=2) {
+                Vec3 offset=vscale(across,(float)side*(hx+.18f));
+                Vec3 bottom=vadd(platform->base,offset),top=vadd(bottom,platform->travel);
+                m->glow=0;
+                if(vertical)mesh_box(m,bottom,(Vec3){.14f,platform->travel.y+.28f,.18f},(Color){.12f,.19f,.23f});
+                else mesh_cylinder(m,vadd(bottom,(Vec3){0,.10f,0}),vadd(top,(Vec3){0,.10f,0}),.07f,(Color){.16f,.24f,.29f},6);
+                m->glow=.6f;
+                mesh_cylinder(m,vadd(bottom,(Vec3){0,.05f,0}),vadd(vadd(base,offset),(Vec3){0,.05f,0}),.035f,route,4);
             }
         }
         m->glow=0;
