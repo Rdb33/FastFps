@@ -115,7 +115,7 @@ static void ai_tests(World *w) {
 }
 static void platform_tests(World *w) {
     Game host,guest;World other;assert(world_init(&other));quiet(&host,w,false);quiet(&guest,&other,false);
-    Vec3 foot={5,w->solids[w->platforms[0].solid].max.y,-9};host.player.body=(Body){foot,{0,0,0},true};guest.player.body=host.player.body;
+    Vec3 foot=w->platforms[0].base;foot.y=w->solids[w->platforms[0].solid].max.y;host.player.body=(Body){foot,{0,0,0},true};guest.player.body=host.player.body;
     for(int tick=0;tick<240;tick++) {
         game_update(&host,(Input){0},FIXED_STEP);game_predict(&guest,(Input){0},FIXED_STEP);
         Box b=w->solids[w->platforms[0].solid];
@@ -125,17 +125,19 @@ static void platform_tests(World *w) {
     }
     assert(host.player.body.position.y>3.4f);
     game_update(&host,(Input){.jump=true},FIXED_STEP);assert(!host.player.body.grounded&&host.player.body.velocity.y>0);
-    quiet(&host,w,false);host.player.body=(Body){{0,.28f,10},{0,0,0},true};
-    for(int tick=0;tick<120;tick++)game_update(&host,(Input){0},FIXED_STEP);
+    quiet(&host,w,false);Vec3 start=w->platforms[2].base;start.y=w->solids[w->platforms[2].solid].max.y;
+    host.player.body=(Body){start,{0,0,0},true};
+    for(int tick=0;tick<(int)(w->platforms[2].period*.5f/FIXED_STEP);tick++)game_update(&host,(Input){0},FIXED_STEP);
     Box shuttle=w->solids[w->platforms[2].solid];
-    assert(host.player.body.position.x>4&&fabsf(host.player.body.position.x-(shuttle.min.x+shuttle.max.x)/2)<.02f);
+    assert(host.player.body.position.x>start.x+w->platforms[2].travel.x*.9f&&fabsf(host.player.body.position.x-(shuttle.min.x+shuttle.max.x)/2)<.02f);
     quiet(&host,w,false);host.time=4;world_platforms_update(w,host.time);
-    host.player.body=(Body){{5,0,-9},{0,0,0},true};
+    Vec3 lower=w->platforms[0].base;host.player.body=(Body){lower,{0,0,0},true};
     for(int tick=0;tick<240;tick++) {
         game_update(&host,(Input){0},FIXED_STEP);
         assert(!world_blocked(w,host.player.body.position,PLAYER_RADIUS,PLAYER_HEIGHT,-1));
     }
-    assert(fabsf(host.player.body.position.x-5)>1.8f||fabsf(host.player.body.position.z+9)>1.8f);
+    assert(fabsf(host.player.body.position.x-lower.x)>w->platforms[0].size.x/2+PLAYER_RADIUS
+        ||fabsf(host.player.body.position.z-lower.z)>w->platforms[0].size.z/2+PLAYER_RADIUS);
     mesh_free(&other.mesh);
 }
 static void snapshot_tests(World *w) {
@@ -155,7 +157,7 @@ static void snapshot_tests(World *w) {
     assert(copy.projectiles[0].kind==1&&copy.projectiles[0].damage==180&&copy.blast_count==MAX_BLASTS&&copy.unlock_time==5);
     uint32_t revision=other.revision;int map=other.map_id;
     data[6]=255;assert(!protocol_snapshot_read(&copy,data,len));assert(other.revision==revision&&other.map_id==map);
-    printf("Etat 0.8 maximal : %zu / %d octets\n",len,NET_PACKET_MAX);mesh_free(&other.mesh);
+    printf("Etat 0.9.2 maximal : %zu / %d octets\n",len,NET_PACKET_MAX);mesh_free(&other.mesh);
 }
 int main(void) {
     assert(SDL_Init(SDL_INIT_TIMER)==0);srand(1);World w;assert(world_init(&w));

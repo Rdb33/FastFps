@@ -245,29 +245,6 @@ void animate_weapon(Mesh *mesh, const Game *g, const App *app) {
         mesh_box(mesh,vadd(fist,(Vec3){-.03f,-.08f,.23f}),(Vec3){.15f,.19f,.35f},skin);
     }
 }
-void animate_teammate(Mesh *m,const Actor *actor,int id) {
-    const Player *p=&actor->player;int first=m->count;
-    static const Color colors[MAX_PLAYERS]={{.20f,.56f,.77f},{.25f,.72f,.70f},{.34f,.49f,.82f},{.74f,.65f,.28f}};
-    Color armor=colors[id],dark={.12f,.20f,.24f},visor={.6f,.95f,1};
-    float stride=sinf(p->bob)*p->movement_blend*.5f;
-    mesh_beveled_box(m,(Vec3){0,.53f,0},(Vec3){.66f,.62f,.43f},.07f,armor);
-    mesh_beveled_box(m,(Vec3){0,1.15f,0},(Vec3){.52f,.35f,.45f},.08f,dark);
-    m->glow=actor->dead?0:.55f;
-    mesh_box(m,(Vec3){0,1.29f,-.24f},(Vec3){.43f,.09f,.035f},visor);
-    m->glow=0;
-    mesh_box(m,(Vec3){0,.72f,.26f},(Vec3){.40f,.39f,.18f},dark);
-    for(int side=-1;side<=1;side+=2) {
-        Vec3 hip={side*.2f,.58f,0};
-        mesh_joint_box(m,(Vec3){hip.x,.04f,0},(Vec3){.23f,.54f,.27f},hip,stride*(float)side,dark);
-        Vec3 shoulder={side*.40f,1.09f,0};
-        mesh_joint_box(m,(Vec3){shoulder.x,.57f,-.05f},(Vec3){.2f,.52f,.24f},shoulder,.72f,armor);
-    }
-    mesh_box(m,(Vec3){.26f,.87f,-.50f},(Vec3){.16f,.12f,p->weapon?.55f:.36f},dark);
-    if(actor->shot_age<.055f&&!actor->dead)
-        mesh_diamond(m,(Vec3){.26f,.94f,-.83f},.09f,(Color){1,.82f,.4f});
-    mesh_pose(m,first,p->body.position,p->yaw,actor->dead?PI_F*.45f:0,actor->dead?.45f:1);
-}
-
 void animate_barrel(Mesh *m,const Barrel *b,float time) {
     if(b->health<=0) {
         if(b->explosion_time<=0)return;

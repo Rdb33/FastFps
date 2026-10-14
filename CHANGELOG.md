@@ -1,3 +1,13 @@
+# Version 0.9.2
+
+- Deux balcons avec couverts sur chaque map, desservis par les ascenseurs ; navette élevée reliant les balcons sur environ 31 mètres. Arrêts aux paliers, mouvement adouci, repères bleus / orange et sens de circulation.
+- Deux postes de soins en hauteur, 25 PV / retour après 30 s ; collecte selon la hauteur du joueur et rendu placé sur le bon étage.
+- Conservation de l’élan au saut depuis la navette et impulsion supplémentaire au saut d’un ascenseur montant, partagées par l’hôte et la prédiction.
+- Modèles des alliés : armures et casques détaillés, couleurs et numéros, cinq silhouettes d’armes, marche / saut / visée / recul / recharge / changement / frappe / aide ; posture à terre à taille normale.
+- Noms et santé à l’écran au-dessus des alliés visibles, avec état à terre et progression de réanimation ; couleurs communes au modèle et à la liste de l’équipe. Lissage de la visée et du mouvement des alliés sur les invités.
+- Protocole 8 : mise à jour de tous les joueurs requise pour les nouvelles collisions et trajectoires ; format de snapshot conservé. Pas de nouvelle dépendance ou d’appel de dessin.
+- Fixtures des contrôles de plateformes existants adaptées aux nouvelles coordonnées et durées. Compilation C11 ; tests et mesures Pi non exécutés pour cette version.
+
 # Version 0.9.1
 
 - Petit rappel non bloquant de huit secondes quand on joue avec le volume musical à zéro : « Tu joues sans musique / Échap > Réglages > Musique ». Une seule fois par partie, en solo comme en coopération ; masqué pendant la pause, le choix de modules et les écrans de progression, retiré dès que la musique est activée. Pas de rappel en démo ou avec `--mute`.

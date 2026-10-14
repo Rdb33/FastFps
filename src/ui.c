@@ -64,7 +64,7 @@ void ui_build(Mesh *m,const Game *g,const App *app) {
             for(int i=0;i<MAX_PLAYERS;i++)if(g->actors[i].active&&i!=g->local_actor) {
                 if(g->actors[i].dead)snprintf(text,sizeof(text),"%s : A TERRE / REANIMER",g->actors[i].name);
                 else snprintf(text,sizeof(text),"%s : %.0f PV",g->actors[i].name,g->actors[i].player.health);
-                mesh_text(m,12,45+(float)row*13,1,(Color){.35f,.85f,1},text);row++;
+                mesh_text(m,12,45+(float)row*13,1,g->actors[i].dead?orange:teammate_color(i),text);row++;
             }
             const Network *n=app->network;
             if(n->mode==NET_CLIENT&&n->latency_ms>=0) {
@@ -191,4 +191,46 @@ void ui_build(Mesh *m,const Game *g,const App *app) {
         return;
     }
     menu_build(m,g,app);
+}
+
+/* Names and health stay crisp in the HUD pass, with the same projection as
+ * the world. Occluded teammates keep only their existing team-list entry. */
+void ui_teammates(Mesh *m,const Game *g,const App *app,Mat4 matrix) {
+    if(!g->cooperative||app->state!=STATE_PLAYING||app->show_build)return;
+    Vec3 eye=player_eye(&g->player,app->motion);
+    float previous_x[MAX_PLAYERS],previous_y[MAX_PLAYERS],previous_w[MAX_PLAYERS],previous_h[MAX_PLAYERS];int used=0;
+    for(int id=0;id<MAX_PLAYERS;id++)if(id!=g->local_actor&&g->actors[id].active) {
+        const Actor *a=&g->actors[id];Vec3 head=vadd(a->player.body.position,(Vec3){0,a->dead?.38f:1.48f,0});
+        Vec3 delta=vsub(head,eye);float distance=vlength(delta);
+        if(distance<.8f||distance>25||world_ray(g->world,eye,vscale(delta,1/distance),distance)<distance-.05f)continue;
+        Vec3 label=vadd(a->player.body.position,(Vec3){0,a->dead?.95f:1.93f,0});
+        float w=matrix.m[3]*label.x+matrix.m[7]*label.y+matrix.m[11]*label.z+matrix.m[15];
+        if(w<=.2f)continue;
+        float x=(matrix.m[0]*label.x+matrix.m[4]*label.y+matrix.m[8]*label.z+matrix.m[12])/w;
+        float y=(matrix.m[1]*label.x+matrix.m[5]*label.y+matrix.m[9]*label.z+matrix.m[13])/w;
+        if(fabsf(x)>.96f||fabsf(y)>.85f)continue;
+        x=(x*.5f+.5f)*640;y=(.5f-y*.5f)*360-14;
+        char name[PLAYER_NAME_LENGTH+8];snprintf(name,sizeof(name),"%d %s",id+1,a->name);
+        float width=(float)strlen(name)*6+12,height=a->dead?27:17;
+        x=clampf(x,width/2+8,632-width/2);
+        for(int attempt=0;attempt<MAX_PLAYERS;attempt++) {
+            bool overlap=false;
+            for(int k=0;k<used;k++)if(fabsf(x-previous_x[k])<(width+previous_w[k])/2+3
+                &&y<previous_y[k]+previous_h[k]+3&&y+height>previous_y[k]-3) {
+                y=previous_y[k]-height-3;overlap=true;
+            }
+            if(!overlap)break;
+        }
+        if(y<44||y+height>286)continue;
+        Color color=a->dead?orange:teammate_color(id);
+        mesh_rect(m,x-width/2,y-3,width,height,(Color){.04f,.065f,.09f});
+        mesh_rect(m,x-width/2,y-3,2,height,color);
+        mesh_text(m,x-width/2+6,y,1,color,name);
+        float progress=clampf(a->dead?a->revive_progress/REVIVE_TIME:a->player.health/player_max_health(&a->player),0,1);
+        float bar_y=y+(a->dead?19:10);
+        if(a->dead)mesh_text(m,x-width/2+6,y+10,1,orange,"A TERRE");
+        mesh_rect(m,x-width/2+6,bar_y,width-12,2,(Color){.16f,.21f,.24f});
+        mesh_rect(m,x-width/2+6,bar_y,(width-12)*progress,2,a->dead?(Color){.4f,1,.7f}:color);
+        previous_x[used]=x;previous_y[used]=y-3;previous_w[used]=width;previous_h[used]=height;used++;
+    }
 }

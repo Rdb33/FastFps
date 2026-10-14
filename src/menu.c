@@ -68,7 +68,7 @@ void menu_build(Mesh *m,const Game *g,const App *a) {
         mesh_text(m,376,209,1,ink,"CLIC DROIT : ESQUIVE");
         mesh_text(m,376,225,1,ink,"R : RECHARGER / 1-5 : ARMES");
         mesh_text(m,376,241,1,blue,"E MAINTENU : REANIMER");
-        mesh_text(m,376,259,1,muted,"PLATEFORMES : SAUTE DESSUS");
+        mesh_text(m,376,259,1,muted,"LIFTS : HAUTEURS ET SOINS");
         mesh_text(m,376,275,1,muted,"TAB : MODULES ET ARSENAL");
         center(m,312,1,muted,"FLECHES OU SOURIS / ENTREE POUR JOUER");
     }else {

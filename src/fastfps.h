@@ -198,6 +198,7 @@ void navigation_actor(World *world, int actor, Vec3 target);
 Vec3 navigation_for_actor(const World *world, int actor, float x, float z);
 void world_platforms_update(World *world, float time);
 Box platform_box(const Platform *platform, float time);
+Vec3 platform_velocity(const Platform *platform, float time);
 void game_prepare_mobility(Game *game, float dt);
 int ai_target(Game *game, const Enemy *enemy);
 Vec3 ai_move(Game *game, Enemy *enemy, const Player *target, bool visible, float dt);
@@ -266,7 +267,8 @@ bool renderer_screenshot(Renderer *renderer, const char *path);
 /* animation.c : poses visuelles dérivées de l'état du combat. */
 void animate_creature(Mesh *mesh, const Enemy *enemy, float time);
 void animate_weapon(Mesh *mesh, const Game *game, const App *app);
-void animate_teammate(Mesh *mesh, const Actor *actor, int id);
+Color teammate_color(int id);
+void animate_teammate(Mesh *mesh, const Actor *actor, int id, float time, int detail);
 void animate_barrel(Mesh *mesh, const Barrel *barrel, float time);
 void animate_arena(Mesh *mesh, const Game *game, const App *app);
 Color sector_theme(int wave);
@@ -274,6 +276,7 @@ int graphics_detail(int quality);
 
 /* ui.c */
 void ui_build(Mesh *mesh, const Game *game, const App *app);
+void ui_teammates(Mesh *mesh, const Game *game, const App *app, Mat4 view_projection);
 void settings_read(App *app);
 void settings_write(const App *app);
 bool settings_event(App *app, Renderer *renderer, const SDL_Event *event);

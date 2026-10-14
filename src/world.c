@@ -227,6 +227,29 @@ void world_set_map(World *w,int id) {
             mesh_box(m,(Vec3){side*25.65f,5.04f,z},(Vec3){.04f,.25f,1.55f},(Color){.67f,.77f,.57f});
         }
     }
+    /* Upper firing decks: open inner edge for the shuttle, sheltered health
+       stations, and enough headroom to keep the ground routes passable. */
+    for(int side=-1;side<=1;side+=2) {
+        float x=(float)side*21;
+        solid(w,(Vec3){x,UPPER_DECK_HEIGHT-.28f,0},(Vec3){7,.28f,12},(Color){.20f,.29f,.33f});
+        for(int end=-1;end<=1;end+=2) {
+            solid(w,(Vec3){(float)side*24,0,(float)end*5.4f},(Vec3){.30f,3.2f,.30f},(Color){.13f,.19f,.23f});
+            mesh_box(m,(Vec3){x,UPPER_DECK_HEIGHT+.005f,(float)end*5.94f},(Vec3){6.85f,.015f,.09f},(Color){.35f,.8f,1});
+        }
+        solid(w,(Vec3){(float)side*24.3f,UPPER_DECK_HEIGHT,0},(Vec3){.24f,.75f,10.8f},(Color){.13f,.20f,.25f});
+        for(int cover=0;cover<2;cover++) {
+            float z=.7f+(float)cover*3.7f;
+            solid(w,(Vec3){(float)side*17.85f,UPPER_DECK_HEIGHT,z},(Vec3){.65f,.90f,2.1f},(Color){.22f,.30f,.34f});
+            mesh_box(m,(Vec3){(float)side*17.85f,UPPER_DECK_HEIGHT+.9f,z},(Vec3){.72f,.04f,2.15f},accent);
+        }
+        m->glow=.65f;
+        mesh_box(m,(Vec3){(float)side*17.57f,UPPER_DECK_HEIGHT+.014f,-4},(Vec3){.08f,.02f,3.2f},(Color){1,.72f,.26f});
+        mesh_ring(m,(Vec3){(float)side*22,UPPER_DECK_HEIGHT+.02f,2},1,.065f,(Color){.3f,.8f,.45f},16);
+        m->glow=0;
+        float lift_z=side<0?-7.75f:7.75f;
+        mesh_beveled_box(m,(Vec3){(float)side*23.35f,.55f,lift_z},(Vec3){.13f,.90f,.95f},.025f,(Color){.10f,.18f,.23f});
+        wall_label(m,"LIFT",(Vec3){(float)side*23.27f,1.18f,lift_z},side<0?-PI_F*.5f:PI_F*.5f,(Color){.35f,.8f,1},.035f);
+    }
     Vec3 spawns[8]={{-21,0,-17},{21,0,-17},{-21,0,17},{21,0,17},{0,0,-19},{23,0,0},{-23,0,0},{0,0,19}};
     memcpy(w->spawns,spawns,sizeof(spawns));
     for(int i=0;i<NAV_W*NAV_H;i++) {
@@ -236,9 +259,9 @@ void world_set_map(World *w,int id) {
 
     memset(w->routes,0xff,sizeof(w->routes));
     const Platform lifts[MAX_PLATFORMS]={
-        {{5,0,-9},{3,.28f,3},{0,3.2f,0},8,0},
-        {{-5,0,9},{3,.28f,3},{0,3.2f,0},10,0},
-        {{0,0,10},{3,.28f,3},{5,0,0},9,0}};
+        {{-21,0,-7.75f},{3.4f,.28f,3.4f},{0,3.2f,0},8,0},
+        {{21,0,7.75f},{3.4f,.28f,3.4f},{0,3.2f,0},9,0},
+        {{-15.3f,3.2f,-4},{4.2f,.28f,3.2f},{30.6f,0,0},12,0}};
     for(int k=0;k<MAX_PLATFORMS;k++) {
         w->platforms[k]=lifts[k];w->platforms[k].solid=w->solid_count++;
         w->platform_count++;

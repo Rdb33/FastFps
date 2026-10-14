@@ -2,7 +2,7 @@
 #define FASTFPS_CONFIG_H
 
 /* Réglages de la première base : gameplay proche d'un Doom moderne. */
-#define GAME_VERSION "0.9.1"
+#define GAME_VERSION "0.9.2"
 #define MAP_COUNT 3
 #define STANDARD_WEAPONS 4
 #define WEAPON_ROCKET 4
@@ -22,6 +22,9 @@
 #define MAX_CORPSES 8
 #define MAX_SOLIDS 64
 #define MAX_PICKUPS 8
+#define PICKUP_RESPAWN_TIME 18.0f
+#define UPPER_PICKUP_RESPAWN_TIME 30.0f
+#define UPPER_DECK_HEIGHT 3.48f
 #define MAX_BARRELS 6
 #define UPGRADE_COUNT 6
 #define UPGRADE_MAX_LEVEL 5

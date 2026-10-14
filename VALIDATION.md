@@ -2,6 +2,15 @@
 
 Historique des contrôles sur la machine de développement, les 12 et 13 octobre 2026.
 
+## Version 0.9.2 — 14 octobre 2026
+
+- Compilation C11 avec les avertissements habituels et revue des changements ; aucune dépendance ajoutée.
+- Inspection des trois layouts : nouveaux balcons à 3,48 m, paliers des plateformes à la même hauteur, jeux de 5 à 10 cm entre les plaques et les balcons, ouvertures vers la navette et passages au sol conservés. La navette passe au nord du réacteur, à l’écart des piliers et machines.
+- Mouvement des plateformes et vitesse emportée calculés depuis le même temps de simulation côté hôte et prédiction. Protocole porté à 8 pour refuser les anciennes collisions / trajectoires. Les positions et délais des soins sont déjà transmis dans les snapshots.
+- Modèles et étiquettes dessinés dans les buffers existants ; aucune allocation par coéquipier à chaque image, aucune passe de rendu supplémentaire. Détail limité à six côtés sur le profil Pi, huit sur les profils supérieurs.
+- Fixtures des tests de plateformes existants adaptées ; **tests non exécutés pour cette version**. Les résultats historiques ci-dessous concernent leurs versions respectives.
+- Déplacements entre les paliers, lisibilité des personnages en jeu, session multijoueur réelle et performances sur Raspberry Pi à vérifier en jouant ; pas de nouvelle mesure matérielle annoncée.
+
 ## Version 0.9.1 — 14 octobre 2026
 
 - Compilation C11 sans avertissement et contrôle du diff.

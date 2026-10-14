@@ -47,17 +47,45 @@ void animate_arena(Mesh *m,const Game *g,const App *app) {
     for(int k=0;k<g->world->platform_count;k++) {
         const Platform *platform=&g->world->platforms[k];Box box=g->world->solids[platform->solid];
         Vec3 base={(box.min.x+box.max.x)/2,box.min.y,(box.min.z+box.max.z)/2};
+        bool lift=platform->travel.y>0;Color route=lift?(Color){.35f,.8f,1}:(Color){1,.72f,.26f};
+        float hx=platform->size.x/2,hz=platform->size.z/2;
         m->glow=0;mesh_beveled_box(m,base,platform->size,.08f,(Color){.18f,.26f,.3f});
-        m->glow=.85f;
+        for(int strip=-1;strip<=1;strip++)mesh_box(m,vadd(base,(Vec3){(float)strip*.65f,.282f,0}),
+            (Vec3){.32f,.025f,platform->size.z*.72f},(Color){.10f,.16f,.19f});
+        m->glow=.8f;
         for(int side=-1;side<=1;side+=2) {
-            mesh_box(m,vadd(base,(Vec3){(float)side*1.43f,.28f,0}),(Vec3){.08f,.025f,2.8f},theme);
-            mesh_box(m,vadd(base,(Vec3){0,.28f,(float)side*1.43f}),(Vec3){2.8f,.025f,.08f},theme);
+            mesh_box(m,vadd(base,(Vec3){(float)side*(hx-.07f),.28f,0}),(Vec3){.08f,.025f,platform->size.z-.15f},route);
+            mesh_box(m,vadd(base,(Vec3){0,.28f,(float)side*(hz-.07f)}),(Vec3){platform->size.x-.15f,.025f,.08f},route);
         }
-        mesh_ring(m,vadd(base,(Vec3){0,.30f,0}),.50f,.045f,theme,16);
-        if(platform->travel.y>0) {
-            mesh_ring(m,vadd(platform->base,(Vec3){0,.035f,0}),1.9f,.06f,theme,20);
-            for(int step=0;step<4;step++)mesh_diamond(m,vadd(base,(Vec3){0,.5f+(float)step*.23f,0}),.04f,theme);
-        }else mesh_box(m,(Vec3){0,.025f,10},(Vec3){13,.02f,.06f},theme);
+        if(lift) {
+            mesh_ring(m,vadd(platform->base,(Vec3){0,.035f,0}),2.1f,.08f,route,16);
+            mesh_box(m,vadd(platform->base,(Vec3){0,.015f,0}),(Vec3){2.6f,.015f,.12f},route);
+            /* Three chevrons on the deck point to the upper landing. */
+            float direction=k==0?1:-1;
+            for(int step=0;step<3;step++) {
+                float z=(float)step*.5f-.5f;
+                mesh_triangle(m,vadd(base,(Vec3){-.30f,.316f,z}),vadd(base,(Vec3){0,.316f,z+direction*.22f}),
+                    vadd(base,(Vec3){.30f,.316f,z}),route,(Vec3){0,1,0});
+                mesh_triangle(m,vadd(base,(Vec3){.30f,.316f,z}),vadd(base,(Vec3){0,.316f,z+direction*.22f}),
+                    vadd(base,(Vec3){-.30f,.316f,z}),route,(Vec3){0,1,0});
+            }
+            m->glow=0;
+            for(int side=-1;side<=1;side+=2) {
+                Vec3 post=vadd(platform->base,(Vec3){(float)side*(hx+.18f),0,0});
+                mesh_box(m,post,(Vec3){.14f,3.48f,.18f},(Color){.12f,.19f,.23f});
+                m->glow=.6f;mesh_box(m,vadd(post,(Vec3){0,.04f,0}),(Vec3){.17f,base.y+.12f,.055f},route);m->glow=0;
+            }
+        }else {
+            mesh_box(m,(Vec3){0,.025f,-4},(Vec3){35,.02f,.06f},route);
+            Vec3 velocity=platform_velocity(platform,g->time);float direction=velocity.x<0?-1:1;
+            for(int arrow=0;arrow<2;arrow++) {
+                float x=(float)arrow*.7f-.35f;
+                mesh_triangle(m,vadd(base,(Vec3){x,.316f,-.22f}),vadd(base,(Vec3){x+direction*.30f,.316f,0}),
+                    vadd(base,(Vec3){x,.316f,.22f}),route,(Vec3){0,1,0});
+                mesh_triangle(m,vadd(base,(Vec3){x,.316f,.22f}),vadd(base,(Vec3){x+direction*.30f,.316f,0}),
+                    vadd(base,(Vec3){x,.316f,-.22f}),route,(Vec3){0,1,0});
+            }
+        }
         m->glow=0;
     }
     for(int k=0;k<g->blast_count;k++) {
@@ -80,7 +108,7 @@ void animate_arena(Mesh *m,const Game *g,const App *app) {
     for(int i=0;i<g->corpse_count;i++)shadow(m,g->world,g->corpses[i].body.position,.66f);
     for(int i=0;i<MAX_PLAYERS;i++)if(g->actors[i].active) {
         const Player *p=i==g->local_actor?&g->player:&g->actors[i].player;
-        if(i!=g->local_actor)shadow(m,g->world,p->body.position,.48f);
+        if(i!=g->local_actor)shadow(m,g->world,p->body.position,g->actors[i].dead?.8f:.48f);
         if(g->cooperative&&g->actors[i].dead) {
             m->glow=1;Vec3 marker=vadd(p->body.position,(Vec3){0,1.25f+.1f*sinf(time*3),0});
             mesh_diamond(m,marker,.13f,(Color){1,.53f,.18f});

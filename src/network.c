@@ -390,9 +390,19 @@ void net_render(const Network *n,const Game *g,Game *view,double now) {
         const Actor *a=&n->previous.actors[i],*b=&n->current.actors[i];
         if(a->active&&!a->dead&&!b->dead&&vlength(vsub(a->player.body.position,b->player.body.position))<5) {
             view->actors[i].player.body.position=position_lerp(a->player.body.position,b->player.body.position,alpha);
+            view->actors[i].player.body.velocity=position_lerp(a->player.body.velocity,b->player.body.velocity,alpha);
             view->actors[i].player.yaw=angle_lerp(a->player.yaw,b->player.yaw,alpha);
+            view->actors[i].player.pitch=a->player.pitch+(b->player.pitch-a->player.pitch)*alpha;
             view->actors[i].player.bob=a->player.bob+(b->player.bob-a->player.bob)*alpha;
+            view->actors[i].player.movement_blend=a->player.movement_blend+(b->player.movement_blend-a->player.movement_blend)*alpha;
+            view->actors[i].player.strafe_blend=a->player.strafe_blend+(b->player.strafe_blend-a->player.strafe_blend)*alpha;
         }
+        /* Timers may count down between snapshots, but a new action must use
+         * the newest snapshot immediately instead of blending old actions. */
+        if(b->player.reload_timer>0)view->actors[i].player.reload_timer=fmaxf(0,b->player.reload_timer-age);
+        if(b->player.weapon_switch>0)view->actors[i].player.weapon_switch=fmaxf(0,b->player.weapon_switch-age);
+        if(b->player.melee_timer>0)view->actors[i].player.melee_timer=fmaxf(0,b->player.melee_timer-age);
+        view->actors[i].shot_age=b->shot_age+age;
     }
     for(int i=0;i<view->enemy_count;i++)for(int j=0;j<n->previous.enemy_count;j++) {
         const Enemy *a=&n->previous.enemies[j];Enemy *b=&view->enemies[i];

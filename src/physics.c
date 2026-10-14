@@ -72,7 +72,20 @@ void update_player(World *world,Player *p,Input input,float dt) {
     if(p->dash_timer==0&&current>limit) {
         b->velocity.x*=limit/current;b->velocity.z*=limit/current;
     }
-    if(b->grounded&&input.jump){b->velocity.y=PLAYER_JUMP;b->grounded=false;audio_play(SOUND_JUMP);}
+    if(b->grounded&&input.jump) {
+        Vec3 ride={0,0,0};
+        for(int k=0;k<world->platform_count;k++) {
+            Box box=world->solids[world->platforms[k].solid];
+            if(fabsf(b->position.y-box.max.y)<.065f&&b->position.x>=box.min.x&&b->position.x<=box.max.x
+                &&b->position.z>=box.min.z&&b->position.z<=box.max.z) {
+                ride=platform_velocity(&world->platforms[k],world->platform_time);break;
+            }
+        }
+        b->velocity.x+=ride.x;b->velocity.z+=ride.z;
+        b->velocity.y=PLAYER_JUMP+fmaxf(0,ride.y);
+        if(hypotf(ride.x,ride.z)>.1f)p->boost_timer=.6f;
+        b->grounded=false;audio_play(SOUND_JUMP);
+    }
     move_horizontal(world,b,b->velocity.x*dt,b->velocity.z*dt,PLAYER_RADIUS,PLAYER_HEIGHT,PLAYER_STEP);
     bool was_grounded=b->grounded;float fall_speed=b->velocity.y;
     move_vertical(world,b,dt,PLAYER_RADIUS,PLAYER_HEIGHT);

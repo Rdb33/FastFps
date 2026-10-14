@@ -31,7 +31,9 @@ void game_reset(Game *g, World *world, int limit) {
     g->pickups[1].position = (Vec3){23, 0, -18};
     g->pickups[2].position = (Vec3){-23, 0, 18};
     g->pickups[3].position = (Vec3){23, 0, 18};
-    g->pickup_count = 4;
+    g->pickups[4].position = (Vec3){-22, UPPER_DECK_HEIGHT, 2};
+    g->pickups[5].position = (Vec3){22, UPPER_DECK_HEIGHT, 2};
+    g->pickup_count = 6;
     const Vec3 barrels[MAX_BARRELS]={{-6,0,-15},{-2,0,-15},{-20,0,2},{-20,0,6},{18,0,5},{18,0,9}};
     g->barrel_count=MAX_BARRELS;
     for(int i=0;i<MAX_BARRELS;i++)g->barrels[i]=(Barrel){.position=barrels[i],.health=45,.owner=-1};
@@ -620,8 +622,9 @@ static void update_actor(Game *g,Input input,float dt) {
     for (int i=0;i<g->pickup_count;i++) {
         Pickup *pickup=&g->pickups[i];
         Vec3 delta=vsub(pickup->position,p->body.position);
-        if (pickup->cooldown==0 && p->health<player_max_health(p) && p->body.position.y<1.2f && hypotf(delta.x,delta.z)<1.3f) {
-            p->health=fminf(player_max_health(p),p->health+25); pickup->cooldown=18;
+        if (pickup->cooldown==0 && p->health<player_max_health(p) && fabsf(delta.y)<.9f && hypotf(delta.x,delta.z)<1.3f) {
+            p->health=fminf(player_max_health(p),p->health+25);
+            pickup->cooldown=pickup->position.y>2?UPPER_PICKUP_RESPAWN_TIME:PICKUP_RESPAWN_TIME;
             audio_play(SOUND_PICKUP); say(g,"+25 SANTE",1);
         }
     }

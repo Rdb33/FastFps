@@ -225,7 +225,7 @@ void renderer_draw(Renderer *r,const Game *g,const App *app) {
     for(int i=0;i<g->enemy_count;i++)animate_creature(m,&g->enemies[i],g->time);
     for(int i=0;i<g->corpse_count;i++)animate_creature(m,&g->corpses[i],g->time);
     if(g->cooperative)for(int i=0;i<MAX_PLAYERS;i++)if(g->actors[i].active&&i!=g->local_actor)
-        animate_teammate(m,&g->actors[i],i);
+        animate_teammate(m,&g->actors[i],i,g->time,r->detail_level);
     for(int i=0;i<g->projectile_count;i++) {
         const Projectile *bolt=&g->projectiles[i];
         m->glow=1;
@@ -253,13 +253,14 @@ void renderer_draw(Renderer *r,const Game *g,const App *app) {
             Vec3 base=g->pickups[i].position;
             mesh_box(m,vadd(base,(Vec3){0,.045f,0}),(Vec3){.18f,.04f,.6f},(Color){.15f,.32f,.22f});
             mesh_box(m,vadd(base,(Vec3){0,.05f,0}),(Vec3){.6f,.04f,.18f},(Color){.15f,.32f,.22f});
-            float progress=1-clampf(g->pickups[i].cooldown/18,0,1);
+            float respawn=base.y>2?UPPER_PICKUP_RESPAWN_TIME:PICKUP_RESPAWN_TIME;
+            float progress=1-clampf(g->pickups[i].cooldown/respawn,0,1);
             mesh_box(m,vadd(base,(Vec3){0,.04f,.8f}),(Vec3){1.4f*progress+.01f,.03f,.08f},(Color){.25f,.7f,.4f});
             continue;
         }
         int first=m->count;
         m->glow=.65f;
-        Vec3 base=g->pickups[i].position;base.y=.45f+sinf(g->time*2+base.x)*.1f;
+        Vec3 base=g->pickups[i].position;base.y+=.45f+sinf(g->time*2+base.x)*.1f;
         mesh_box(m,(Vec3){0,0,0},(Vec3){.23f,.65f,.23f},(Color){.3f,1,.4f});
         mesh_box(m,(Vec3){0,.2f,0},(Vec3){.65f,.23f,.23f},(Color){.3f,1,.4f});
         mesh_pose(m,first,base,g->time*.7f,0,1);
@@ -270,7 +271,7 @@ void renderer_draw(Renderer *r,const Game *g,const App *app) {
     glUniform3f(r->light_color,0,0,0);glUniform3f(r->sector_color,.75f,.85f,1);
     glUniform3f(r->light_color2,0,0,0);glUniform3f(r->eye,0,0,0);
     glClear(GL_DEPTH_BUFFER_BIT);upload(r->gun_buffer,m);draw(r,r->gun_buffer,m->count,projection,0,0);
-    ui_build(&r->ui,g,app);upload(r->ui_buffer,&r->ui);
+    ui_build(&r->ui,g,app);ui_teammates(&r->ui,g,app,matrix);upload(r->ui_buffer,&r->ui);
     /* L'interface est dessinée après l'agrandissement, à la résolution de la fenêtre. */
     glBindFramebuffer(GL_FRAMEBUFFER,0);
     int width,height;SDL_GL_GetDrawableSize(r->window,&width,&height);

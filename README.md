@@ -1,10 +1,22 @@
 # FASTFPS — Secteur zéro
 
-**FPS 3D natif, style Doom, pensé pour le Raspberry Pi 4.** Base à améliorer progressivement : déplacement nerveux, quatre armes à débloquer et survie dans trois arènes industrielles. Version **0.9.1** : rappel pour activer la musique. La **0.9.0** apporte les musiques de menu et de combat, le volume indépendant et les transitions douces.
+**FPS 3D natif, style Doom, pensé pour le Raspberry Pi 4.** Base à améliorer progressivement : déplacement nerveux, quatre armes à débloquer et survie dans trois arènes industrielles. Version **0.9.2** : plateformes qui desservent des postes en hauteur, soins sur les balcons et coéquipiers plus détaillés.
 
 Application en **C11**, **SDL2** (fenêtre, clavier, souris et son) et **OpenGL ES 2** (rendu 3D). Graphismes, police et bruitages sont générés localement. Les musiques MP3 sont lues avec **mpg123**.
 
 Le mode solo fonctionne hors ligne. Pour jouer ensemble, sélectionne **Multijoueur** ; voir [MULTIJOUEUR.md](MULTIJOUEUR.md) pour la création, la connexion sur Internet et les limites de cette première version.
+
+## Nouveautés — version 0.9.2
+
+- **Les plateformes ont désormais des destinations sur les trois maps.** Deux ascenseurs bleus rejoignent des balcons à **3,48 m**, avec couvertures, garde-corps extérieurs et deux postes de soins. Le passage au sol reste ouvert sous les balcons. Ascenseur de gauche dans la moitié nord, celui de droite dans la moitié sud ; repère les panneaux **LIFT** et les bordures bleues. Marche dessus lorsqu’ils sont en bas, attends le palier puis avance vers le balcon.
+- **Navette orange en hauteur** : elle relie les deux balcons, au-dessus du combat, en traversant environ **31 mètres**. Embarque depuis la bordure orange du balcon ; à l’autre bout, marche vers le palier. Les plateformes marquent un arrêt aux deux extrémités (environ 1,3 / 1,4 s pour les ascenseurs, 1,9 s pour la navette), puis accélèrent et ralentissent progressivement.
+- **Les deux nouveaux soins rendent 25 PV** et reviennent après **30 secondes**, contre 18 s pour les quatre soins au sol. Il faut monter pour les récupérer ; passer en dessous ne suffit pas. Les couverts et la hauteur permettent de changer de ligne de tir et d’éviter une onde de choc au sol, mais les tirs des invocateurs peuvent toujours t’atteindre.
+- **Sauts depuis une plateforme mobile** : l’élan horizontal de la navette est conservé, avec un court délai de contrôle aérien ; un ascenseur qui monte apporte une petite impulsion verticale supplémentaire. Aucun saut n’est déclenché automatiquement.
+- **Coéquipiers plus expressifs** : armures géométriques avec casques, visières, épaulières, gants, genouillères, bottes et sacs dorsaux. Quatre couleurs cohérentes avec la liste de l’équipe, numéros à l’avant et à l’arrière. Chaque arme possède sa silhouette, y compris le lance-roquettes.
+- Marche articulée, inclinaison latérale, jambes repliées en saut, regard et arme orientés avec la visée, recul, recharge, changement d’arme, frappe et aide à un allié. Un joueur à terre conserve sa taille et apparaît couché ; son arme est masquée.
+- **Identification dans la vue du joueur** : noms, couleur et santé au-dessus des coéquipiers visibles à moins de 25 m ; état à terre et progression de réanimation si nécessaire. Les murs masquent les étiquettes. Le nom et la santé de chaque allié restent dans la liste de l’équipe.
+
+**Multijoueur : protocole 8. Mets tous les ordinateurs à jour en 0.9.2.** Les nouvelles collisions et trajectoires ne sont pas compatibles avec la prédiction des versions précédentes. Les animations réutilisent les états déjà transmis et les maillages existants ; les cinq appels de dessin et les capacités de buffers sont conservés. Voir [VALIDATION.md](VALIDATION.md) pour les vérifications effectuées et celles restant à faire en jouant.
 
 ## Rappel — version 0.9.1
 
@@ -28,7 +40,7 @@ Le mode solo fonctionne hors ligne. Pour jouer ensemble, sélectionne **Multijou
 - **Événement rare : Roquettes !** À partir du round 3, l’hôte effectue un tirage de 8 % par round éligible, avec au moins cinq rounds entre événements. Chaque joueur, même à terre, reçoit un lance-roquettes temporaire pour ce round, automatiquement équipé. **5** ou la molette permet de le sélectionner ensuite. Trois roquettes par chargeur, recharge de 2,1 secondes, réserves illimitées pendant l’événement. Les roquettes infligent des dégâts de zone sur 6,5 mètres, avec diminution selon la distance et blocage par les murs. Les explosions ne font pas de tirs à la tête. Elles ne blessent pas directement les alliés ; le tireur peut subir ses propres dégâts et faire un **rocket jump**. Les barils restent dangereux pour toute l’équipe. À la fin du round, le lanceur est retiré et l’arme précédant l’événement est restaurée si nécessaire.
 - **Mobilité sur les trois maps** : deux plaques élévatrices montent jusqu’à 3,48 mètres et une navette se déplace horizontalement. Monte dessus à leur passage ou saute dessus, puis utilise-les pour atteindre les hauteurs. Les joueurs, ennemis et corps peuvent être transportés. Une plaque descendante dégage un personnage vers un côté libre plutôt que de l’enfermer. Positions et collisions sont calculées depuis le temps de simulation de l’hôte et rejouées pour la prédiction locale.
 
-La version utilise le **protocole réseau 7**. Mets à jour tous les ordinateurs avant une partie ; les salons des anciennes versions sont incompatibles. Les invitations LAN / Tailscale fonctionnent comme auparavant. Voir [VALIDATION.md](VALIDATION.md) pour les tests réalisés et les limites des mesures.
+La **0.8** utilisait le **protocole réseau 7** ; la **0.9.2** utilise le **protocole 8**. Mets à jour tous les ordinateurs avant une partie ; les salons des anciennes versions sont incompatibles. Les invitations LAN / Tailscale fonctionnent comme auparavant. Voir [VALIDATION.md](VALIDATION.md) pour les tests réalisés et les limites des mesures.
 
 ## Nouveautés — version 0.7
 
@@ -274,6 +286,7 @@ make clean
 | `src/graphics.c` | Réacteur, ombres stylisées et effets d’arène |
 | `src/renderer.c` | OpenGL ES, caméra, modèles et résolution |
 | `src/animation.c` | Poses des ennemis, articulations et animations des armes |
+| `src/teammate.c` | Armures, identification et animations des coéquipiers |
 | `src/network.c`, `src/network.h` | Connexions, salon, commandes et prédiction |
 | `src/discovery.c` | Recherche LAN, adresses VPN et invitations |
 | `src/protocol.c` | Encodage portable et validation des messages |
@@ -290,7 +303,7 @@ Carte et paramètres sont actuellement dans les sources. Aucune option de compil
 
 Trois cartes et un mode survie solo ou coopératif, quatre armes permanentes par run, un lance-roquettes temporaire et un rechargement par chargeur. Collisions par boîtes, trajectoires parfois anguleuses. Pas encore de rampes, accroupissement, sauvegarde de partie ou manette.
 
-La coopération utilise un joueur hôte qui fait autorité sur le monde, un état d’entrée `Input`, des identifiants d’ennemis stables, une prédiction du déplacement et une interpolation à l’affichage. La connexion se fait par IPv4 et port TCP, sans service central dans le jeu. Tailscale utilise ses propres services de connexion et éventuellement de relais. La validation entre deux machines et sur Internet reste à faire : voir [VALIDATION.md](VALIDATION.md). La version 0.8 utilise le protocole 7, incompatible avec les versions précédentes. Tous les joueurs doivent avoir la même version de gameplay.
+La coopération utilise un joueur hôte qui fait autorité sur le monde, un état d’entrée `Input`, des identifiants d’ennemis stables, une prédiction du déplacement et une interpolation à l’affichage. La connexion se fait par IPv4 et port TCP, sans service central dans le jeu. Tailscale utilise ses propres services de connexion et éventuellement de relais. La validation entre deux machines et sur Internet reste à faire : voir [VALIDATION.md](VALIDATION.md). La version 0.9.2 utilise le protocole 8, incompatible avec les versions précédentes. Tous les joueurs doivent avoir la même version de gameplay.
 
 Voir [ROADMAP.md](ROADMAP.md). Le prototype navigateur est conservé dans `prototype-web/` comme archive ; le lanceur principal utilise **l’application native**.
 
