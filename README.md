@@ -1,15 +1,27 @@
 # FASTFPS — Secteur zéro
 
-**FPS 3D natif, style Doom, pensé pour le Raspberry Pi 4.** Base à améliorer progressivement : déplacement nerveux, quatre armes à débloquer et survie dans trois arènes industrielles. Version **0.7.0** : vies, maps, rechargement, arsenal progressif et réglages numériques.
+**FPS 3D natif, style Doom, pensé pour le Raspberry Pi 4.** Base à améliorer progressivement : déplacement nerveux, quatre armes à débloquer et survie dans trois arènes industrielles. Version **0.8.0** : champions qui sautent, IA enrichie, réanimation des alliés, plateformes mobiles et événement roquettes.
 
 Application en **C11**, **SDL2** (fenêtre, clavier, souris et son) et **OpenGL ES 2** (rendu 3D). Graphismes, police et sons sont générés localement.
 
-Le mode solo fonctionne hors ligne. Pour jouer ensemble, sélectionne **Multijoueur / salons** ; voir [MULTIJOUEUR.md](MULTIJOUEUR.md) pour la création, la connexion sur Internet et les limites de cette première version.
+Le mode solo fonctionne hors ligne. Pour jouer ensemble, sélectionne **Multijoueur** ; voir [MULTIJOUEUR.md](MULTIJOUEUR.md) pour la création, la connexion sur Internet et les limites de cette première version.
+
+## Nouveautés — version 0.8
+
+- **Champions : saut et écrasement au sol.** Le champion prépare son saut pendant 0,75 seconde. Le cercle orange de six mètres annonce sa cible ; celle-ci est fixée avant le décollage. Il saute réellement avec gravité et collisions, frappe à l’atterrissage, puis récupère. Les murs bloquent le choc ; sauter assez haut au bon moment ou quitter le cercle permet de l’éviter. Les dégâts sont appliqués une seule fois à l’impact.
+- **IA des ennemis** : cibles privilégiées selon leur visibilité, maintien de la cible pour éviter les changements incessants, itinéraires propres à chaque joueur en coopération, contournement des obstacles, séparation du groupe et tentatives de sortie lorsqu’un ennemi se bloque. Les traqueurs approchent par les côtés ; les invocateurs reculent si tu es trop près, se déplacent latéralement à distance et anticipent ton mouvement avant leur tir.
+- **Menu principal et Réglages séparés** : grandes actions Solo, Multijoueur, Réglages, Quitter ; raccourcis et contexte de partie affichés à droite. Les sliders et la saisie de luminosité / sensibilité sont conservés dans Réglages. Échap revient au menu précédent.
+- **Réanimation obligatoire en coopération** : aucun retour automatique. Approche-toi à moins de 2,8 mètres et maintiens **E pendant 2,5 secondes**, avec une ligne de vue libre. Relâcher E, s’éloigner, perdre la ligne de vue ou subir des dégâts interrompt la progression. Le joueur réanimé conserve ses modules et chargeurs, retrouve 50 % de sa santé maximale et bénéficie de deux secondes de protection. Une icône au-dessus du corps et une barre indiquent l’état. Si tous les joueurs actifs sont à terre, game over immédiat. Le solo conserve ses trois vies.
+- **Pop-up à chaque nouvelle arme** : carte visible pendant six secondes au déblocage des armes aux rounds 10, 20 et 30, avec le nom et la touche. Le combat continue pendant son affichage.
+- **Événement rare : Roquettes !** À partir du round 3, l’hôte effectue un tirage de 8 % par round éligible, avec au moins cinq rounds entre événements. Chaque joueur, même à terre, reçoit un lance-roquettes temporaire pour ce round, automatiquement équipé. **5** ou la molette permet de le sélectionner ensuite. Trois roquettes par chargeur, recharge de 2,1 secondes, réserves illimitées pendant l’événement. Les roquettes infligent des dégâts de zone sur 6,5 mètres, avec diminution selon la distance et blocage par les murs. Les explosions ne font pas de tirs à la tête. Elles ne blessent pas directement les alliés ; le tireur peut subir ses propres dégâts et faire un **rocket jump**. Les barils restent dangereux pour toute l’équipe. À la fin du round, le lanceur est retiré et l’arme précédant l’événement est restaurée si nécessaire.
+- **Mobilité sur les trois maps** : deux plaques élévatrices montent jusqu’à 3,48 mètres et une navette se déplace horizontalement. Monte dessus à leur passage ou saute dessus, puis utilise-les pour atteindre les hauteurs. Les joueurs, ennemis et corps peuvent être transportés. Une plaque descendante dégage un personnage vers un côté libre plutôt que de l’enfermer. Positions et collisions sont calculées depuis le temps de simulation de l’hôte et rejouées pour la prédiction locale.
+
+La version utilise le **protocole réseau 7**. Mets à jour tous les ordinateurs avant une partie ; les salons des anciennes versions sont incompatibles. Les invitations LAN / Tailscale fonctionnent comme auparavant. Voir [VALIDATION.md](VALIDATION.md) pour les tests réalisés et les limites des mesures.
 
 ## Nouveautés — version 0.7
 
 - **Solo : trois vies au total.** Une mort consomme une vie ; tant qu’il en reste, retour après trois secondes, avec deux secondes de protection. Les modules, armes et rounds atteints sont conservés. Le combat s’arrête pendant ce bref retour. Après la troisième mort, écran de game over et possibilité de recommencer.
-- **Coopération : game over dès que tous les joueurs actifs sont morts simultanément**, avant toute réapparition. Chaque joueur peut revenir au salon ; l’hôte peut lancer une nouvelle partie. Un joueur isolé dans un salon suit cette règle de coopération.
+- **Coopération : réanimation par un allié avec E ; game over dès que tous les joueurs actifs sont à terre simultanément.** Chaque joueur peut revenir au salon ; l’hôte peut lancer une nouvelle partie. Un joueur isolé dans un salon suit cette règle de coopération.
 - **Trois maps** : Réacteur (plateforme et piliers), Fonderie (lignes de machines et passages latéraux), Bastion (murs décalés et couvertures). Réacteur pour les rounds 1–5, Fonderie pour 6–10, Bastion pour 11–15, puis le cycle recommence. Chaque changement replace l’équipe à une position libre, avec deux secondes de protection.
 - **Difficulté accrue** : jusqu’à 18 ennemis, courses et projectiles plus rapides, résistance croissante et dégâts augmentés en Normal / Brutal. Les soins donnent 25 PV, reviennent après 18 secondes et les fins de vague rendent 10 PV.
 - **Modules protégés contre les clics accidentels** : une seconde de blocage, relâchement du tir, puis sélection d’une carte. Confirme avec **Entrée ou le bouton Valider**, situé sous les cartes. Cliquer plusieurs fois sur une carte ne l’installe pas. La sélection automatique après 15 secondes reste annoncée à l’écran ; le module installé apparaît par son nom.
@@ -28,7 +40,7 @@ Le mode solo fonctionne hors ligne. Pour jouer ensemble, sélectionne **Multijou
 
 La molette parcourt uniquement les armes disponibles. **Tab** affiche les modules et l’arsenal, avec les prochains rounds de déblocage. Le HUD affiche le chargeur et une barre de rechargement ; le modèle de l’arme, la main et le chargeur accompagnent le geste.
 
-**Multijoueur : tous les ordinateurs doivent être mis à jour en 0.7**, qui utilise le protocole réseau 6. Les anciennes versions ne peuvent pas rejoindre ces salons. Les maps, choix, armes et chargeurs restent décidés par l’hôte.
+**Multijoueur : tous les ordinateurs doivent être mis à jour en 0.8**, qui utilise le protocole réseau 7. Les anciennes versions ne peuvent pas rejoindre ces salons. Les maps, choix, armes et chargeurs restent décidés par l’hôte.
 
 ## Graphismes — version 0.6
 
@@ -63,7 +75,7 @@ Après chaque vague terminée, chaque joueur choisit un module parmi trois propo
 | Blindage | −6 % de dégâts reçus |
 | Vampirisme | +2 santé par élimination |
 
-Chaque module a **cinq rangs**. Les bonus s’additionnent par rang ; tu peux ainsi orienter ton personnage vers les dégâts, la mobilité ou la survie. Le niveau du personnage augmente à chaque module installé. **Tab** affiche ta configuration actuelle. Les améliorations restent actives après une réapparition en coopération et sont remises à zéro au début d’une nouvelle partie.
+Chaque module a **cinq rangs**. Les bonus s’additionnent par rang ; tu peux ainsi orienter ton personnage vers les dégâts, la mobilité ou la survie. Le niveau du personnage augmente à chaque module installé. **Tab** affiche ta configuration actuelle. Les améliorations restent actives après une réanimation en coopération et sont remises à zéro au début d’une nouvelle partie.
 
 Toutes les **cinq vagues**, un champion doré apparaît : il est plus grand et résistant, vaut cinq fois les points d’un ennemi ordinaire et prépare une attaque de zone. Un cercle au sol annonce sa portée ; quitte la zone avant le choc. Vaincre le champion ouvre le secteur suivant, avec une nouvelle ambiance lumineuse. Les trois maps alternent tous les cinq rounds, avec quatre thèmes de lumière qui se répètent. La survie continue ensuite, avec une résistance ennemie qui augmente progressivement.
 
@@ -136,7 +148,8 @@ Le Pi 4 possède un GPU compatible OpenGL ES ([documentation Raspberry Pi](https
 | Sauter | Espace ; maintenir pour enchaîner à l’atterrissage |
 | Esquive dans la direction du mouvement | Clic droit ou Alt gauche ; recharge de 1,25 seconde |
 | Frappe au corps à corps | F ; une élimination rend 10 points de santé |
-| Choisir une arme disponible | 1 / 2 / 3 / 4 ; molette pour changer |
+| Choisir une arme disponible | 1 / 2 / 3 / 4 / 5 ; molette pour changer |
+| Réanimer un allié en coopération | E maintenu pendant 2,5 secondes, près du corps |
 | Recharger | R ; automatiquement lorsque le chargeur est vide |
 | Choisir un module entre les vagues | Clic, 1 / 2 / 3 ou flèches ; Entrée / bouton Valider pour confirmer |
 | Afficher / masquer les modules installés | Tab |
@@ -198,7 +211,7 @@ En plein écran, la 3D reste à la résolution choisie puis est agrandie avec li
 
 Cinq appels de dessin par image : décor, objets mobiles, arme, agrandissement avec effets, puis interface à la résolution de la fenêtre. Décor chargé une seule fois sur le GPU, tableaux et buffers réutilisés, aucune allocation dans la boucle normale de jeu. Les animations transforment les sommets dans ces mêmes buffers, sans ajouter d’appels de dessin. Les matériaux sont générés dans le shader, avec des effets plus simples sur le profil Pi. Les ombres stylisées restent géométriques ; aucun rendu supplémentaire de cartes d’ombres. Les effets de contraste, vignette et bloom sont intégrés à l’agrandissement existant. La texture de scène est réutilisée ; les captures allouent une cible temporaire uniquement au moment de l’export. Simulation à pas fixe de 60 Hz ; navigation partagée calculée environ trois fois par seconde.
 
-**Un essai sur Raspberry Pi a été rapporté comme satisfaisant par l’utilisateur pour la version précédente. Les nouveaux effets et les vagues de la 0.7 restent à mesurer ; aucune valeur de FPS réelle n’a été fournie.** La fluidité dépendra du matériel, des pilotes et de la température. Les inspections visuelles ici utilisent un rendu logiciel hors écran sur la machine de développement ; elles ne mesurent pas les performances du Pi. Le compteur FPS permet une première mesure en jeu.
+**Un essai sur Raspberry Pi a été rapporté comme satisfaisant par l’utilisateur pour la version précédente. Les nouvelles mécaniques et les vagues de la 0.8 restent à mesurer ; aucune valeur de FPS réelle n’a été fournie.** La fluidité dépendra du matériel, des pilotes et de la température. Les inspections visuelles ici utilisent un rendu logiciel hors écran sur la machine de développement ; elles ne mesurent pas les performances du Pi. Le compteur FPS permet une première mesure en jeu.
 
 ## Options
 
@@ -238,7 +251,11 @@ make clean
 | `src/world.c` | Carte, obstacles et navigation |
 | `src/physics.c` | Collisions, déplacement, gravité et marches |
 | `src/game.c` | Armes, ennemis, projectiles, soins, vagues et score |
-| `src/weapons.c` | Arsenal, déblocages et chargeurs |
+| `src/weapons.c` | Arsenal, chargeurs et événement roquettes |
+| `src/ai.c` | Choix de cible, contournement, séparation et stratégies des ennemis |
+| `src/mobility.c` | Plateformes mobiles, transport et sécurité des collisions |
+| `src/menu.c` | Écrans principaux, navigation et menu de réglages |
+| `src/presets.c` | Profils graphiques partagés |
 | `src/settings.c` | Sliders et saisie numérique des réglages |
 | `src/progression.c` | Bonus des modules, propositions, choix et interface |
 | `src/graphics.c` | Réacteur, ombres stylisées et effets d’arène |
@@ -257,9 +274,9 @@ Carte et paramètres sont actuellement dans les sources. Aucune option de compil
 
 ## Limites et suite
 
-Trois cartes et un mode survie solo ou coopératif, quatre armes et un rechargement par chargeur. Collisions par boîtes, trajectoires parfois anguleuses. Pas encore de rampes, accroupissement, sauvegarde de partie ou manette.
+Trois cartes et un mode survie solo ou coopératif, quatre armes permanentes par run, un lance-roquettes temporaire et un rechargement par chargeur. Collisions par boîtes, trajectoires parfois anguleuses. Pas encore de rampes, accroupissement, sauvegarde de partie ou manette.
 
-La coopération utilise un joueur hôte qui fait autorité sur le monde, un état d’entrée `Input`, des identifiants d’ennemis stables, une prédiction du déplacement et une interpolation à l’affichage. La connexion se fait par IPv4 et port TCP, sans service central dans le jeu. Tailscale utilise ses propres services de connexion et éventuellement de relais. La validation entre deux machines et sur Internet reste à faire : voir [VALIDATION.md](VALIDATION.md). La version 0.7 utilise le protocole 6, incompatible avec les versions précédentes. Tous les joueurs doivent avoir la même version de gameplay.
+La coopération utilise un joueur hôte qui fait autorité sur le monde, un état d’entrée `Input`, des identifiants d’ennemis stables, une prédiction du déplacement et une interpolation à l’affichage. La connexion se fait par IPv4 et port TCP, sans service central dans le jeu. Tailscale utilise ses propres services de connexion et éventuellement de relais. La validation entre deux machines et sur Internet reste à faire : voir [VALIDATION.md](VALIDATION.md). La version 0.8 utilise le protocole 7, incompatible avec les versions précédentes. Tous les joueurs doivent avoir la même version de gameplay.
 
 Voir [ROADMAP.md](ROADMAP.md). Le prototype navigateur est conservé dans `prototype-web/` comme archive ; le lanceur principal utilise **l’application native**.
 

@@ -54,7 +54,7 @@ static void network_preferences(App *app,bool write) {
 }
 static void pause_game(App *app) {
     if(app->state!=STATE_PLAYING&&app->state!=STATE_UPGRADE)return;
-    app->state=STATE_PAUSED;app->selected=0;SDL_SetRelativeMouseMode(SDL_FALSE);
+    app->state=STATE_PAUSED;app->selected=0;app->menu_page=0;SDL_SetRelativeMouseMode(SDL_FALSE);
 }
 static void start_game(App *app,Game *game,bool restart,bool demo) {
     if(restart||app->state!=STATE_PAUSED){game_reset(game,game->world,PRESETS[app->quality].particles);app->show_build=false;}
@@ -63,7 +63,7 @@ static void start_game(App *app,Game *game,bool restart,bool demo) {
     if(!demo&&SDL_SetRelativeMouseMode(SDL_TRUE)!=0) {
         app->capture_error=true;SDL_Log("Capture souris : %s",SDL_GetError());return;
     }
-    app->capture_error=false;app->state=STATE_PLAYING;
+    app->capture_error=false;app->state=STATE_PLAYING;app->menu_page=0;
     int x,y;SDL_GetRelativeMouseState(&x,&y);
 }
 static void toggle_fullscreen(App *app,Renderer *renderer) {
@@ -105,16 +105,9 @@ static void menu_action(App *app,Game *game,Renderer *renderer,int direction) {
         case 8:app->modern=!app->modern;break;
         case 9:app->brightness=clampf(app->brightness+.05f*(float)direction,.5f,2);break;
         case 10:app->running=false;break;
+        case 11:app->menu_page=1;app->selected=2;break;
+        case 12:app->menu_page=0;app->selected=11;break;
     }
-}
-static int menu_hit(Renderer *r,int x,int y) {
-    int width,height;SDL_GetWindowSize(r->window,&width,&height);
-    float draw_width=(float)width,draw_height=draw_width*9/16;
-    if(draw_height>height){draw_height=(float)height;draw_width=draw_height*16/9;}
-    float px=((float)x-((float)width-draw_width)/2)*640/draw_width;
-    float py=((float)y-((float)height-draw_height)/2)*360/draw_height;
-    if(px<76||px>564||py<128||py>=128+MENU_ROWS*14)return -1;
-    return (int)((py-128)/14);
 }
 static Input read_input(void) {
     const Uint8 *keys=SDL_GetKeyboardState(NULL);
@@ -127,7 +120,7 @@ static Input read_input(void) {
         .jump=keys[SDL_SCANCODE_SPACE]!=0,.sprint=keys[SDL_SCANCODE_LSHIFT]||keys[SDL_SCANCODE_RSHIFT],
         .firing=(SDL_GetMouseState(NULL,NULL)&SDL_BUTTON(SDL_BUTTON_LEFT))!=0,
         .dash=keys[SDL_SCANCODE_LALT]||(SDL_GetMouseState(NULL,NULL)&SDL_BUTTON(SDL_BUTTON_RIGHT))!=0,
-        .melee=keys[SDL_SCANCODE_F]!=0,.reload=keys[SDL_SCANCODE_R]!=0};
+        .melee=keys[SDL_SCANCODE_F]!=0,.reload=keys[SDL_SCANCODE_R]!=0,.revive=keys[SDL_SCANCODE_E]!=0};
 }
 static Input demo_input(Game *game) {
     if(game->player.upgrade_pending)return (Input){.upgrade=1};
@@ -261,10 +254,10 @@ int main(int argc,char **argv) {
                     game.player.sway_x=clampf(game.player.sway_x+(float)event.motion.xrel*.00012f,-.028f,.028f);
                     game.player.sway_y=clampf(game.player.sway_y+(float)event.motion.yrel*.00009f,-.02f,.02f);
                 }else if(app.state!=STATE_PLAYING) {
-                    int hit=menu_hit(&renderer,event.motion.x,event.motion.y);if(hit>=0)app.selected=hit;
+                    int hit=menu_hit(&app,&renderer,event.motion.x,event.motion.y);if(hit>=0)app.selected=hit;
                 }
             }else if(event.type==SDL_MOUSEBUTTONDOWN&&event.button.button==SDL_BUTTON_LEFT&&app.state!=STATE_PLAYING) {
-                int hit=menu_hit(&renderer,event.button.x,event.button.y);
+                int hit=menu_hit(&app,&renderer,event.button.x,event.button.y);
                 if(hit>=0){app.selected=hit;menu_action(&app,&game,&renderer,1);}
             }else if(event.type==SDL_MOUSEWHEEL&&app.state==STATE_PLAYING) {
                 game_cycle_weapon(&game,event.wheel.y<0?1:-1);
@@ -277,12 +270,13 @@ int main(int argc,char **argv) {
                 else if(key==SDL_SCANCODE_F4){app.motion=!app.motion;game.motion=app.motion;}
                 else if(key==SDL_SCANCODE_F5)app.modern=!app.modern;
                 else if(key==SDL_SCANCODE_ESCAPE) {
-                    if(app.state==STATE_PLAYING||app.state==STATE_UPGRADE)pause_game(&app);
+                    if(app.menu_page){app.menu_page=0;app.selected=11;}
+                    else if(app.state==STATE_PLAYING||app.state==STATE_UPGRADE)pause_game(&app);
                     else if(app.state==STATE_PAUSED)start_game(&app,&game,false,demo);
                     else app.running=false;
                 }else if(app.state!=STATE_PLAYING) {
-                    if(key==SDL_SCANCODE_UP)app.selected=(app.selected+MENU_ROWS-1)%MENU_ROWS;
-                    else if(key==SDL_SCANCODE_DOWN)app.selected=(app.selected+1)%MENU_ROWS;
+                    if(key==SDL_SCANCODE_UP)menu_move(&app,-1);
+                    else if(key==SDL_SCANCODE_DOWN)menu_move(&app,1);
                     else if(key==SDL_SCANCODE_RETURN||key==SDL_SCANCODE_KP_ENTER||key==SDL_SCANCODE_SPACE)menu_action(&app,&game,&renderer,1);
                     else if((key==SDL_SCANCODE_LEFT||key==SDL_SCANCODE_RIGHT)&&app.selected>=2&&app.selected<=9)
                         menu_action(&app,&game,&renderer,key==SDL_SCANCODE_LEFT?-1:1);
@@ -291,6 +285,7 @@ int main(int argc,char **argv) {
                 else if(key==SDL_SCANCODE_2||key==SDL_SCANCODE_KP_2)game_request_weapon(&game,1);
                 else if(key==SDL_SCANCODE_3||key==SDL_SCANCODE_KP_3)game_request_weapon(&game,2);
                 else if(key==SDL_SCANCODE_4||key==SDL_SCANCODE_KP_4)game_request_weapon(&game,3);
+                else if(key==SDL_SCANCODE_5||key==SDL_SCANCODE_KP_5)game_request_weapon(&game,WEAPON_ROCKET);
             }
         }
         double now=(double)SDL_GetPerformanceCounter()/frequency;
@@ -312,7 +307,7 @@ int main(int argc,char **argv) {
                 upgrade_sync(&app,&game,demo);
                 accumulator-=FIXED_STEP;steps++;
                 if(game.round_over&&!game.cooperative) {
-                    app.state=STATE_DEAD;app.selected=0;SDL_SetRelativeMouseMode(SDL_FALSE);
+                    app.state=STATE_DEAD;app.selected=0;app.menu_page=0;SDL_SetRelativeMouseMode(SDL_FALSE);
                     if(game.score>app.best_score)app.best_score=game.score;
                     break;
                 }

@@ -44,6 +44,29 @@ void animate_arena(Mesh *m,const Game *g,const App *app) {
         float angle=time*.9f+(float)i*PI_F/2;
         mesh_diamond(m,(Vec3){sinf(angle)*1.45f,3.4f+sinf(time*2+(float)i)*.22f,cosf(angle)*1.45f},.09f,glow);
     }
+    for(int k=0;k<g->world->platform_count;k++) {
+        const Platform *platform=&g->world->platforms[k];Box box=g->world->solids[platform->solid];
+        Vec3 base={(box.min.x+box.max.x)/2,box.min.y,(box.min.z+box.max.z)/2};
+        m->glow=0;mesh_beveled_box(m,base,platform->size,.08f,(Color){.18f,.26f,.3f});
+        m->glow=.85f;
+        for(int side=-1;side<=1;side+=2) {
+            mesh_box(m,vadd(base,(Vec3){(float)side*1.43f,.28f,0}),(Vec3){.08f,.025f,2.8f},theme);
+            mesh_box(m,vadd(base,(Vec3){0,.28f,(float)side*1.43f}),(Vec3){2.8f,.025f,.08f},theme);
+        }
+        mesh_ring(m,vadd(base,(Vec3){0,.30f,0}),.50f,.045f,theme,16);
+        if(platform->travel.y>0) {
+            mesh_ring(m,vadd(platform->base,(Vec3){0,.035f,0}),1.9f,.06f,theme,20);
+            for(int step=0;step<4;step++)mesh_diamond(m,vadd(base,(Vec3){0,.5f+(float)step*.23f,0}),.04f,theme);
+        }else mesh_box(m,(Vec3){0,.025f,10},(Vec3){13,.02f,.06f},theme);
+        m->glow=0;
+    }
+    for(int k=0;k<g->blast_count;k++) {
+        const Blast *b=&g->blasts[k];float life=b->time/.8f,age=1-life;
+        m->glow=1;Color fire={life,life*.5f,life*.13f};
+        mesh_ring(m,vadd(b->position,(Vec3){0,.04f,0}),.3f+age*b->radius,.15f,fire,24);
+        if(age<.4f)mesh_diamond(m,b->position,.35f+age*2,fire);
+        m->glow=0;
+    }
     int detail=graphics_detail(app->quality);
     int sparks=detail==0?8:(detail==1?14:20);
     for(int i=0;i<sparks;i++) {
@@ -58,6 +81,13 @@ void animate_arena(Mesh *m,const Game *g,const App *app) {
     for(int i=0;i<MAX_PLAYERS;i++)if(g->actors[i].active) {
         const Player *p=i==g->local_actor?&g->player:&g->actors[i].player;
         if(i!=g->local_actor)shadow(m,g->world,p->body.position,.48f);
+        if(g->cooperative&&g->actors[i].dead) {
+            m->glow=1;Vec3 marker=vadd(p->body.position,(Vec3){0,1.25f+.1f*sinf(time*3),0});
+            mesh_diamond(m,marker,.13f,(Color){1,.53f,.18f});
+            mesh_box(m,vadd(marker,(Vec3){0,.20f,0}),(Vec3){.06f,.27f,.06f},(Color){.75f,1,.95f});
+            mesh_box(m,vadd(marker,(Vec3){0,.29f,0}),(Vec3){.27f,.06f,.06f},(Color){.75f,1,.95f});
+            m->glow=0;
+        }
         if(p->upgrade_flash>0) {
             m->glow=.8f;
             float age=1.4f-p->upgrade_flash;

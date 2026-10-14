@@ -25,7 +25,7 @@ static void weapons(World *w) {
     game_shoot(&g);game_reload(&g);assert(g.player.reload_timer>0);
     game_request_weapon(&g,1);assert(g.player.weapon_switch==0);
     g.player.reload_timer=0;
-    for(int i=1;i<WEAPON_COUNT;i++) {
+    for(int i=1;i<STANDARD_WEAPONS;i++) {
         g.wave=WEAPONS[i].unlock_wave-1;game_request_weapon(&g,i);assert(g.player.weapon_switch==0);
         g.wave++;game_request_weapon(&g,i);assert(g.player.weapon_target==i&&g.player.weapon_switch>0);
         game_update(&g,(Input){0},WEAPON_SWITCH_TIME+.01f);
@@ -40,7 +40,7 @@ static void solo_lives(World *w) {
     Game g;quiet(&g,w);g.player.upgrades[UPGRADE_VITALITY]=1;
     for(int remaining=2;remaining>=0;remaining--) {
         g.player.health=1;g.actors[0].invulnerable=0;g.projectile_count=1;
-        g.projectiles[0]=(Projectile){vadd(g.player.body.position,(Vec3){0,1,0}),{0,0,1},1,{1,1,1}};
+        g.projectiles[0]=(Projectile){.position=vadd(g.player.body.position,(Vec3){0,1,0}),.velocity={0,0,1},.life=1,.color={1,1,1}};
         game_update(&g,(Input){0},FIXED_STEP);
         assert(g.dead&&g.lives==remaining&&g.round_over==(remaining==0));
         if(remaining) {
@@ -109,15 +109,15 @@ static SDL_Event mouse(Uint32 type,int x,int y) {
 }
 static void controls(World *w) {
     Renderer r={0};r.window=SDL_CreateWindow("test",0,0,640,360,SDL_WINDOW_HIDDEN);assert(r.window);
-    App a={.state=STATE_MENU,.sensitivity=1,.brightness=1,.numeric_edit=-1,.slider_drag=-1};
-    SDL_Event e=mouse(SDL_MOUSEBUTTONDOWN,395,175);assert(settings_event(&a,&r,&e)&&a.slider_drag==3);
-    e=(SDL_Event){.type=SDL_MOUSEMOTION};e.motion.x=-10;e.motion.y=175;assert(settings_event(&a,&r,&e)&&a.sensitivity==.3f);
-    e=mouse(SDL_MOUSEBUTTONUP,0,175);assert(settings_event(&a,&r,&e)&&a.slider_drag==-1);
+    App a={.state=STATE_MENU,.menu_page=1,.sensitivity=1,.brightness=1,.numeric_edit=-1,.slider_drag=-1};
+    SDL_Event e=mouse(SDL_MOUSEBUTTONDOWN,395,151);assert(settings_event(&a,&r,&e)&&a.slider_drag==3);
+    e=(SDL_Event){.type=SDL_MOUSEMOTION};e.motion.x=-10;e.motion.y=151;assert(settings_event(&a,&r,&e)&&a.sensitivity==.3f);
+    e=mouse(SDL_MOUSEBUTTONUP,0,151);assert(settings_event(&a,&r,&e)&&a.slider_drag==-1);
     e=mouse(SDL_MOUSEBUTTONDOWN,505,259);assert(settings_event(&a,&r,&e)&&a.numeric_edit==9);
     e=(SDL_Event){.type=SDL_TEXTINPUT};strcpy(e.text.text,"900");assert(settings_event(&a,&r,&e));
     e=(SDL_Event){.type=SDL_KEYDOWN};e.key.keysym.scancode=SDL_SCANCODE_RETURN;
     assert(settings_event(&a,&r,&e)&&a.brightness==2&&a.numeric_edit==-1);
-    e=mouse(SDL_MOUSEBUTTONDOWN,505,175);assert(settings_event(&a,&r,&e));
+    e=mouse(SDL_MOUSEBUTTONDOWN,505,151);assert(settings_event(&a,&r,&e));
     e=(SDL_Event){.type=SDL_TEXTINPUT};strcpy(e.text.text,"1,37");assert(settings_event(&a,&r,&e));
     e=(SDL_Event){.type=SDL_KEYDOWN};e.key.keysym.scancode=SDL_SCANCODE_RETURN;
     assert(settings_event(&a,&r,&e)&&fabsf(a.sensitivity-1.37f)<.001f);

@@ -1,3 +1,15 @@
+# Version 0.8.0
+
+- Champions : préparation annoncée, cible fixée, saut avec collisions, choc unique au sol et récupération. Murs et hauteur protègent du choc.
+- IA : choix de cible tenant compte de la visibilité, hystérésis, itinéraires par joueur, flancs, recul / déplacement latéral des invocateurs, tir anticipé, séparation et sortie des blocages.
+- Menu principal avec grandes actions, page Réglages séparée, raccourcis et informations de partie.
+- Coopération : remplacement du retour automatique par E maintenu 2,5 s à moins de 2,8 m ; dégâts, portée et ligne de vue interrompent l’aide. Réanimation à 50 % de santé et deux secondes de protection. Game over si tous sont à terre.
+- Cartes de déblocage d’arme et d’événement pendant six secondes.
+- Événement rare pour un round : lance-roquettes offert et équipé à tous, touche 5, projectiles et dégâts de zone avec occlusion, impulsion de rocket jump pour le tireur et retrait du lanceur après le round.
+- Deux élévateurs et une navette sur chaque map ; transport des personnages et corps, dégagement lors de la descente, prédiction et reconstruction depuis le temps de l’hôte.
+- Protocole 7, incompatible avec les anciennes versions ; limite de paquet 24 Ko. Simulation des nouvelles règles réservée à l’hôte.
+- Tests de gameplay, mécanique et session virtuelle à quatre joueurs ; vérification mémoire et rendu hors écran. TCP réel et Pi restent à valider sur les machines des joueurs.
+
 # Version 0.7.0
 
 - Luminosité réglable de 50 à 200 %, sensibilité de 0,30 à 3,00 : sliders, saisie directe, limites, validation et sauvegarde.

@@ -5,10 +5,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-const Preset PRESETS[PRESET_COUNT]={
-    {640,360,30,64,"PI 4"},{960,540,60,100,"EQUILIBRE"},
-    {1280,720,60,160,"PC"},{854,480,30,80,"PI+"}
-};
 static const char *vertex_source=
     "attribute vec3 aPosition;attribute vec3 aColor;attribute vec3 aNormal;attribute float aGlow;"
     "uniform mat4 uMatrix;uniform float uFog;uniform mediump float uUnlit;"
@@ -207,6 +203,10 @@ void renderer_draw(Renderer *r,const Game *g,const App *app) {
         float blast=(g->barrels[i].explosion_time-.4f)*4;
         if(blast>strength){strength=blast;light=vadd(g->barrels[i].position,(Vec3){0,1,0});flash=(Color){blast,blast*.46f,blast*.12f};}
     }
+    for(int i=0;i<g->blast_count;i++)if(g->blasts[i].time>.5f) {
+        float blast=g->blasts[i].time/.8f;
+        if(blast>strength){strength=blast;light=g->blasts[i].position;flash=(Color){blast,blast*.45f,blast*.1f};}
+    }
     glUniform3f(r->light_position,light.x,light.y,light.z);glUniform3f(r->light_color,flash.r,flash.g,flash.b);
     Vec3 light2={0,4.15f,0};Color flash2={0,0,0};float energy=0;
     for(int i=0;i<MAX_PLAYERS;i++)if(i!=g->local_actor&&g->actors[i].active&&!g->actors[i].dead&&g->actors[i].shot_age<.1f) {
@@ -229,7 +229,11 @@ void renderer_draw(Renderer *r,const Game *g,const App *app) {
     for(int i=0;i<g->projectile_count;i++) {
         const Projectile *bolt=&g->projectiles[i];
         m->glow=1;
-        mesh_diamond(m,bolt->position,.17f,bolt->color);
+        if(bolt->kind==1) {
+            Vec3 tail=vsub(bolt->position,vscale(vnormalize(bolt->velocity),.35f));
+            mesh_cylinder(m,tail,bolt->position,.09f,(Color){.74f,.77f,.66f},6);
+            mesh_diamond(m,tail,.14f,bolt->color);
+        }else mesh_diamond(m,bolt->position,.17f,bolt->color);
         if(i<(r->detail_level?32:12)) {
             Vec3 end=vsub(bolt->position,vscale(vnormalize(bolt->velocity),.48f));
             mesh_cylinder(m,end,bolt->position,.035f,bolt->color,6);
@@ -249,7 +253,7 @@ void renderer_draw(Renderer *r,const Game *g,const App *app) {
             Vec3 base=g->pickups[i].position;
             mesh_box(m,vadd(base,(Vec3){0,.045f,0}),(Vec3){.18f,.04f,.6f},(Color){.15f,.32f,.22f});
             mesh_box(m,vadd(base,(Vec3){0,.05f,0}),(Vec3){.6f,.04f,.18f},(Color){.15f,.32f,.22f});
-            float progress=1-clampf(g->pickups[i].cooldown/12,0,1);
+            float progress=1-clampf(g->pickups[i].cooldown/18,0,1);
             mesh_box(m,vadd(base,(Vec3){0,.04f,.8f}),(Vec3){1.4f*progress+.01f,.03f,.08f},(Color){.25f,.7f,.4f});
             continue;
         }

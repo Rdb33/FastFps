@@ -2,6 +2,32 @@
 
 Historique des contrôles sur la machine de développement, les 12 et 13 octobre 2026.
 
+## Version 0.8 — 14 octobre 2026
+
+- Compilation C11 avec `-O2 -Wall -Wextra -Wpedantic`, sans avertissement.
+- `make test` réussi : protocole et paquets fragmentés, session à quatre joueurs, prédiction, maps et manches ; nouvelles phases du champion et projectiles roquettes transmis aux trois invités ; un invité réanime un autre invité, les invités restent synchronisés en montant sur les trois plateformes avec quatre mondes séparés, et la disparition du lanceur est confirmée sur tous les clients.
+- Tests de réanimation : absence de retour automatique après douze secondes, aide maintenue, interruption par relâchement / distance / ligne de vue / dégâts, retour à 50 % de santé, protection et fin immédiate lorsque tous sont à terre.
+- Tests des roquettes : prêt à tous, y compris un joueur à terre ; chargeur, projectile, dégâts à plusieurs ennemis, murs qui protègent, absence de dégâts directs aux alliés, impulsion au tireur et retrait après le round.
+- Tirage rare déterministe de contrôle : 95 événements sur 1 000 rounds éligibles pour cette graine ; délai minimal entre événements vérifié. Ce résultat ponctuel ne modifie pas la règle de tirage de 8 %.
+- Champion : préparation sans dégâts, phase aérienne réelle, hauteur supérieure à 1,5 m, impact unique, protection par un mur et esquive en hauteur.
+- IA : recul de l’invocateur, approches latérales des traqueurs, exclusion des joueurs à terre, navigation distincte vers deux joueurs et sonde d’évitement.
+- Plateformes : transport vertical et horizontal, saut depuis une plaque, absence d’enfermement lors de la descente ; positions d’un hôte et d’une prédiction locale concordantes sur quatre secondes avec deux mondes séparés.
+- Snapshot rempli : 15 544 octets pour une limite de 24 576 ; phases de champion, réanimation, roquettes, explosions et pop-up conservés au décodage. Paquets tronqués / map invalide rejetés sans modifier le monde.
+- Suites réseau, gameplay et mécanique exécutées avec AddressSanitizer et UndefinedBehaviorSanitizer, sans erreur signalée ; contrôle des fuites désactivé pour SDL.
+- Rendu hors écran avec Mesa llvmpipe : menu, Réglages, pop-up d’arme / événement, modèle du lance-roquettes et rechargement, trois phases du champion, réanimation, vue à terre et game over. Captures inspectées ; capacités des maillages respectées.
+- Démonstrations de 180 images terminées avec tirs et éliminations. Le rendu logiciel sur cette machine ne fournit pas une mesure des performances du Pi ; les mesures comparatives ponctuelles sont indiquées ci-dessous.
+- Comparaison ponctuelle à scène fixe (cinq ennemis, même caméra, 30 images, `glFinish` après chaque image), sans compilation simultanée :
+
+  | Profil / rendu logiciel | 0.7 | 0.8 |
+  | --- | --- | --- |
+  | Pi+ | 105,12 ms / image | 102,60 ms / image |
+  | Pi | 53,99 ms / image | 52,75 ms / image |
+
+  Les temps sont proches sur cet échantillon ; ils ne constituent pas une mesure de l’ARM, du GPU du Pi ou d’une partie à quatre joueurs. Les profils conservent leurs limites de rendu et aucune dépendance graphique n’a été ajoutée.
+
+- `make test-tcp` tenté : sortie 77, `Operation not permitted` lors de la création de socket. L’environnement interdit les connexions réelles, y compris locales. Partie entre deux ordinateurs, comportement avec latence et performances sur Raspberry Pi restent à vérifier sur les machines des joueurs.
+- Diff Git contrôlé ; protocole 7. Tous les joueurs doivent installer la version 0.8.
+
 ## Version 0.7 — 13 octobre 2026
 
 - Compilation C11 avec `-O2 -Wall -Wextra -Wpedantic`, sans avertissement.

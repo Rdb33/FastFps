@@ -8,6 +8,7 @@ static float random01(void) { return (float)rand() / ((float)RAND_MAX + 1.0f); }
 static float enemy_scale(const Enemy *e) { return enemy_size(e); }
 static bool actor_alive(const Game *g,int id);
 static Player *actor_player(Game *g,int id);
+static void update_revives(Game *g,float dt);
 
 static void say(Game *g, const char *text, float duration) {
     snprintf(g->message, sizeof(g->message), "%s", text);
@@ -17,6 +18,7 @@ static void say(Game *g, const char *text, float duration) {
 void game_reset(Game *g, World *world, int limit) {
     memset(g, 0, sizeof(*g));
     g->world = world;world_set_map(world,0);g->map_id=0;g->lives=3;
+    world_platforms_update(world,0);g->unlock_weapon=-1;g->event_last_wave=-5;g->event_rng=(uint32_t)rand();
     g->particle_limit = limit;
     g->motion = true;
     g->difficulty=1;
@@ -35,16 +37,17 @@ void game_reset(Game *g, World *world, int limit) {
     for(int i=0;i<MAX_BARRELS;i++)g->barrels[i]=(Barrel){.position=barrels[i],.health=45,.owner=-1};
     say(g, "BOUGE - CLIC DROIT : ESQUIVE - F : FRAPPE", 3);
     g->actors[0].active=true;
+    for(int id=0;id<MAX_PLAYERS;id++)g->actors[id].revive_target=-1;
     snprintf(g->actors[0].name,sizeof(g->actors[0].name),"VOUS");
     game_actor_save(g);
-    navigation_update(world, 0, 16);
+    navigation_update(world, 0, 16);navigation_actor(world,0,g->player.body.position);
 }
 
 static void start_wave(Game *g) {
     g->wave++;
     int map=((g->wave-1)/5)%MAP_COUNT;
     if(map!=g->map_id) {
-        world_set_map(g->world,map);g->map_id=map;
+        world_set_map(g->world,map);world_platforms_update(g->world,g->time);g->map_id=map;
         g->corpse_count=g->particle_count=g->projectile_count=0;g->nav_timer=0;
         int original=g->current_actor;
         for(int i=0;i<MAX_PLAYERS;i++)if(g->actors[i].active) {
@@ -52,6 +55,7 @@ static void start_wave(Game *g) {
             g->player.body=(Body){{(float)i*1.7f,0,19},{0,0,0},true};
             g->player.yaw=0;g->player.pitch=0;g->player.dash_timer=0;
             game_actor_save(g);g->actors[i].invulnerable=2;
+            g->actors[i].revive_progress=0;g->actors[i].revive_held=false;g->actors[i].revive_target=-1;
         }
         game_actor_select(g,original);
         const Vec3 locations[MAP_COUNT][MAX_BARRELS]={
@@ -108,8 +112,11 @@ static void start_wave(Game *g) {
     else if(g->wave==1)snprintf(message,sizeof(message),"VAGUE 01 - VISE LA TETE / BARILS ROUGES EXPLOSIFS");
     else if(g->wave==2)snprintf(message,sizeof(message),"VAGUE 02 - F : FRAPPE FATALE POUR RECUPERER DE LA SANTE");
     else snprintf(message, sizeof(message), g->wave == 3 ? "VAGUE %02d - ATTENTION AUX BRUTES" : "VAGUE %02d - %d CREATURES", g->wave, count);
-    for(int i=1;i<WEAPON_COUNT;i++)if(g->wave==WEAPONS[i].unlock_wave)
+    for(int i=1;i<STANDARD_WEAPONS;i++)if(g->wave==WEAPONS[i].unlock_wave) {
         snprintf(message,sizeof(message),"ARME DEBLOQUEE : %s / TOUCHE %d",WEAPONS[i].name,i+1);
+        g->unlock_weapon=i;g->unlock_time=6;
+    }
+    game_roll_event(g);
     if(g->wave>1&&g->wave%5==1)snprintf(message,sizeof(message),"NOUVELLE MAP : %s / VAGUE %02d",world_map_name(g->map_id),g->wave);
     say(g, message, 3.5f);
     g->wave_timer = -1;
@@ -156,7 +163,8 @@ static void hurt_actor(Game *g,int id,float damage,Vec3 source) {
     if(id==g->current_actor){g->damage_time=.32f;g->dead=p->health==0;}
     else {g->actors[id].damage_time=.32f;g->actors[id].dead=p->health==0;}
     if(p->health==0) {
-        g->actors[id].respawn_timer=g->cooperative?5:3;
+        g->actors[id].respawn_timer=g->cooperative?0:3;
+        g->actors[id].revive_progress=0;g->actors[id].revive_target=-1;
         p->reload_timer=0;
         if(!g->cooperative){g->lives--;if(g->lives<=0)g->round_over=true;}
     }
@@ -272,6 +280,7 @@ void game_shoot(Game *g) {
     Player *p = &g->player;
     if (g->dead||g->round_over||p->upgrade_pending||p->weapon_switch>0||p->melee_timer>0||p->reload_timer>0) return;
     if(!p->ammo[p->weapon]){game_reload(g);return;}
+    if(p->weapon==WEAPON_ROCKET&&g->projectile_count>=MAX_PROJECTILES&&!g->prediction)return;
     p->ammo[p->weapon]--;
     Vec3 origin = player_eye(p, g->motion);
     bool hit = false;
@@ -296,11 +305,17 @@ void game_shoot(Game *g) {
         g->shot_cooldown = player_fire_interval(p);
         audio_play(SOUND_SHOTGUN);
     }
-    if(p->weapon>=2) {
+    if(p->weapon>=2&&p->weapon<STANDARD_WEAPONS) {
         float spread=p->weapon==2?.01f:0;
         hit=fire_ray(g,origin,look_direction(p->yaw+(random01()-.5f)*spread,p->pitch+(random01()-.5f)*spread),
             WEAPONS[p->weapon].damage*player_damage_multiplier(p),true);
         g->shot_cooldown=player_fire_interval(p);audio_play(SOUND_SHOT);
+    }
+    if(p->weapon==WEAPON_ROCKET) {
+        Vec3 direction=look_direction(p->yaw,p->pitch);
+        g->projectiles[g->projectile_count++]=(Projectile){.position=origin,.velocity=vscale(direction,30),
+            .life=3,.color={1,.5f,.12f},.kind=1,.owner=g->current_actor,.damage=WEAPONS[WEAPON_ROCKET].damage*player_damage_multiplier(p)};
+        g->shot_cooldown=player_fire_interval(p);audio_play(SOUND_SHOTGUN);
     }
     if (hit) audio_play(g->headshot_time==.28f?SOUND_HEADSHOT:SOUND_HIT);
     g->recoil = 1;
@@ -315,7 +330,7 @@ void game_shoot(Game *g) {
 
 void game_request_weapon(Game *g, int weapon) {
     Player *p = &g->player;
-    if (weapon < 0 || weapon >= game_unlocked_weapons(g) || weapon == p->weapon || p->weapon_switch > 0 || p->reload_timer > 0 || g->dead || g->round_over || p->upgrade_pending) return;
+    if (!game_weapon_available(g,weapon) || weapon == p->weapon || p->weapon_switch > 0 || p->reload_timer > 0 || g->dead || g->round_over || p->upgrade_pending) return;
     p->weapon_target = weapon;
     p->weapon_switch = WEAPON_SWITCH_TIME;
     audio_play(SOUND_SWITCH);
@@ -352,7 +367,6 @@ void game_melee(Game *g) {
 
 static void begin_attack(Enemy *e, Vec3 direction, int target) {
     e->attack_duration = e->type == ENEMY_BRUTE ? .95f : (e->type == ENEMY_CASTER ? .75f : .62f);
-    if(e->elite)e->attack_duration=1.25f;
     e->attack_timer = e->attack_duration;
     e->attack_direction = direction;
     e->attack_fired = false;
@@ -368,19 +382,11 @@ static void attack_update(Game *g, Enemy *e, float dt) {
     if (e->type == ENEMY_CASTER) {
         if (g->projectile_count < MAX_PROJECTILES) {
             Vec3 origin = vadd(e->body.position,(Vec3){0,1.3f,0});
-            g->projectiles[g->projectile_count++] = (Projectile){origin,vscale(e->attack_direction,14),5,{.3f,1,.78f}};
+            g->projectiles[g->projectile_count++] = (Projectile){.position=origin,.velocity=vscale(e->attack_direction,14),.life=5,.color={.3f,1,.78f},.owner=-1};
         }
         e->shot_timer = fmaxf(.9f,2.5f-(float)g->wave*.06f)+random01()*.5f;
     } else {
         Vec3 origin = vadd(e->body.position,(Vec3){0,1.0f*enemy_scale(e),0});
-        if(e->elite) {
-            for(int id=0;id<MAX_PLAYERS;id++)if(actor_alive(g,id)) {
-                Vec3 delta=vsub(player_eye(actor_player(g,id),g->motion),origin);float distance=vlength(delta);
-                if(distance<4.5f&&world_ray(g->world,origin,vnormalize(delta),distance)>=distance-.01f)
-                    hurt_actor(g,id,32,origin);
-            }
-            e->touch_timer=1.6f;game_burst(g,origin,(Color){1,.68f,.2f},10);audio_play_at(SOUND_EXPLOSION,origin);return;
-        }
         if(!actor_alive(g,e->target_actor))return;
         Vec3 delta = vsub(player_eye(actor_player(g,e->target_actor),g->motion),origin), dir = vnormalize(delta);
         float distance = vlength(delta), range = e->type == ENEMY_BRUTE ? 2.7f : 1.9f;
@@ -391,6 +397,53 @@ static void attack_update(Game *g, Enemy *e, float dt) {
     }
 }
 
+static void begin_slam(Game *g,Enemy *e,const Player *p,int target) {
+    Vec3 destination=vadd(p->body.position,(Vec3){p->body.velocity.x*.25f,0,p->body.velocity.z*.25f});
+    Vec3 delta=vsub(destination,e->body.position);delta.y=0;float distance=vlength(delta);
+    if(distance>9)destination=vadd(e->body.position,vscale(delta,9/distance));
+    Vec3 chosen=e->body.position;
+    for(int attempt=0;attempt<8;attempt++) {
+        Vec3 q=vadd(e->body.position,vscale(vsub(destination,e->body.position),1-(float)attempt/8));
+        q.y=e->body.position.y+2.25f;float floor=world_ray(g->world,q,(Vec3){0,-1,0},20);q.y-=floor;
+        if(floor>.01f&&!world_blocked(g->world,q,ENEMY_RADIUS*enemy_size(e),ENEMY_HEIGHT*enemy_size(e),-1)){chosen=q;break;}
+    }
+    e->slam_target=chosen;e->slam_state=1;e->slam_timer=.75f;e->target_actor=target;e->attack_timer=0;
+    e->body.velocity=(Vec3){0,0,0};audio_play_at(SOUND_CHAMPION,e->body.position);
+}
+static void slam_update(Game *g,Enemy *e,float dt) {
+    e->slam_timer=fmaxf(0,e->slam_timer-dt);
+    float scale=enemy_size(e);
+    if(e->slam_state==1) {
+        if(e->slam_timer>0)return;
+        float rise=e->slam_target.y-e->body.position.y;
+        float flight=(11+sqrtf(fmaxf(4,121-2*PLAYER_GRAVITY*rise)))/PLAYER_GRAVITY;
+        Vec3 delta=vsub(e->slam_target,e->body.position);
+        e->body.velocity=(Vec3){delta.x/flight,11,delta.z/flight};e->body.grounded=false;
+        e->slam_state=2;e->slam_timer=3;
+    }
+    if(e->slam_state==2) {
+        move_horizontal(g->world,&e->body,e->body.velocity.x*dt,e->body.velocity.z*dt,ENEMY_RADIUS*scale,ENEMY_HEIGHT*scale,0);
+        move_vertical(g->world,&e->body,dt,ENEMY_RADIUS*scale,ENEMY_HEIGHT*scale);
+        if(!e->body.grounded&&e->slam_timer>0)return;
+        e->slam_state=3;e->slam_timer=.85f;e->slam_flash=.8f;e->touch_timer=4.5f;
+        e->slam_target=e->body.position;e->body.velocity=(Vec3){0,0,0};
+        Vec3 origin=vadd(e->body.position,(Vec3){0,.35f,0});
+        for(int id=0;id<MAX_PLAYERS;id++)if(actor_alive(g,id)) {
+            Player *p=actor_player(g,id);Vec3 delta=vsub(vadd(p->body.position,(Vec3){0,.55f,0}),origin);
+            float distance=vlength(delta);
+            if(distance<6&&fabsf(p->body.position.y-e->body.position.y)<1
+                &&world_ray(g->world,origin,vnormalize(delta),distance)>=distance-.05f) {
+                hurt_actor(g,id,38*(1-distance/10),origin);
+                if(actor_alive(g,id)&&g->actors[id].invulnerable<=0) {
+                    Vec3 push=vscale(vnormalize((Vec3){delta.x,0,delta.z}),5);
+                    p->body.velocity=vadd(p->body.velocity,push);p->body.velocity.y=4;p->boost_timer=.35f;p->body.grounded=false;
+                }
+            }
+        }
+        game_burst(g,origin,(Color){1,.62f,.18f},16);audio_play_at(SOUND_EXPLOSION,origin);
+    }else if(e->slam_state==3&&e->slam_timer==0)e->slam_state=0;
+}
+
 static void update_enemies(Game *g, float dt) {
     for (int i = 0; i < g->enemy_count; i++) {
         Enemy *e = &g->enemies[i];
@@ -399,21 +452,26 @@ static void update_enemies(Game *g, float dt) {
         e->stagger = fmaxf(0,e->stagger-dt);
         e->spawn_time = fmaxf(0,e->spawn_time-dt);
         e->shot_timer -= dt;
-        e->touch_timer = fmaxf(0,e->touch_timer-dt);
-        int target_id=nearest_actor(g,e->body.position);
+        e->touch_timer = fmaxf(0,e->touch_timer-dt);e->slam_flash=fmaxf(0,e->slam_flash-dt);
+        if(e->slam_state){slam_update(g,e,dt);continue;}
+        int target_id=ai_target(g,e);
         if(target_id<0)continue;
         Vec3 p = player_eye(actor_player(g,target_id),g->motion), origin = vadd(e->body.position,(Vec3){0,1.3f*enemy_scale(e),0});
         Vec3 delta = vsub(p,origin), dir = vnormalize(delta);
         float distance = vlength(delta), horizontal = hypotf(delta.x,delta.z);
         bool visible = world_ray(g->world,origin,dir,distance) >= distance-.05f;
-        Vec3 target = visible ? p : navigation_next(g->world,e->body.position.x,e->body.position.z);
-        Vec3 move = vsub(target,e->body.position); move.y = 0;
-        if (e->type == ENEMY_CASTER && visible && horizontal<8 && horizontal>2) {
-            float sign = e->id%2 ? 1 : -1; move = (Vec3){-delta.z*sign,0,delta.x*sign};
+        e->target_actor=target_id;
+        if(e->elite&&e->body.grounded&&e->spawn_time==0&&e->touch_timer==0&&visible&&horizontal<14) {
+            begin_slam(g,e,actor_player(g,target_id),target_id);continue;
         }
+        Vec3 move=ai_move(g,e,actor_player(g,target_id),visible,dt);
         if (e->attack_timer == 0 && e->spawn_time == 0 && e->stagger == 0 && visible) {
-            if (e->type == ENEMY_CASTER && distance<36 && e->shot_timer<=0) begin_attack(e,dir,target_id);
-            else if (e->type != ENEMY_CASTER && horizontal<(e->elite?4.2f:(e->type == ENEMY_BRUTE ? 2.5f : 1.6f))
+            if (e->type == ENEMY_CASTER && distance<36 && e->shot_timer<=0) {
+                Player *victim=actor_player(g,target_id);float lead=clampf(distance/14,0,1.0f)*.6f;
+                Vec3 aim=vadd(p,vscale(victim->body.velocity,lead));
+                begin_attack(e,vnormalize(vsub(aim,origin)),target_id);
+            }
+            else if (!e->elite&&e->type != ENEMY_CASTER && horizontal<(e->type == ENEMY_BRUTE ? 2.5f : 1.6f)
                 && fabsf(delta.y)<1.7f && e->touch_timer==0) begin_attack(e,dir,target_id);
         }
         float desired_yaw = atan2f(delta.x,-delta.z);
@@ -429,8 +487,11 @@ static void update_enemies(Game *g, float dt) {
         e->knockback = vscale(e->knockback,fmaxf(0,1-dt*14));
         e->body.velocity.x = desired.x; e->body.velocity.z = desired.z;
         float scale = enemy_scale(e);
+        Vec3 before=e->body.position;
         move_horizontal(g->world,&e->body,desired.x*dt,desired.z*dt,ENEMY_RADIUS*scale,ENEMY_HEIGHT*scale,PLAYER_STEP);
         move_vertical(g->world,&e->body,dt,ENEMY_RADIUS*scale,ENEMY_HEIGHT*scale);
+        float moved=hypotf(e->body.position.x-before.x,e->body.position.z-before.z);
+        if(speed>1&&moved<speed*dt*.15f)e->stuck_time+=dt;else e->stuck_time=fmaxf(0,e->stuck_time-dt*2);
         float moving = hypotf(e->body.velocity.x,e->body.velocity.z);
         e->walk_phase += moving*dt*(e->type == ENEMY_BRUTE ? 1.8f : 2.8f);
         e->movement_blend += (clampf(moving/4,0,1)-e->movement_blend)*fminf(1,dt*12);
@@ -438,7 +499,7 @@ static void update_enemies(Game *g, float dt) {
     }
     for (int i=0;i<g->enemy_count;i++) for (int j=i+1;j<g->enemy_count;j++) {
         Enemy *a=&g->enemies[i], *b=&g->enemies[j];
-        if (a->health<=0 || b->health<=0) continue;
+        if (a->health<=0 || b->health<=0 || a->slam_state==2 || b->slam_state==2) continue;
         Vec3 delta=vsub(a->body.position,b->body.position); delta.y=0;
         float distance=vlength(delta), separation=ENEMY_RADIUS*(enemy_scale(a)+enemy_scale(b));
         if (distance>=separation || fabsf(a->body.position.y-b->body.position.y)>1) continue;
@@ -451,22 +512,68 @@ static void update_enemies(Game *g, float dt) {
         if (g->enemies[i].health<=0) g->enemies[i]=g->enemies[--g->enemy_count]; else i++;
 }
 
-static void update_projectiles(Game *g, float dt) {
-    for (int i=0;i<g->projectile_count;) {
-        Projectile *b=&g->projectiles[i]; b->life-=dt;
-        float length=vlength(b->velocity)*dt;
-        Vec3 dir=vnormalize(b->velocity);
-        float wall=world_ray(g->world,b->position,dir,length),nearest=wall;
-        int victim=-1;
-        for(int id=0;id<MAX_PLAYERS;id++)if(actor_alive(g,id)) {
-            Vec3 p=actor_player(g,id)->body.position;
-            Box bounds={{p.x-PLAYER_RADIUS,p.y,p.z-PLAYER_RADIUS},{p.x+PLAYER_RADIUS,p.y+PLAYER_HEIGHT,p.z+PLAYER_RADIUS}};
-            float hit=ray_box(b->position,dir,bounds,length);
-            if(hit<=nearest){nearest=hit;victim=id;}
+static void rocket_explode(Game *g,const Projectile *rocket,Vec3 point) {
+    int original=g->current_actor,owner=rocket->owner;
+    if(owner<0||owner>=MAX_PLAYERS)return;
+    game_actor_select(g,owner);
+    if(g->blast_count<MAX_BLASTS)g->blasts[g->blast_count++]=(Blast){point,.8f,6.5f};
+    else g->blasts[0]=(Blast){point,.8f,6.5f};
+    game_burst(g,point,(Color){1,.44f,.08f},18);audio_play_at(SOUND_EXPLOSION,point);
+    for(int i=0;i<g->enemy_count;i++)if(g->enemies[i].health>0) {
+        Enemy *e=&g->enemies[i];Vec3 delta=vsub(vadd(e->body.position,(Vec3){0,.8f*enemy_size(e),0}),point);
+        float distance=vlength(delta);Vec3 direction=vnormalize(delta);
+        if(distance<6.5f&&world_ray(g->world,point,direction,distance)>=distance-.08f)
+            damage_enemy(g,e,rocket->damage*(1-distance/6.5f),direction);
+    }
+    for(int i=0;i<g->barrel_count;i++)if(g->barrels[i].health>0) {
+        Vec3 delta=vsub(vadd(g->barrels[i].position,(Vec3){0,.55f,0}),point);float distance=vlength(delta);
+        if(distance<5&&world_ray(g->world,point,vnormalize(delta),distance)>=distance-.08f)explode_barrel(g,i,owner);
+    }
+    /* Pas de dégâts de roquette aux alliés ; le tireur peut effectuer un rocket jump. */
+    if(actor_alive(g,owner)) {
+        Player *p=actor_player(g,owner);Vec3 delta=vsub(player_eye(p,false),point);float distance=vlength(delta);
+        if(distance<5&&world_ray(g->world,point,vnormalize(delta),distance)>=distance-.08f) {
+            float strength=1-distance/5;hurt_actor(g,owner,22*strength,point);
+            if(actor_alive(g,owner)) {
+                Vec3 push=vscale(vnormalize(delta),11*strength);
+                p->body.velocity=vadd(p->body.velocity,push);p->body.velocity.y=fmaxf(p->body.velocity.y,16*strength);
+                p->body.grounded=false;p->boost_timer=.6f;
+            }
         }
-        if(victim>=0){hurt_actor(g,victim,12,b->position);b->life=0;}
-        else if(wall<length){game_burst(g,vadd(b->position,vscale(dir,wall)),(Color){1,.4f,.1f},2);b->life=0;}
-        else b->position=vadd(b->position,vscale(b->velocity,dt));
+    }
+    game_actor_save(g);game_actor_select(g,original);
+}
+static void update_projectiles(Game *g,float dt) {
+    for(int i=0;i<g->projectile_count;) {
+        Projectile *b=&g->projectiles[i];b->life-=dt;
+        float length=vlength(b->velocity)*dt;Vec3 direction=vnormalize(b->velocity);
+        float nearest=world_ray(g->world,b->position,direction,length);
+        int victim=-1;
+        if(b->kind==1) {
+            for(int k=0;k<g->enemy_count;k++)if(g->enemies[k].health>0) {
+                const Enemy *e=&g->enemies[k];Vec3 p=e->body.position;float r=.5f*enemy_size(e);
+                float hit=ray_box(b->position,direction,(Box){{p.x-r,p.y,p.z-r},{p.x+r,p.y+ENEMY_HEIGHT*enemy_size(e),p.z+r}},length);
+                if(hit<nearest){nearest=hit;victim=k;}
+            }
+            for(int k=0;k<g->barrel_count;k++)if(g->barrels[k].health>0) {
+                Vec3 p=g->barrels[k].position;
+                float hit=ray_box(b->position,direction,(Box){{p.x-.43f,p.y,p.z-.43f},{p.x+.43f,p.y+1.1f,p.z+.43f}},length);
+                if(hit<nearest){nearest=hit;victim=k;}
+            }
+            if(nearest<length||victim>=0||b->life<=0) {
+                Vec3 point=vadd(b->position,vscale(direction,fmaxf(0,nearest-.06f)));
+                Projectile copy=*b;rocket_explode(g,&copy,point);b->life=0;
+            }else b->position=vadd(b->position,vscale(b->velocity,dt));
+        }else {
+            for(int id=0;id<MAX_PLAYERS;id++)if(actor_alive(g,id)) {
+                Vec3 p=actor_player(g,id)->body.position;
+                float hit=ray_box(b->position,direction,(Box){{p.x-PLAYER_RADIUS,p.y,p.z-PLAYER_RADIUS},{p.x+PLAYER_RADIUS,p.y+PLAYER_HEIGHT,p.z+PLAYER_RADIUS}},length);
+                if(hit<=nearest){nearest=hit;victim=id;}
+            }
+            if(victim>=0){hurt_actor(g,victim,12,b->position);b->life=0;}
+            else if(nearest<length){game_burst(g,vadd(b->position,vscale(direction,nearest)),(Color){1,.4f,.1f},2);b->life=0;}
+            else b->position=vadd(b->position,vscale(b->velocity,dt));
+        }
         if(b->life<=0)g->projectiles[i]=g->projectiles[--g->projectile_count];else i++;
     }
 }
@@ -474,7 +581,10 @@ static void update_projectiles(Game *g, float dt) {
 static void update_actor(Game *g,Input input,float dt) {
     g->player.upgrade_lock=fmaxf(0,g->player.upgrade_lock-dt);
     if(input.upgrade)game_choose_upgrade(g,input.upgrade);
-    if(g->dead)return;
+    g->actors[g->current_actor].revive_held=input.revive&&!g->dead;
+    if(g->dead){if(g->cooperative)move_vertical(g->world,&g->player.body,dt,PLAYER_RADIUS,.5f);return;}
+    input.revive=input.revive&&game_revive_target(g,g->current_actor)>=0;
+    if(input.revive){input.firing=false;input.melee=false;input.sprint=false;input.dash=false;input.forward*=.25f;input.right*=.25f;}
     if(g->player.upgrade_pending){input.firing=false;input.melee=false;}
     g->hit_time=fmaxf(0,g->hit_time-dt); g->damage_time=fmaxf(0,g->damage_time-dt);
     g->headshot_time=fmaxf(0,g->headshot_time-dt);g->kill_time=fmaxf(0,g->kill_time-dt);
@@ -518,10 +628,52 @@ static void update_actor(Game *g,Input input,float dt) {
     }
 }
 
+int game_revive_target(const Game *g,int helper) {
+    if(!g->cooperative||helper<0||helper>=MAX_PLAYERS||!actor_alive(g,helper))return -1;
+    const Player *from=helper==g->current_actor?&g->player:&g->actors[helper].player;
+    int target=-1;float best=REVIVE_RANGE;
+    for(int id=0;id<MAX_PLAYERS;id++)if(id!=helper&&g->actors[id].active&&!actor_alive(g,id)) {
+        const Player *to=id==g->current_actor?&g->player:&g->actors[id].player;
+        Vec3 origin=player_eye(from,false),point=vadd(to->body.position,(Vec3){0,.55f,0});
+        Vec3 delta=vsub(point,origin);float length=vlength(delta);
+        float distance=vlength(vsub(to->body.position,from->body.position));
+        if(distance<best&&world_ray(g->world,origin,vnormalize(delta),length)>=length-.05f){target=id;best=distance;}
+    }
+    return target;
+}
+static void update_revives(Game *g,float dt) {
+    for(int id=0;id<MAX_PLAYERS;id++)g->actors[id].revive_target=-1;
+    for(int down=0;down<MAX_PLAYERS;down++)if(g->actors[down].active&&!actor_alive(g,down)) {
+        int helper=-1;
+        for(int id=0;id<MAX_PLAYERS;id++)if(actor_alive(g,id)&&g->actors[id].revive_held) {
+            float damage=id==g->current_actor?g->damage_time:g->actors[id].damage_time;
+            if(damage<.29f&&game_revive_target(g,id)==down){helper=id;break;}
+        }
+        Actor *a=&g->actors[down];
+        if(helper<0){a->revive_progress=0;continue;}
+        g->actors[helper].revive_target=down;a->revive_progress=fminf(REVIVE_TIME,a->revive_progress+dt);
+        if(a->revive_progress<REVIVE_TIME)continue;
+        Player *p=actor_player(g,down);
+        if(world_blocked(g->world,p->body.position,PLAYER_RADIUS,PLAYER_HEIGHT,-1))continue;
+        p->health=player_max_health(p)*.5f;p->body.velocity=(Vec3){0,0,0};
+        p->reload_timer=p->weapon_switch=p->melee_timer=0;p->weapon_target=p->weapon;
+        a->dead=false;a->revive_progress=0;a->revive_held=false;a->revive_target=-1;a->respawn_timer=0;a->invulnerable=2;
+        if(down==g->current_actor){g->dead=false;g->shot_cooldown=0;g->shot_age=10;}
+        else {a->shot_cooldown=0;a->shot_age=10;}
+        if(down==g->local_actor||helper==g->local_actor)audio_play(SOUND_PICKUP);
+        say(g,"COEQUIPIER REANIME / +2 S DE PROTECTION",2);
+    }
+}
+
 static void update_world(Game *g,float dt) {
     g->time+=dt;g->tick++;
     g->message_time=fmaxf(0,g->message_time-dt);
     g->wave_clear_time=fmaxf(0,g->wave_clear_time-dt);
+    g->unlock_time=fmaxf(0,g->unlock_time-dt);g->event_notice_time=fmaxf(0,g->event_notice_time-dt);
+    for(int i=0;i<g->blast_count;) {
+        g->blasts[i].time-=dt;
+        if(g->blasts[i].time<=0)g->blasts[i]=g->blasts[--g->blast_count];else i++;
+    }
     g->nav_timer-=dt;
     if(g->nav_timer<=0) {
         int target=nearest_actor(g,(Vec3){0,0,0});
@@ -529,6 +681,7 @@ static void update_world(Game *g,float dt) {
             Vec3 p=actor_player(g,target)->body.position;
             navigation_update(g->world,p.x,p.z);
         }
+        for(int id=0;id<MAX_PLAYERS;id++)if(actor_alive(g,id))navigation_actor(g->world,id,actor_player(g,id)->body.position);
         g->nav_timer=.35f;
     }
     for(int i=0;i<g->pickup_count;i++)g->pickups[i].cooldown=fmaxf(0,g->pickups[i].cooldown-dt);
@@ -551,10 +704,11 @@ static void update_world(Game *g,float dt) {
     int alive=0;
     for(int i=0;i<MAX_PLAYERS;i++)if(actor_alive(g,i))alive++;
     if(alive==0){if(g->cooperative||g->lives<=0)g->round_over=true;return;}
+    if(g->cooperative)update_revives(g,dt);
     if(g->enemy_count==0) {
         if(g->wave_timer<0) {
             g->wave_timer=INTERMISSION_TIME;g->score+=250;g->completed_waves=g->wave;g->wave_clear_time=2.8f;
-            g->projectile_count=0;game_offer_upgrades(g);
+            g->projectile_count=0;game_end_rocket_event(g);game_offer_upgrades(g);
             for(int i=0;i<MAX_PLAYERS;i++)if(actor_alive(g,i)) {
                 Player *p=actor_player(g,i);p->health=fminf(player_max_health(p),p->health+10);
             }
@@ -626,10 +780,11 @@ void game_update_coop(Game *g,const Input inputs[MAX_PLAYERS],float dt) {
     game_actor_save(g);
     bool alive=false;for(int i=0;i<MAX_PLAYERS;i++)if(actor_alive(g,i))alive=true;
     if(!alive){g->round_over=true;return;}
+    game_prepare_mobility(g,dt);
     for(int i=0;i<MAX_PLAYERS;i++)if(g->actors[i].active) {
         game_actor_select(g,i);
         Actor *a=&g->actors[i];a->invulnerable=fmaxf(0,a->invulnerable-dt);
-        if(a->dead){a->respawn_timer=fmaxf(0,a->respawn_timer-dt);if(a->respawn_timer==0){respawn(g,i);g->current_actor=-1;game_actor_select(g,i);}}
+        if(a->dead)a->respawn_timer=0;
         audio_suppressed(i!=g->local_actor);
         update_actor(g,inputs[i],dt);
         audio_suppressed(false);
@@ -642,7 +797,7 @@ void game_update_coop(Game *g,const Input inputs[MAX_PLAYERS],float dt) {
 }
 void game_predict(Game *g,Input input,float dt) {
     g->prediction=true;
-    update_actor(g,input,dt);
+    game_prepare_mobility(g,dt);update_actor(g,input,dt);g->time+=dt;
     g->prediction=false;game_actor_save(g);
 }
 void game_update(Game *g,Input input,float dt) {
@@ -655,6 +810,7 @@ void game_update(Game *g,Input input,float dt) {
         }
         return;
     }
+    game_prepare_mobility(g,dt);
     g->actors[0].invulnerable=fmaxf(0,g->actors[0].invulnerable-dt);
     audio_listener(player_eye(&g->player,g->motion),g->player.yaw);
     update_actor(g,input,dt);game_actor_save(g);

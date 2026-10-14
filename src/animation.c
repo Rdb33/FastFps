@@ -18,6 +18,8 @@ void animate_creature(Mesh *mesh, const Enemy *e, float time) {
     float progress=e->attack_timer>0?1-e->attack_timer/e->attack_duration:0;
     float strike=e->attack_timer>0?sinf(smooth(clampf((progress-.25f)/.5f,0,1))*PI_F):0;
     float shoulder=bounce+breath;
+    if(!dead&&e->slam_state==1)shoulder-=.15f*(1-e->slam_timer/.75f);
+    if(!dead&&e->slam_state==3)shoulder-=e->slam_timer/.85f*.17f;
     Color skin={.64f,.17f,.09f},armor={.27f,.17f,.12f},eye={1,.78f,.22f};
     float width=.72f;
     if(e->type==ENEMY_CASTER) {
@@ -56,6 +58,7 @@ void animate_creature(Mesh *mesh, const Enemy *e, float time) {
         mesh_joint_box(mesh,(Vec3){hip.x,.13f+shoulder,0},(Vec3){.23f,.44f,.25f},hip,leg_angle,skin);
         mesh_joint_box(mesh,(Vec3){hip.x,.025f+shoulder,-.07f},(Vec3){.27f,.15f,.37f},hip,leg_angle,armor);
         float arm_angle=-leg_angle*.75f;
+        if(!dead&&e->slam_state)arm_angle=e->slam_state==2?1.8f:(e->slam_state==1?-.5f:1.2f);
         if(e->attack_timer>0)arm_angle=e->type==ENEMY_CASTER?.55f+strike*.65f:-.42f+strike*1.75f;
         Vec3 pivot={side*(width/2+.12f),1.1f+shoulder,0};
         mesh_joint_box(mesh,(Vec3){pivot.x,.62f+shoulder,0},(Vec3){.20f,.48f,.25f},pivot,arm_angle,skin);
@@ -94,15 +97,23 @@ void animate_creature(Mesh *mesh, const Enemy *e, float time) {
         mesh->data[i].position.y=fmaxf(mesh->data[i].position.y,e->body.position.y+.012f);
     if(!dead&&e->spawn_time>0)mesh_ring(mesh,vadd(position,(Vec3){0,.035f,0}),
         .6f+(1-e->spawn_time/.5f)*.9f,.1f,e->elite?(Color){1,.68f,.24f}:(Color){.42f,.63f,.88f},16);
-    if(!dead&&e->elite&&e->attack_timer>0) {
-        Color charge=e->attack_fired?(Color){1,.63f,.18f}:(Color){.73f,.29f,.08f};
-        mesh_ring(mesh,vadd(position,(Vec3){0,.045f,0}),4.5f,.08f,charge,24);
-        mesh_ring(mesh,vadd(position,(Vec3){0,.049f,0}),fmaxf(.15f,progress*4.5f),.10f,charge,20);
+    if(!dead&&e->elite&&(e->slam_state==1||e->slam_state==2)) {
+        mesh->glow=1;Color warning={1,.38f+.12f*sinf(time*12),.10f};
+        Vec3 center=vadd(e->slam_target,(Vec3){0,.045f,0});
+        mesh_ring(mesh,center,6,.075f,warning,32);
+        mesh_ring(mesh,vadd(center,(Vec3){0,.005f,0}),.7f,.10f,warning,20);
+        mesh_diamond(mesh,vadd(center,(Vec3){0,.3f,0}),.1f,warning);mesh->glow=0;
+    }
+    if(!dead&&e->slam_flash>0) {
+        mesh->glow=1;float amount=e->slam_flash/.8f;
+        mesh_ring(mesh,vadd(e->body.position,(Vec3){0,.05f,0}),.4f+(1-amount)*6,.18f,(Color){amount,amount*.6f,amount*.15f},32);
+        mesh->glow=0;
     }
 }
 
 void animate_weapon(Mesh *mesh, const Game *g, const App *app) {
     mesh->count=0;
+    if(g->dead)return;
     const Player *p=&g->player;
     float motion=app->motion?1:0;
     float blend=p->movement_blend;
@@ -112,6 +123,8 @@ void animate_weapon(Mesh *mesh, const Game *g, const App *app) {
     float reload=p->reload_timer>0?1-p->reload_timer/p->reload_duration:0;
     float reload_pose=p->reload_timer>0?sinf(reload*PI_F):0;
     lower+=reload_pose*.10f;
+    bool helping=g->cooperative&&g->actors[g->local_actor].revive_target>=0;
+    if(helping)lower+=.30f;
     float melee_age=MELEE_COOLDOWN-p->melee_timer;
     float punch=p->melee_timer>0&&melee_age<.30f?sinf(melee_age/.30f*PI_F):0;
     Vec3 base={sway-p->sway_x*motion,-.39f-vertical-lower-g->recoil*.035f+p->landing*.4f*motion,
@@ -164,7 +177,7 @@ void animate_weapon(Mesh *mesh, const Game *g, const App *app) {
             mesh_box(mesh,vadd(base,(Vec3){.077f,.16f,-.22f}),(Vec3){.04f,.02f,.4f},accent);
         }
     }
-    if(p->weapon>=2) {
+    if(p->weapon>=2&&p->weapon<STANDARD_WEAPONS) {
         bool rail=p->weapon==3;int sides=graphics_detail(app->quality)>0?10:6;
         mesh_beveled_box(mesh,base,(Vec3){rail?.31f:.27f,.20f,.54f},.045f,dark);
         mesh_beveled_box(mesh,vadd(base,(Vec3){0,.14f,-.05f}),(Vec3){.18f,.13f,.63f},.03f,metal);
@@ -184,6 +197,24 @@ void animate_weapon(Mesh *mesh, const Game *g, const App *app) {
             for(int i=0;i<4;i++)mesh_box(mesh,vadd(base,(Vec3){0,.25f,-.3f-(float)i*.05f}),(Vec3){.16f,.025f,.022f},dark);
             mesh_box(mesh,vadd(base,(Vec3){0,.32f,.02f}),(Vec3){.09f,.05f,.055f},accent);
         }
+    }
+    if(p->weapon==WEAPON_ROCKET) {
+        int sides=graphics_detail(app->quality)>0?10:6;
+        mesh_cylinder(mesh,vadd(base,(Vec3){0,.12f,.20f}),vadd(base,(Vec3){0,.12f,-.59f}),.14f,metal,sides);
+        mesh_cylinder(mesh,vadd(base,(Vec3){0,.12f,-.6f}),vadd(base,(Vec3){0,.12f,-.605f}),.10f,(Color){.04f,.05f,.055f},sides);
+        mesh_beveled_box(mesh,vadd(base,(Vec3){0,-.10f,.10f}),(Vec3){.17f,.20f,.16f},.025f,dark);
+        mesh_beveled_box(mesh,vadd(base,(Vec3){.10f,-.09f,.12f}),(Vec3){.15f,.13f,.20f},.025f,glove);
+        mesh_box(mesh,vadd(base,(Vec3){.17f,-.20f,.27f}),(Vec3){.13f,.16f,.28f},skin);
+        mesh_box(mesh,vadd(base,(Vec3){0,.29f,-.06f}),(Vec3){.06f,.065f,.22f},dark);
+        mesh->glow=.7f;
+        for(int i=0;i<3;i++)mesh_cylinder(mesh,vadd(base,(Vec3){0,.12f,-.32f-(float)i*.06f}),vadd(base,(Vec3){0,.12f,-.34f-(float)i*.06f}),.145f,accent,sides);
+        mesh->glow=0;
+    }
+    if(helping) {
+        Vec3 palm={-.17f,-.19f,-.62f};
+        mesh_beveled_box(mesh,palm,(Vec3){.16f,.10f,.19f},.02f,glove);
+        mesh_box(mesh,vadd(palm,(Vec3){-.04f,-.12f,.20f}),(Vec3){.13f,.18f,.29f},skin);
+        mesh->glow=.8f;mesh_diamond(mesh,vadd(palm,(Vec3){0,.10f,0}),.055f,(Color){.4f,1,.7f});mesh->glow=0;
     }
     /* Chargeur retiré puis remis en place, et main gauche qui accompagne le geste. */
     if(p->weapon!=1) {

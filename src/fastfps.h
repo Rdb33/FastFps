@@ -10,6 +10,8 @@
 typedef struct { float x, y, z; } Vec3;
 typedef struct { float r, g, b; } Color;
 typedef struct { Vec3 min, max; } Box;
+typedef struct { Vec3 base, size, travel; float period; int solid; } Platform;
+typedef struct { Vec3 position; float time, radius; } Blast;
 typedef struct { float m[16]; } Mat4;
 typedef struct { Vec3 position; Color color; Vec3 normal; float glow; } Vertex;
 typedef struct { Vertex *data; int count, capacity; float glow; } Mesh;
@@ -24,6 +26,10 @@ typedef struct {
     Vec3 spawns[8];
     uint8_t passable[NAV_W * NAV_H];
     int16_t distance[NAV_W * NAV_H];
+    int16_t routes[MAX_PLAYERS][NAV_W * NAV_H];
+    Platform platforms[MAX_PLATFORMS];
+    int platform_count;
+    float platform_time;
 } World;
 typedef struct {
     Body body;
@@ -33,6 +39,8 @@ typedef struct {
     int weapon, weapon_target;
     uint8_t ammo[WEAPON_COUNT];
     float reload_timer, reload_duration, upgrade_lock;
+    float boost_timer;
+    uint8_t previous_weapon;
     uint8_t upgrades[UPGRADE_COUNT], offers[UPGRADE_CHOICES];
     bool upgrade_pending;
     uint8_t last_upgrade;
@@ -42,6 +50,9 @@ typedef struct {
     Player player;
     float shot_cooldown, recoil, hit_time, damage_time, shot_age, combo_timer;
     float respawn_timer, invulnerable;
+    float revive_progress;
+    bool revive_held;
+    int revive_target;
     float headshot_time, kill_time, damage_yaw;
     int combo;
     int run_kills, run_headshots, reward_points;
@@ -61,8 +72,11 @@ typedef struct {
     bool attack_fired;
     int target_actor;
     bool elite;
+    int slam_state;
+    float slam_timer, slam_flash, stuck_time;
+    Vec3 slam_target;
 } Enemy;
-typedef struct { Vec3 position, velocity; float life; Color color; } Projectile;
+typedef struct { Vec3 position, velocity; float life; Color color; int kind, owner; float damage; } Projectile;
 typedef struct { Vec3 position, velocity; Color color; float life, max_life, size; } Particle;
 typedef struct { Vec3 position; float cooldown; } Pickup;
 typedef struct { Vec3 position; float health, explosion_time; int owner; } Barrel;
@@ -75,6 +89,11 @@ typedef struct {
     Particle particles[MAX_PARTICLES]; int particle_count, particle_limit;
     Pickup pickups[MAX_PICKUPS]; int pickup_count;
     Barrel barrels[MAX_BARRELS]; int barrel_count;
+    Blast blasts[MAX_BLASTS]; int blast_count;
+    bool rocket_event;
+    int event_last_wave, unlock_weapon;
+    uint32_t event_rng, event_serial;
+    float unlock_time, event_notice_time;
     int wave, score, kills, next_id, difficulty;
     int completed_waves, map_id, lives;
     float time, wave_timer, nav_timer, shot_cooldown, recoil, hit_time, damage_time;
@@ -91,7 +110,7 @@ typedef struct {
     uint32_t tick;
     bool cooperative, round_over, prediction;
 } Game;
-typedef struct { float forward, right; bool jump, sprint, firing, dash, melee, reload; int upgrade; } Input;
+typedef struct { float forward, right; bool jump, sprint, firing, dash, melee, reload, revive; int upgrade; } Input;
 typedef struct { const char *name; int magazine, unlock_wave; float interval, reload, damage; Color color; } Weapon;
 extern const Weapon WEAPONS[WEAPON_COUNT];
 typedef struct { int width, height, fps, particles; const char *name; } Preset;
@@ -128,6 +147,7 @@ typedef struct {
     int editing;
     bool select_all, network_help, show_build;
     int upgrade_choice;
+    int menu_page;
     float ui_time;
 } App;
 typedef enum { SOUND_SHOT, SOUND_SHOTGUN, SOUND_HIT, SOUND_KILL,
@@ -174,6 +194,13 @@ bool world_blocked(const World *world, Vec3 position, float radius, float height
 float world_ray(const World *world, Vec3 origin, Vec3 direction, float range);
 void navigation_update(World *world, float x, float z);
 Vec3 navigation_next(const World *world, float x, float z);
+void navigation_actor(World *world, int actor, Vec3 target);
+Vec3 navigation_for_actor(const World *world, int actor, float x, float z);
+void world_platforms_update(World *world, float time);
+Box platform_box(const Platform *platform, float time);
+void game_prepare_mobility(Game *game, float dt);
+int ai_target(Game *game, const Enemy *enemy);
+Vec3 ai_move(Game *game, Enemy *enemy, const Player *target, bool visible, float dt);
 
 /* physics.c */
 void move_horizontal(const World *world, Body *body, float dx, float dz,
@@ -190,6 +217,11 @@ void game_burst(Game *game, Vec3 position, Color color, int count);
 void game_request_weapon(Game *game, int weapon);
 void game_reload(Game *game);
 int game_unlocked_weapons(const Game *game);
+bool game_weapon_available(const Game *game, int weapon);
+void game_begin_rocket_event(Game *game);
+void game_end_rocket_event(Game *game);
+void game_roll_event(Game *game);
+int game_revive_target(const Game *game, int actor);
 void game_cycle_weapon(Game *game, int direction);
 void game_melee(Game *game);
 void game_actor_save(Game *game);
@@ -243,5 +275,10 @@ int graphics_detail(int quality);
 void ui_build(Mesh *mesh, const Game *game, const App *app);
 bool settings_event(App *app, Renderer *renderer, const SDL_Event *event);
 void settings_controls(Mesh *mesh, const App *app, int row, float y);
+int menu_count(const App *app);
+int menu_row_id(const App *app, int row);
+void menu_move(App *app, int direction);
+int menu_hit(const App *app, Renderer *renderer, int x, int y);
+void menu_build(Mesh *mesh, const Game *game, const App *app);
 
 #endif

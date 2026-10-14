@@ -46,6 +46,7 @@ static float approach(float value,float target,float step) {
 }
 void update_player(World *world,Player *p,Input input,float dt) {
     Body *b=&p->body;
+    p->boost_timer=fmaxf(0,p->boost_timer-dt);
     p->dash_cooldown=fmaxf(0,p->dash_cooldown-dt);
     p->dash_timer=fmaxf(0,p->dash_timer-dt);
     p->landing+=(0-p->landing)*fminf(1,dt*13);
@@ -60,15 +61,16 @@ void update_player(World *world,Player *p,Input input,float dt) {
         audio_play(SOUND_DASH);
     }
     float mobility=1+.03f*(float)p->upgrades[UPGRADE_MOBILITY];
-    float speed=(input.sprint?PLAYER_SPRINT:PLAYER_SPEED)*mobility;
-    float acceleration=b->grounded?PLAYER_ACCELERATION:22;
+    float speed=(input.sprint?PLAYER_SPRINT:PLAYER_SPEED)*mobility*(input.revive?.35f:1);
+    float acceleration=p->boost_timer>0?8:(b->grounded?PLAYER_ACCELERATION:22);
     if(p->dash_timer==0&&(length>0||b->grounded)) {
         b->velocity.x=approach(b->velocity.x,wx*speed,acceleration*dt);
         b->velocity.z=approach(b->velocity.z,wz*speed,acceleration*dt);
     }
     float current=hypotf(b->velocity.x,b->velocity.z);
-    if(p->dash_timer==0&&current>PLAYER_SPRINT*mobility) {
-        b->velocity.x*=PLAYER_SPRINT*mobility/current;b->velocity.z*=PLAYER_SPRINT*mobility/current;
+    float limit=p->boost_timer>0?28:PLAYER_SPRINT*mobility;
+    if(p->dash_timer==0&&current>limit) {
+        b->velocity.x*=limit/current;b->velocity.z*=limit/current;
     }
     if(b->grounded&&input.jump){b->velocity.y=PLAYER_JUMP;b->grounded=false;audio_play(SOUND_JUMP);}
     move_horizontal(world,b,b->velocity.x*dt,b->velocity.z*dt,PLAYER_RADIUS,PLAYER_HEIGHT,PLAYER_STEP);
@@ -90,5 +92,5 @@ void update_player(World *world,Player *p,Input input,float dt) {
 }
 Vec3 player_eye(const Player *p,bool motion) {
     float bob=motion&&p->body.grounded?sinf(p->bob*2)*p->movement_blend*.018f:0;
-    return vadd(p->body.position,(Vec3){0,PLAYER_EYE+bob+(motion?p->landing:0),0});
+    return vadd(p->body.position,(Vec3){0,(p->health<=0?.55f:PLAYER_EYE)+bob+(motion?p->landing:0),0});
 }

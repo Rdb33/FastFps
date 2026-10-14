@@ -26,9 +26,9 @@ static void player_write(Writer *w,const Player *p) {
     #define F(field) wf(w,p->field)
     F(yaw);F(pitch);F(health);F(bob);F(pad_cooldown);F(movement_blend);F(strafe_blend);
     F(landing);F(sway_x);F(sway_y);F(step_timer);F(dash_timer);F(dash_cooldown);
-    F(weapon_switch);F(melee_timer);F(reload_timer);F(reload_duration);F(upgrade_lock);
+    F(weapon_switch);F(melee_timer);F(reload_timer);F(reload_duration);F(upgrade_lock);F(boost_timer);
     #undef F
-    w8(w,(uint8_t)p->weapon);w8(w,(uint8_t)p->weapon_target);
+    w8(w,(uint8_t)p->weapon);w8(w,(uint8_t)p->weapon_target);w8(w,p->previous_weapon);
     for(int i=0;i<WEAPON_COUNT;i++)w8(w,p->ammo[i]);
     for(int i=0;i<UPGRADE_COUNT;i++)w8(w,p->upgrades[i]);
     for(int i=0;i<UPGRADE_CHOICES;i++)w8(w,p->offers[i]);
@@ -39,9 +39,10 @@ static void player_read(Reader *r,Player *p) {
     #define F(field) p->field=rf(r)
     F(yaw);F(pitch);F(health);F(bob);F(pad_cooldown);F(movement_blend);F(strafe_blend);
     F(landing);F(sway_x);F(sway_y);F(step_timer);F(dash_timer);F(dash_cooldown);
-    F(weapon_switch);F(melee_timer);F(reload_timer);F(reload_duration);F(upgrade_lock);
+    F(weapon_switch);F(melee_timer);F(reload_timer);F(reload_duration);F(upgrade_lock);F(boost_timer);
     #undef F
-    p->weapon=r8(r);p->weapon_target=r8(r);
+    p->weapon=r8(r);p->weapon_target=r8(r);p->previous_weapon=r8(r);
+    if(p->previous_weapon>=STANDARD_WEAPONS||p->boost_timer<0||p->boost_timer>.7f)r->ok=false;
     for(int i=0;i<WEAPON_COUNT;i++){p->ammo[i]=r8(r);if(p->ammo[i]>WEAPONS[i].magazine)r->ok=false;}
     if(p->reload_timer<0||p->reload_timer>2.2f||p->reload_duration<0||p->reload_duration>2.2f
         ||p->upgrade_lock<0||p->upgrade_lock>UPGRADE_LOCK_TIME+.01f)r->ok=false;
@@ -53,23 +54,26 @@ static void player_read(Reader *r,Player *p) {
     if(p->weapon>=WEAPON_COUNT||p->weapon_target>=WEAPON_COUNT||p->health<0||p->health>player_max_health(p)||fabsf(p->pitch)>1.46f)r->ok=false;
 }
 static void actor_write(Writer *w,const Actor *a) {
-    w8(w,(uint8_t)((a->active?1:0)|(a->dead?2:0)|(a->dash_pressed?4:0)|(a->melee_pressed?8:0)));
+    w8(w,(uint8_t)((a->active?1:0)|(a->dead?2:0)|(a->dash_pressed?4:0)|(a->melee_pressed?8:0)|(a->revive_held?16:0)));
     ws(w,a->name,PLAYER_NAME_LENGTH);player_write(w,&a->player);
     #define F(field) wf(w,a->field)
-    F(shot_cooldown);F(recoil);F(hit_time);F(damage_time);F(shot_age);F(combo_timer);F(respawn_timer);F(invulnerable);
+    F(shot_cooldown);F(recoil);F(hit_time);F(damage_time);F(shot_age);F(combo_timer);F(respawn_timer);F(invulnerable);F(revive_progress);
     F(headshot_time);F(kill_time);F(damage_yaw);
     #undef F
+    w8(w,(uint8_t)a->revive_target);
     w32(w,(uint32_t)a->combo);w32(w,a->input_ack);w32(w,a->shots);
     w32(w,(uint32_t)a->run_kills);w32(w,(uint32_t)a->run_headshots);w32(w,(uint32_t)a->reward_points);wf(w,a->reward_time);
 }
 static void actor_read(Reader *r,Actor *a) {
-    uint8_t flags=r8(r);if(flags>15)r->ok=false;
-    a->active=(flags&1)!=0;a->dead=(flags&2)!=0;a->dash_pressed=(flags&4)!=0;a->melee_pressed=(flags&8)!=0;
+    uint8_t flags=r8(r);if(flags>31)r->ok=false;
+    a->active=(flags&1)!=0;a->dead=(flags&2)!=0;a->dash_pressed=(flags&4)!=0;a->melee_pressed=(flags&8)!=0;a->revive_held=(flags&16)!=0;
     rs(r,a->name,sizeof(a->name));player_read(r,&a->player);
     #define F(field) a->field=rf(r)
-    F(shot_cooldown);F(recoil);F(hit_time);F(damage_time);F(shot_age);F(combo_timer);F(respawn_timer);F(invulnerable);
+    F(shot_cooldown);F(recoil);F(hit_time);F(damage_time);F(shot_age);F(combo_timer);F(respawn_timer);F(invulnerable);F(revive_progress);
     F(headshot_time);F(kill_time);F(damage_yaw);
     #undef F
+    unsigned target=r8(r);a->revive_target=target==255?-1:(int)target;
+    if((target>=MAX_PLAYERS&&target!=255)||a->revive_progress<0||a->revive_progress>REVIVE_TIME+.001f)r->ok=false;
     uint32_t combo=r32(r);if(combo>1000000)r->ok=false;a->combo=(int)combo;
     a->input_ack=r32(r);a->shots=r32(r);
     uint32_t kills=r32(r),heads=r32(r),reward=r32(r);
@@ -83,7 +87,7 @@ static void enemy_write(Writer *w,const Enemy *e) {
     F(movement_blend);F(attack_timer);F(attack_duration);F(stagger);F(spawn_time);F(death_time);
     #undef F
     wv(w,e->attack_direction);wv(w,e->knockback);w8(w,e->attack_fired);w8(w,(uint8_t)e->target_actor);
-    w8(w,e->elite);
+    w8(w,e->elite);w8(w,(uint8_t)e->slam_state);wf(w,e->slam_timer);wf(w,e->slam_flash);wv(w,e->slam_target);
 }
 static void enemy_read(Reader *r,Enemy *e) {
     uint32_t id=r32(r);if(id>2147483647u)r->ok=false;e->id=(int)id;e->type=r8(r);rb(r,&e->body);
@@ -94,6 +98,8 @@ static void enemy_read(Reader *r,Enemy *e) {
     e->attack_direction=rv(r);e->knockback=rv(r);uint8_t fired=r8(r);e->attack_fired=fired!=0;
     e->target_actor=r8(r);
     uint8_t elite=r8(r);e->elite=elite!=0;if(elite>1)r->ok=false;
+    e->slam_state=r8(r);e->slam_timer=rf(r);e->slam_flash=rf(r);e->slam_target=rv(r);
+    if(e->slam_state>3||e->slam_timer<0||e->slam_timer>3.01f||e->slam_flash<0||e->slam_flash>.81f||(!e->elite&&e->slam_state))r->ok=false;
     if(e->type>ENEMY_BRUTE||fired>1||e->target_actor>=MAX_PLAYERS||e->attack_timer<0
         ||(e->attack_timer>0&&e->attack_duration<=0)||e->max_health<0||e->max_health>10000)r->ok=false;
 }
@@ -101,16 +107,16 @@ static void enemy_read(Reader *r,Enemy *e) {
 size_t protocol_command_write(uint8_t *data,size_t capacity,const Command *c) {
     Writer w={data,capacity,0,true};w32(&w,c->sequence);w32(&w,c->round);wf(&w,c->yaw);wf(&w,c->pitch);
     wf(&w,c->input.forward);wf(&w,c->input.right);
-    uint8_t flags=(uint8_t)((c->input.jump?1:0)|(c->input.sprint?2:0)|(c->input.firing?4:0)|(c->input.dash?8:0)|(c->input.melee?16:0)|(c->input.reload?32:0));
+    uint8_t flags=(uint8_t)((c->input.jump?1:0)|(c->input.sprint?2:0)|(c->input.firing?4:0)|(c->input.dash?8:0)|(c->input.melee?16:0)|(c->input.reload?32:0)|(c->input.revive?64:0));
     w8(&w,flags);w8(&w,(uint8_t)c->weapon);w8(&w,(uint8_t)c->input.upgrade);return w.ok?w.pos:0;
 }
 bool protocol_command_read(Command *c,const uint8_t *data,size_t size) {
     Reader r={data,size,0,true};Command out={0};out.sequence=r32(&r);out.round=r32(&r);out.yaw=rf(&r);out.pitch=rf(&r);
     out.input.forward=rf(&r);out.input.right=rf(&r);uint8_t flags=r8(&r);out.weapon=r8(&r);
     out.input.jump=(flags&1)!=0;out.input.sprint=(flags&2)!=0;out.input.firing=(flags&4)!=0;
-    out.input.dash=(flags&8)!=0;out.input.melee=(flags&16)!=0;out.input.reload=(flags&32)!=0;
+    out.input.dash=(flags&8)!=0;out.input.melee=(flags&16)!=0;out.input.reload=(flags&32)!=0;out.input.revive=(flags&64)!=0;
     out.input.upgrade=r8(&r);
-    if(flags>63||out.weapon>=WEAPON_COUNT||out.input.upgrade>UPGRADE_CHOICES||fabsf(out.yaw)>2*PI_F+.01f||fabsf(out.pitch)>1.46f
+    if(flags>127||out.weapon>=WEAPON_COUNT||out.input.upgrade>UPGRADE_CHOICES||fabsf(out.yaw)>2*PI_F+.01f||fabsf(out.pitch)>1.46f
         ||fabsf(out.input.forward)>1||fabsf(out.input.right)>1)r.ok=false;
     if(!r.ok||r.pos!=size)return false;
     *c=out;return true;
@@ -118,16 +124,21 @@ bool protocol_command_read(Command *c,const uint8_t *data,size_t size) {
 size_t protocol_snapshot_write(uint8_t *data,size_t capacity,const Game *g) {
     if(g->enemy_count<0||g->enemy_count>MAX_ENEMIES||g->corpse_count<0||g->corpse_count>MAX_CORPSES
         ||g->projectile_count<0||g->projectile_count>MAX_PROJECTILES||g->pickup_count<0||g->pickup_count>MAX_PICKUPS
+        ||g->blast_count<0||g->blast_count>MAX_BLASTS
         ||g->barrel_count<0||g->barrel_count>MAX_BARRELS||g->particle_count<0||g->particle_count>MAX_PARTICLES)return 0;
     Writer w={data,capacity,0,true};w8(&w,NET_PROTOCOL);w8(&w,(uint8_t)g->difficulty);w32(&w,g->tick);
     w8(&w,(uint8_t)g->map_id);w8(&w,(uint8_t)g->lives);w8(&w,g->round_over);w32(&w,(uint32_t)g->wave);w32(&w,(uint32_t)g->score);w32(&w,(uint32_t)g->kills);
     wf(&w,g->time);wf(&w,g->wave_timer);wf(&w,g->message_time);ws(&w,g->message,95);
     w32(&w,(uint32_t)g->completed_waves);wf(&w,g->wave_clear_time);
+    w8(&w,g->rocket_event);w32(&w,g->event_serial);wf(&w,g->event_notice_time);
+    w8(&w,(uint8_t)g->unlock_weapon);wf(&w,g->unlock_time);
+    w8(&w,(uint8_t)g->blast_count);
+    for(int i=0;i<g->blast_count;i++){wv(&w,g->blasts[i].position);wf(&w,g->blasts[i].time);wf(&w,g->blasts[i].radius);}
     for(int i=0;i<MAX_PLAYERS;i++)actor_write(&w,&g->actors[i]);
     w8(&w,(uint8_t)g->enemy_count);for(int i=0;i<g->enemy_count;i++)enemy_write(&w,&g->enemies[i]);
     w8(&w,(uint8_t)g->corpse_count);for(int i=0;i<g->corpse_count;i++)enemy_write(&w,&g->corpses[i]);
     w8(&w,(uint8_t)g->projectile_count);
-    for(int i=0;i<g->projectile_count;i++){const Projectile *p=&g->projectiles[i];wv(&w,p->position);wv(&w,p->velocity);wf(&w,p->life);wc(&w,p->color);}
+    for(int i=0;i<g->projectile_count;i++){const Projectile *p=&g->projectiles[i];wv(&w,p->position);wv(&w,p->velocity);wf(&w,p->life);wc(&w,p->color);w8(&w,(uint8_t)p->kind);w8(&w,(uint8_t)p->owner);wf(&w,p->damage);}
     w8(&w,(uint8_t)g->pickup_count);
     for(int i=0;i<g->pickup_count;i++){wv(&w,g->pickups[i].position);wf(&w,g->pickups[i].cooldown);}
     w8(&w,(uint8_t)g->barrel_count);
@@ -154,13 +165,26 @@ bool protocol_snapshot_read(Game *g,const uint8_t *data,size_t size) {
     out.time=rf(&r);out.wave_timer=rf(&r);out.message_time=rf(&r);rs(&r,out.message,sizeof(out.message));
     uint32_t completed=r32(&r);if(completed>1000000||completed>wave)r.ok=false;
     out.completed_waves=(int)completed;out.wave_clear_time=rf(&r);
+    uint8_t event=r8(&r);out.rocket_event=event!=0;out.event_serial=r32(&r);out.event_notice_time=rf(&r);
+    unsigned unlock=r8(&r);out.unlock_weapon=unlock==255?-1:(int)unlock;out.unlock_time=rf(&r);
+    if(event>1||(unlock!=255&&(unlock<1||unlock>=STANDARD_WEAPONS))||out.unlock_time<0||out.unlock_time>6.01f
+        ||out.event_notice_time<0||out.event_notice_time>6.01f||out.time<0)return false;
+    out.blast_count=r8(&r);if(out.blast_count>MAX_BLASTS)return false;
+    for(int i=0;i<out.blast_count;i++) {
+        Blast *b=&out.blasts[i];b->position=rv(&r);b->time=rf(&r);b->radius=rf(&r);
+        if(b->time<0||b->time>.81f||b->radius<=0||b->radius>6.6f)r.ok=false;
+    }
     for(int i=0;i<MAX_PLAYERS;i++)actor_read(&r,&out.actors[i]);
     out.enemy_count=r8(&r);if(out.enemy_count>MAX_ENEMIES)return false;
     for(int i=0;i<out.enemy_count;i++)enemy_read(&r,&out.enemies[i]);
     out.corpse_count=r8(&r);if(out.corpse_count>MAX_CORPSES)return false;
     for(int i=0;i<out.corpse_count;i++)enemy_read(&r,&out.corpses[i]);
     out.projectile_count=r8(&r);if(out.projectile_count>MAX_PROJECTILES)return false;
-    for(int i=0;i<out.projectile_count;i++){Projectile *p=&out.projectiles[i];p->position=rv(&r);p->velocity=rv(&r);p->life=rf(&r);p->color=rc(&r);}
+    for(int i=0;i<out.projectile_count;i++){Projectile *p=&out.projectiles[i];p->position=rv(&r);p->velocity=rv(&r);p->life=rf(&r);p->color=rc(&r);p->kind=r8(&r);
+        unsigned owner=r8(&r);p->owner=owner==255?-1:(int)owner;p->damage=rf(&r);
+        if(p->kind>1||(owner>=MAX_PLAYERS&&owner!=255)||(p->kind==1&&owner>=MAX_PLAYERS)
+            ||p->damage<0||p->damage>400||p->life<0||p->life>5.01f)r.ok=false;
+    }
     out.pickup_count=r8(&r);if(out.pickup_count>MAX_PICKUPS)return false;
     for(int i=0;i<out.pickup_count;i++){out.pickups[i].position=rv(&r);out.pickups[i].cooldown=rf(&r);}
     out.barrel_count=r8(&r);if(out.barrel_count>MAX_BARRELS)return false;
@@ -180,10 +204,10 @@ bool protocol_snapshot_read(Game *g,const uint8_t *data,size_t size) {
     if(!r.ok||r.pos!=size||out.local_actor<0||out.local_actor>=MAX_PLAYERS)return false;
     if(out.map_id!=((out.wave>0?out.wave-1:0)/5)%MAP_COUNT)return false;
     for(int i=0;i<MAX_PLAYERS;i++)if(out.actors[i].active) {
-        if(out.actors[i].player.weapon>=game_unlocked_weapons(&out)||out.actors[i].player.weapon_target>=game_unlocked_weapons(&out))return false;
+        if(!game_weapon_available(&out,out.actors[i].player.weapon)||!game_weapon_available(&out,out.actors[i].player.weapon_target))return false;
     }
     /* Reconstruire seulement après validation complète : un paquet invalide ne change pas les collisions. */
-    world_set_map(out.world,out.map_id);
+    world_set_map(out.world,out.map_id);world_platforms_update(out.world,out.time);
     out.cooperative=true;out.current_actor=-1;game_actor_select(&out,out.local_actor);
     *g=out;return true;
 }

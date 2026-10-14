@@ -27,18 +27,23 @@ run: all
 clean:
 	rm -rf build
 
-TEST_SOURCES := tests/network.c src/network.c src/discovery.c src/protocol.c src/game.c src/weapons.c src/progression.c src/physics.c src/world.c src/math.c src/mesh.c
+TEST_SOURCES := tests/network.c src/network.c src/discovery.c src/protocol.c src/game.c src/presets.c src/ai.c src/mobility.c src/weapons.c src/progression.c src/physics.c src/world.c src/math.c src/mesh.c
 build/test-network: $(TEST_SOURCES) src/fastfps.h src/network.h src/config.h | check-deps
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) -I src $(TEST_SOURCES) $(LDLIBS) -o $@
 
-build/test-gameplay: tests/gameplay.c $(filter-out tests/network.c,$(TEST_SOURCES)) src/settings.c src/fastfps.h src/network.h src/config.h | check-deps
+build/test-gameplay: tests/gameplay.c $(filter-out tests/network.c,$(TEST_SOURCES)) src/settings.c src/menu.c src/fastfps.h src/network.h src/config.h | check-deps
 	@mkdir -p build
-	$(CC) $(CPPFLAGS) $(CFLAGS) -I src tests/gameplay.c $(filter-out tests/network.c,$(TEST_SOURCES)) src/settings.c $(LDLIBS) -o $@
+	$(CC) $(CPPFLAGS) $(CFLAGS) -I src tests/gameplay.c $(filter-out tests/network.c,$(TEST_SOURCES)) src/settings.c src/menu.c $(LDLIBS) -o $@
 
-test: build/test-network build/test-gameplay
+build/test-mechanics: tests/mechanics.c $(filter-out tests/network.c,$(TEST_SOURCES)) src/fastfps.h src/network.h src/config.h | check-deps
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -I src tests/mechanics.c $(filter-out tests/network.c,$(TEST_SOURCES)) $(LDLIBS) -o $@
+
+test: build/test-network build/test-gameplay build/test-mechanics
 	./build/test-network
 	./build/test-gameplay
+	./build/test-mechanics
 
 test-tcp: build/test-network
 	./build/test-network --tcp

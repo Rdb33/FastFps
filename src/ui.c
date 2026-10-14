@@ -62,7 +62,7 @@ void ui_build(Mesh *m,const Game *g,const App *app) {
         if(g->cooperative) {
             int row=0;
             for(int i=0;i<MAX_PLAYERS;i++)if(g->actors[i].active&&i!=g->local_actor) {
-                if(g->actors[i].dead)snprintf(text,sizeof(text),"%s : RETOUR %.0f S",g->actors[i].name,ceilf(g->actors[i].respawn_timer));
+                if(g->actors[i].dead)snprintf(text,sizeof(text),"%s : A TERRE / REANIMER",g->actors[i].name);
                 else snprintf(text,sizeof(text),"%s : %.0f PV",g->actors[i].name,g->actors[i].player.health);
                 mesh_text(m,12,45+(float)row*13,1,(Color){.35f,.85f,1},text);row++;
             }
@@ -72,9 +72,17 @@ void ui_build(Mesh *m,const Game *g,const App *app) {
                 mesh_text(m,640-(float)strlen(text)*6-12,45,1,n->latency_ms>120?orange:muted,text);
             }
             if(g->dead) {
-                snprintf(text,sizeof(text),"RETOUR DANS %.0f S",ceilf(g->actors[g->local_actor].respawn_timer));
-                centered(m,145,2,orange,text);centered(m,166,1,ink,"TES ALLIES PEUVENT CONTINUER");
+                centered(m,145,2,orange,"TU ES A TERRE");
+                centered(m,166,1,ink,"UN ALLIE DOIT MAINTENIR E PRES DE TOI");
+                mesh_rect(m,230,180,180,5,(Color){.13f,.20f,.23f});
+                mesh_rect(m,230,180,180*g->actors[g->local_actor].revive_progress/REVIVE_TIME,5,(Color){.4f,1,.7f});
             }
+        }
+        int revive=game_revive_target(g,g->local_actor);
+        if(revive>=0&&!g->dead) {
+            snprintf(text,sizeof(text),"MAINTIENS E : REANIMER %s",g->actors[revive].name);centered(m,253,1,(Color){.4f,1,.7f},text);
+            mesh_rect(m,240,268,160,4,(Color){.13f,.20f,.23f});
+            mesh_rect(m,240,268,160*g->actors[revive].revive_progress/REVIVE_TIME,4,(Color){.4f,1,.7f});
         }
         if(g->dead&&!g->cooperative&&!g->round_over) {
             snprintf(text,sizeof(text),"%d VIES / RETOUR DANS %.0f S",g->lives,ceilf(g->actors[0].respawn_timer));
@@ -146,59 +154,32 @@ void ui_build(Mesh *m,const Game *g,const App *app) {
             }
         }
         if(app->show_build&&app->state==STATE_PLAYING) {
-            mesh_rect(m,424,108,206,114,(Color){.04f,.065f,.08f});
+            mesh_rect(m,424,108,206,133,(Color){.04f,.065f,.08f});
             mesh_text(m,434,119,1,ink,"ARSENAL DE CETTE PARTIE");
             for(int i=0;i<WEAPON_COUNT;i++) {
-                bool available=i<game_unlocked_weapons(g);
+                bool available=game_weapon_available(g,i);
                 snprintf(text,sizeof(text),"%d %-14s %s",i+1,WEAPONS[i].name,available?"PRET":"");
                 mesh_text(m,434,138+(float)i*19,1,available?WEAPONS[i].color:muted,text);
-                if(!available){snprintf(text,sizeof(text),"R%d",WEAPONS[i].unlock_wave);mesh_text(m,581,138+(float)i*19,1,muted,text);}
+                if(!available){snprintf(text,sizeof(text),i==WEAPON_ROCKET?"EVENT":"R%d",WEAPONS[i].unlock_wave);mesh_text(m,581,138+(float)i*19,1,muted,text);}
             }
+        }
+        if(g->rocket_event)mesh_text(m,486,82,1,orange,"EVENEMENT ROQUETTES");
+        if(g->unlock_time>0&&g->unlock_weapon>=1&&g->unlock_weapon<STANDARD_WEAPONS) {
+            Color c=WEAPONS[g->unlock_weapon].color;
+            mesh_rect(m,398,106,232,73,(Color){.045f,.085f,.12f});mesh_rect(m,398,106,232,3,c);
+            mesh_text(m,410,119,1,c,"NOUVELLE ARME DEBLOQUEE");
+            mesh_text(m,410,136,2,ink,WEAPONS[g->unlock_weapon].name);
+            snprintf(text,sizeof(text),"TOUCHE %d OU MOLETTE POUR L'EQUIPER",g->unlock_weapon+1);mesh_text(m,410,161,1,c,text);
+        }
+        if(g->event_notice_time>0) {
+            mesh_rect(m,398,188,232,80,(Color){.12f,.065f,.04f});mesh_rect(m,398,188,232,3,orange);
+            mesh_text(m,410,201,1,orange,"EVENEMENT RARE / TOUTE L'EQUIPE");
+            mesh_text(m,410,218,2,ink,"ROQUETTES !");
+            mesh_text(m,410,241,1,orange,"LANCEUR PRETE POUR CE ROUND");
+            mesh_text(m,410,255,1,muted,"TOUCHE 5 / DEGATS DE ZONE");
         }
         if(app->state==STATE_UPGRADE)upgrade_ui(m,g,app);
         return;
     }
-    mesh_rect(m,48,12,544,336,(Color){.055f,.06f,.047f});
-    mesh_rect(m,48,12,544,3,orange);mesh_rect(m,48,345,544,3,(Color){.27f,.29f,.20f});
-    mesh_text(m,73,26,1,muted,"FASTFPS " GAME_VERSION " / APPLICATION NATIVE / OPENGL ES 2");
-    mesh_text(m,153,44,8,ink,"FASTFPS");
-    centered(m,110,1,orange,app->state==STATE_DEAD?(g->cooperative?"GAME OVER / EQUIPE ELIMINEE":"GAME OVER / TES TROIS VIES SONT EPUISEES"):"BOUGE. TIRE. SURVIS.");
-    if(app->state==STATE_DEAD) {
-        snprintf(text,sizeof(text),"SCORE %d / NIVEAU %d / %d ELIMINATIONS",g->score,player_level(&g->player),g->actors[g->local_actor].run_kills);
-        centered(m,119,1,ink,text);
-    }else if(app->state==STATE_PAUSED)centered(m,119,1,ink,"PAUSE");
-    else centered(m,119,1,muted,"SURVIS. CHOISIS TES MODULES. AFFRONTE LES CHAMPIONS.");
-    for(int i=0;i<MENU_ROWS;i++) {
-        float y=133+(float)i*14;
-        if(i==app->selected)mesh_rect(m,76,y-5,488,13,(Color){.20f,.23f,.15f});
-        switch(i) {
-            case 0:snprintf(text,sizeof(text),"%s",g->cooperative&&app->state==STATE_DEAD?"RETOUR AU SALON":(app->state==STATE_PAUSED?"REPRENDRE":(app->state==STATE_DEAD?"RECOMMENCER":"JOUER")));break;
-            case 1:snprintf(text,sizeof(text),"%s",g->cooperative?"QUITTER LE SALON":(app->state==STATE_PAUSED?"RECOMMENCER":"MULTIJOUEUR / SALONS"));break;
-            case 2:snprintf(text,sizeof(text),"RENDU : %s / %d X %d / %d FPS",PRESETS[app->quality].name,
-                PRESETS[app->quality].width,PRESETS[app->quality].height,PRESETS[app->quality].fps);break;
-            case 3:snprintf(text,sizeof(text),"SENSIBILITE (0.30-3.00)");break;
-            case 4:snprintf(text,sizeof(text),"SON : %s",app->sound?"ACTIF":"COUPE");break;
-            case 5:snprintf(text,sizeof(text),"PLEIN ECRAN : %s",app->fullscreen?"ACTIF":"NON");break;
-            case 6:snprintf(text,sizeof(text),"MOUVEMENTS CAMERA : %s",app->motion?"ACTIFS":"REDUITS");break;
-            case 7: {
-                const char *names[]={"DETENTE","NORMAL","BRUTAL"};
-                snprintf(text,sizeof(text),"DIFFICULTE%s : %s",g->cooperative?" DE L'HOTE":"",names[g->cooperative?g->difficulty:app->difficulty]);break;
-            }
-            case 8:snprintf(text,sizeof(text),"VISUEL : %s / F5",app->modern?"MODERNE":"RETRO");break;
-            case 9:snprintf(text,sizeof(text),"LUMINOSITE (50-200%%)");break;
-            default:snprintf(text,sizeof(text),"QUITTER");break;
-        }
-        if(i==app->selected)mesh_text(m,87,y,1,orange,">");
-        mesh_text(m,106,y,1,i==app->selected?ink:muted,text);
-        settings_controls(m,app,i,y);
-    }
-    if(app->capture_error)centered(m,290,1,orange,"CAPTURE SOURIS REFUSEE - REESSAIE OU CHANGE DE SESSION");
-    else if(app->state==STATE_DEAD) {
-        snprintf(text,sizeof(text),"%d VAGUES TERMINEES / %d IMPACTS TETE / RECORD %d",g->completed_waves,g->actors[g->local_actor].run_headshots,app->best_score);
-        centered(m,290,1,orange,text);
-    }
-    else centered(m,290,1,muted,"SLIDER : GLISSER / VALEUR : SAISIR / ENTREE : VALIDER");
-    mesh_text(m,76,303,1,ink,"ZQSD / WASD : BOUGER   MAJ : SPRINT   ESPACE : SAUTER");
-    mesh_text(m,76,316,1,ink,"CLIC : TIR   DROIT : ESQUIVE   F : FRAPPE   1-4 : ARMES");
-    centered(m,334,1,muted,"ECHAP : PAUSE / F2 : QUALITE / F4 : CAMERA / F5 : VISUEL");
+    menu_build(m,g,app);
 }

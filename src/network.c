@@ -144,6 +144,18 @@ static void reconcile(Network *n,Game *g,const uint8_t *data,size_t size,double 
     }
     if(snapshot.wave>n->previous.wave)audio_play(snapshot.wave%5==0?SOUND_CHAMPION:SOUND_WAVE);
     if(snapshot.completed_waves>n->previous.completed_waves)audio_play(SOUND_UPGRADE);
+    if(snapshot.event_serial!=n->previous.event_serial)audio_play(SOUND_CHAMPION);
+    if(snapshot.unlock_time>n->previous.unlock_time+.2f)audio_play(SOUND_UPGRADE);
+    if(old->dead&&!local->dead)audio_play(SOUND_PICKUP);
+    for(int i=0;i<snapshot.blast_count;i++)if(snapshot.blasts[i].time>.72f) {
+        bool seen=false;for(int j=0;j<n->previous.blast_count;j++)if(vlength(vsub(snapshot.blasts[i].position,n->previous.blasts[j].position))<.1f
+            &&n->previous.blasts[j].time>=snapshot.blasts[i].time-.1f)seen=true;
+        if(!seen)audio_play_at(SOUND_EXPLOSION,snapshot.blasts[i].position);
+    }
+    for(int i=0;i<snapshot.enemy_count;i++)for(int j=0;j<n->previous.enemy_count;j++)if(snapshot.enemies[i].id==n->previous.enemies[j].id) {
+        if(snapshot.enemies[i].slam_state==1&&n->previous.enemies[j].slam_state==0)audio_play_at(SOUND_CHAMPION,snapshot.enemies[i].body.position);
+        if(snapshot.enemies[i].slam_flash>n->previous.enemies[j].slam_flash+.2f)audio_play_at(SOUND_EXPLOSION,snapshot.enemies[i].body.position);
+    }
     *g=snapshot;
     uint32_t ack=g->actors[n->local_id].input_ack,count=n->sequence-ack;
     if(snapshot.map_id!=n->previous.map_id){count=0;n->previous=snapshot;}
@@ -368,7 +380,7 @@ void net_render(const Network *n,const Game *g,Game *view,double now) {
     *view=*g;
     if(n->mode!=NET_CLIENT||!n->has_snapshot)return;
     float age=clampf((float)(now-n->snapshot_time),0,.1f);
-    view->time+=age;
+    view->time=n->current.time+age;
     for(int i=0;i<view->barrel_count;i++)view->barrels[i].explosion_time=fmaxf(0,view->barrels[i].explosion_time-age);
     for(int i=0;i<view->particle_count;i++) {
         Particle *p=&view->particles[i];p->life-=age;p->position=vadd(p->position,vscale(p->velocity,age));

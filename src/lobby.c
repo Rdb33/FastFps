@@ -5,7 +5,7 @@
 static const Color ink={.92f,.9f,.79f},muted={.51f,.55f,.45f},orange={1,.48f,.18f},blue={.35f,.85f,1};
 static void centered(Mesh *m,float y,int scale,Color color,const char *text){mesh_text(m,(640-(float)strlen(text)*6*(float)scale)/2,y,scale,color,text);}
 void lobby_open(App *app) {
-    app->state=STATE_NETWORK;app->selected=0;app->editing=-1;app->select_all=false;app->network_help=false;
+    app->state=STATE_NETWORK;app->selected=0;app->menu_page=0;app->editing=-1;app->select_all=false;app->network_help=false;
     app->network->discovery_requested=true;
     net_local_addresses(app->network);SDL_StopTextInput();SDL_SetRelativeMouseMode(SDL_FALSE);
 }
@@ -144,9 +144,9 @@ void lobby_sync(App *app,Game *g) {
     }
     if(n->phase==ROOM_PLAYING&&(app->state==STATE_LOBBY||app->state==STATE_DEAD)) {
         app->capture_error=SDL_SetRelativeMouseMode(SDL_TRUE)!=0;
-        app->state=app->capture_error?STATE_PAUSED:STATE_PLAYING;g->motion=app->motion;
+        app->state=app->capture_error?STATE_PAUSED:STATE_PLAYING;app->menu_page=0;g->motion=app->motion;
     }else if(n->phase==ROOM_FINISHED&&app->state!=STATE_LOBBY&&app->state!=STATE_DEAD) {
-        app->state=STATE_DEAD;app->selected=0;SDL_SetRelativeMouseMode(SDL_FALSE);
+        app->state=STATE_DEAD;app->selected=0;app->menu_page=0;SDL_SetRelativeMouseMode(SDL_FALSE);
         if(g->score>app->best_score)app->best_score=g->score;
     }
 }

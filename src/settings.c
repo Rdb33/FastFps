@@ -35,7 +35,7 @@ static void append(App *a,const char *s) {
     }
 }
 bool settings_event(App *a,Renderer *r,const SDL_Event *e) {
-    if(a->state!=STATE_MENU&&a->state!=STATE_PAUSED&&a->state!=STATE_DEAD)return false;
+    if((a->state!=STATE_MENU&&a->state!=STATE_PAUSED&&a->state!=STATE_DEAD)||!a->menu_page)return false;
     if(e->type==SDL_TEXTINPUT&&a->numeric_edit>=0){append(a,e->text.text);return true;}
     if(e->type==SDL_KEYDOWN&&a->numeric_edit>=0) {
         SDL_Scancode key=e->key.keysym.scancode;
@@ -70,8 +70,8 @@ bool settings_event(App *a,Renderer *r,const SDL_Event *e) {
     if(e->type==SDL_MOUSEBUTTONDOWN&&e->button.button==SDL_BUTTON_LEFT) {
         float x,y;if(!coordinates(r,e->button.x,e->button.y,&x,&y))return false;
         finish(a,true);
-        int row=(int)floorf((y-128)/14);
-        if(y<128||row>=MENU_ROWS||!numeric_row(row))return false;
+        int row=menu_row_id(a,(int)floorf((y-128)/18));
+        if(x<64||x>576||y<128||row<0||!numeric_row(row))return false;
         a->selected=row;
         if(x>=308&&x<=476) {
             a->slider_drag=row;

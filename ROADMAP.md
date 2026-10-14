@@ -107,3 +107,16 @@ Les personnages jouables restent identiques pour cette version ; la variété de
 - [x] Tests de simulation, de saisie et de transitions en coopération.
 - [ ] Ajuster l’équilibrage et mesurer les nouvelles vagues sur un Pi 4.
 - [ ] Observer une vraie partie en coopération entre deux machines.
+
+## Version 0.8 : coopération et mobilité
+
+- [x] Champion qui saute et frappe le sol, avec annonce de cible.
+- [x] IA enrichie et itinéraires vers chaque joueur.
+- [x] Menu principal plus lisible et réglages séparés.
+- [x] Réanimation par un allié, interruptions et game over collectif.
+- [x] Pop-up lors d’un déblocage d’arme.
+- [x] Événement roquettes collectif, dégâts de zone et rocket jump.
+- [x] Élévateurs et navette, collisions et transport prédits.
+- [x] Tests d’une réanimation entre invités et des nouvelles mécaniques répliquées.
+- [ ] Mesurer les temps d’image sur Pi 4 et ajuster l’équilibrage avec les joueurs.
+- [ ] Vérifier une vraie partie entre deux ordinateurs avec latence réseau.

@@ -51,12 +51,16 @@ static void gameplay_test(World *world) {
     g.wave_timer=100;Input inputs[MAX_PLAYERS]={0};inputs[1].right=1;
     for(int i=0;i<30;i++)game_update_coop(&g,inputs,FIXED_STEP);
     assert(g.player.body.position.x==0&&g.actors[1].player.body.position.x>3);
+    inputs[1]=(Input){0};g.actors[1].player.body.position=vadd(g.player.body.position,(Vec3){1.5f,0,0});g.actors[1].player.body.velocity=(Vec3){0,0,0};
     g.actors[1].dead=true;g.actors[1].player.health=0;g.actors[1].respawn_timer=.03f;
     game_update_coop(&g,inputs,FIXED_STEP);game_update_coop(&g,inputs,FIXED_STEP);
-    assert(!g.actors[1].dead&&g.actors[1].player.health==100&&g.actors[1].invulnerable>0);
+    assert(g.actors[1].dead);inputs[0].revive=true;
+    for(int tick=0;tick<155;tick++)game_update_coop(&g,inputs,FIXED_STEP);
+    assert(!g.actors[1].dead&&g.actors[1].player.health==50&&g.actors[1].invulnerable>0);
     g.dead=true;g.player.health=0;g.actors[0].respawn_timer=.03f;game_actor_save(&g);
-    game_update_coop(&g,inputs,FIXED_STEP);game_update_coop(&g,inputs,FIXED_STEP);
-    assert(!g.dead&&g.player.health==100);
+    inputs[0]=(Input){0};inputs[1].revive=true;
+    for(int tick=0;tick<155;tick++)game_update_coop(&g,inputs,FIXED_STEP);
+    assert(!g.dead&&g.player.health==50);inputs[1]=(Input){0};
     g.pickups[0].cooldown=12;game_update_coop(&g,inputs,FIXED_STEP);
     assert(fabsf(g.pickups[0].cooldown-(12-FIXED_STEP))<.0001f);
     g.enemy_count=1;g.enemies[0]=(Enemy){.body={{15,0,15},{0,0,0},true},.health=80,.max_health=80};
@@ -69,12 +73,13 @@ static void gameplay_test(World *world) {
 static void virtual_sessions(World *world) {
     Network *host=calloc(1,sizeof(*host)),*clients[3];assert(host);net_init(host);
     host->mode=NET_HOST;host->members[0]=(Member){.present=true,.ready=true};strcpy(host->members[0].name,"HOTE");
+    World guest_worlds[3];
     Game server,games[3];game_reset(&server,world,28);
     uint8_t bytes[NET_PACKET_MAX];
     for(int i=0;i<3;i++) {
         clients[i]=calloc(1,sizeof(Network));assert(clients[i]);net_init(clients[i]);
         clients[i]->mode=NET_CLIENT;clients[i]->connecting=true;clients[i]->peers[0].fd=-2;
-        host->peers[i+1].fd=-2;game_reset(&games[i],world,28);
+        host->peers[i+1].fd=-2;assert(world_init(&guest_worlds[i]));game_reset(&games[i],&guest_worlds[i],28);
         uint8_t hello[2+PLAYER_NAME_LENGTH+1]={NET_PROTOCOL,1};snprintf((char *)hello+2,PLAYER_NAME_LENGTH+1,"AMI %d",i+1);
         size_t size=frame(bytes,PACKET_HELLO,hello,sizeof(hello));
         for(size_t j=0;j<size;j++)assert(net_feed(host,i+1,&server,bytes+j,1,0));
@@ -118,14 +123,66 @@ static void virtual_sessions(World *world) {
         assert(games[i].wave==6&&games[i].map_id==1&&games[i].world->map_id==1);
         assert(games[i].player.ammo[0]==17&&games[i].player.reload_timer>1);
     }
-    server.round_over=true;net_tick(host,&server,(Command){0},FIXED_STEP,5);
-    for(int i=0;i<3;i++){transfer(host,i+1,clients[i],0,&games[i],5);assert(clients[i]->phase==ROOM_FINISHED);}
-    assert(net_start(host,&server,6));
-    for(int i=0;i<3;i++){transfer(host,i+1,clients[i],0,&games[i],6);assert(clients[i]->round==2&&clients[i]->sequence==0);}
+    /* Même session : roquettes, champion et réanimation par un invité. */
+    for(int k=0;k<server.enemy_count;k++)server.enemies[k].spawn_time=1000;
+    server.enemies[0].elite=true;server.enemies[0].type=ENEMY_BRUTE;
+    server.enemies[0].body=(Body){{22,0,-18},{0,0,0},true};
+    server.enemies[0].slam_state=1;server.enemies[0].slam_timer=.7f;server.enemies[0].slam_target=(Vec3){21,0,-17};
+    game_begin_rocket_event(&server);server.projectile_count=0;game_shoot(&server);
+    server.actors[3].player.body=(Body){vadd(server.actors[2].player.body.position,(Vec3){1.5f,0,0}),{0,0,0},true};
+    server.actors[3].dead=true;server.actors[3].player.health=0;
+    net_tick(host,&server,(Command){.weapon=4},FIXED_STEP,4.7);
+    for(int i=0;i<3;i++) {
+        transfer(host,i+1,clients[i],0,&games[i],4.7);
+        assert(games[i].rocket_event&&game_weapon_available(&games[i],4)&&games[i].actors[3].dead);
+        assert(games[i].projectile_count>0&&games[i].projectiles[0].kind==1);
+        assert(games[i].enemies[0].slam_state==1);
+    }
+    bool progress_seen=false;
+    for(int tick=1;tick<=170;tick++) {
+        double now=4.7+(double)tick/60;
+        for(int i=0;i<3;i++) {
+            Command command={.weapon=4,.yaw=games[i].player.yaw,.pitch=games[i].player.pitch,.input={.revive=i==1}};
+            net_tick(clients[i],&games[i],command,FIXED_STEP,now);transfer(clients[i],0,host,i+1,&server,now);
+        }
+        net_tick(host,&server,(Command){.weapon=4},FIXED_STEP,now);
+        for(int i=0;i<3;i++)transfer(host,i+1,clients[i],0,&games[i],now);
+        if(games[2].actors[3].revive_progress>1)progress_seen=true;
+    }
+    assert(progress_seen&&!server.actors[3].dead&&server.actors[3].player.health==50);
+    for(int i=0;i<3;i++)assert(!games[i].actors[3].dead&&games[i].actors[3].player.health==50);
+    /* Tous les clients possèdent leur propre monde, comme quatre processus réels. */
+    game_actor_save(&server);
+    for(int id=0;id<MAX_PLAYERS;id++) {
+        int platform=id==3?2:(id==2?1:0);Box b=world->solids[world->platforms[platform].solid];
+        server.actors[id].player.body=(Body){{(b.min.x+b.max.x)/2+(id==1?.4f:0),b.max.y,(b.min.z+b.max.z)/2},{0,0,0},true};
+        server.actors[id].player.boost_timer=0;
+    }
+    server.current_actor=-1;game_actor_select(&server,0);
+    net_tick(host,&server,(Command){.weapon=4},FIXED_STEP,10);
+    for(int i=0;i<3;i++)transfer(host,i+1,clients[i],0,&games[i],10);
+    for(int tick=1;tick<=60;tick++) {
+        double now=10+(double)tick/60;
+        for(int i=0;i<3;i++) {
+            Command command={.weapon=4,.yaw=games[i].player.yaw,.pitch=games[i].player.pitch};
+            net_tick(clients[i],&games[i],command,FIXED_STEP,now);transfer(clients[i],0,host,i+1,&server,now);
+        }
+        net_tick(host,&server,(Command){.weapon=4},FIXED_STEP,now);
+        for(int i=0;i<3;i++) {
+            transfer(host,i+1,clients[i],0,&games[i],now);
+            assert(vlength(vsub(games[i].player.body.position,server.actors[i+1].player.body.position))<.05f);
+        }
+    }
+    game_end_rocket_event(&server);net_tick(host,&server,(Command){0},FIXED_STEP,12);
+    for(int i=0;i<3;i++){transfer(host,i+1,clients[i],0,&games[i],12);assert(!games[i].rocket_event&&games[i].player.weapon!=4);}
+    server.round_over=true;net_tick(host,&server,(Command){0},FIXED_STEP,15);
+    for(int i=0;i<3;i++){transfer(host,i+1,clients[i],0,&games[i],15);assert(clients[i]->phase==ROOM_FINISHED);}
+    assert(net_start(host,&server,16));
+    for(int i=0;i<3;i++){transfer(host,i+1,clients[i],0,&games[i],16);assert(clients[i]->round==2&&clients[i]->sequence==0);}
     Command stale={.sequence=900,.round=1};uint8_t body[64];size_t len=protocol_command_write(body,sizeof(body),&stale);
-    size_t size=frame(bytes,PACKET_INPUT,body,len);assert(net_feed(host,1,&server,bytes,size,6));assert(host->peers[1].count==0);
-    uint8_t invalid[4]={0,0,0,0};assert(!net_feed(host,1,&server,invalid,sizeof(invalid),6));
-    for(int i=0;i<3;i++){net_close(clients[i]);free(clients[i]);}net_close(host);free(host);
+    size_t size=frame(bytes,PACKET_INPUT,body,len);assert(net_feed(host,1,&server,bytes,size,16));assert(host->peers[1].count==0);
+    uint8_t invalid[4]={0,0,0,0};assert(!net_feed(host,1,&server,invalid,sizeof(invalid),16));
+    for(int i=0;i<3;i++){net_close(clients[i]);free(clients[i]);mesh_free(&guest_worlds[i].mesh);}net_close(host);free(host);
 }
 static int tcp_session(World *world) {
     Network *host=calloc(1,sizeof(*host)),*client=calloc(1,sizeof(*client));assert(host&&client);

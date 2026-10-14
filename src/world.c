@@ -33,7 +33,7 @@ static int neighbours(int i,int out[4]) {
     if(i<NAV_W*(NAV_H-1))out[n++]=i+NAV_W;
     return n;
 }
-void navigation_update(World *w,float x,float z) {
+static void navigation_fill(World *w,float x,float z,int16_t *distance) {
     int target=nav_index(x,z);
     if(!w->passable[target]) {
         float best=1e9f;
@@ -42,22 +42,34 @@ void navigation_update(World *w,float x,float z) {
             if(d<best){best=d;target=i;}
         }
     }
-    for(int i=0;i<NAV_W*NAV_H;i++)w->distance[i]=-1;
+    for(int i=0;i<NAV_W*NAV_H;i++)distance[i]=-1;
     int16_t queue[NAV_W*NAV_H];int head=0,tail=0;
-    queue[tail++]=(int16_t)target;w->distance[target]=0;
+    queue[tail++]=(int16_t)target;distance[target]=0;
     while(head<tail) {
         int current=queue[head++],next[4],n=neighbours(current,next);
-        for(int k=0;k<n;k++)if(w->passable[next[k]]&&w->distance[next[k]]<0) {
-            w->distance[next[k]]=(int16_t)(w->distance[current]+1);queue[tail++]=(int16_t)next[k];
+        for(int k=0;k<n;k++)if(w->passable[next[k]]&&distance[next[k]]<0) {
+            distance[next[k]]=(int16_t)(distance[current]+1);queue[tail++]=(int16_t)next[k];
         }
     }
 }
-Vec3 navigation_next(const World *w,float x,float z) {
-    int current=nav_index(x,z),best=current,d=w->distance[current],next[4],n=neighbours(current,next);
-    for(int k=0;k<n;k++)if(w->distance[next[k]]>=0&&(d<0||w->distance[next[k]]<d)) {
-        best=next[k];d=w->distance[next[k]];
+static Vec3 navigation_follow(const int16_t *distance,float x,float z) {
+    int current=nav_index(x,z),best=current,d=distance[current],next[4],n=neighbours(current,next);
+    for(int k=0;k<n;k++)if(distance[next[k]]>=0&&(d<0||distance[next[k]]<d)) {
+        best=next[k];d=distance[next[k]];
     }
     return nav_center(best);
+}
+void navigation_update(World *w,float x,float z) {
+    navigation_fill(w,x,z,w->distance);
+}
+Vec3 navigation_next(const World *w,float x,float z) {
+    return navigation_follow(w->distance,x,z);
+}
+void navigation_actor(World *w,int actor,Vec3 target) {
+    if(actor>=0&&actor<MAX_PLAYERS)navigation_fill(w,target.x,target.z,w->routes[actor]);
+}
+Vec3 navigation_for_actor(const World *w,int actor,float x,float z) {
+    return navigation_follow(actor>=0&&actor<MAX_PLAYERS?w->routes[actor]:w->distance,x,z);
 }
 static void wall_label(Mesh *m,const char *text,Vec3 position,float yaw,Color color,float scale) {
     float previous=m->glow;m->glow=.65f;
@@ -89,7 +101,7 @@ bool world_init(World *w) {
 }
 void world_set_map(World *w,int id) {
     if(id<0||id>=MAP_COUNT||id==w->map_id)return;
-    w->mesh.count=0;w->mesh.glow=0;w->solid_count=0;w->map_id=id;w->revision++;
+    w->mesh.count=0;w->mesh.glow=0;w->solid_count=0;w->platform_count=0;w->map_id=id;w->revision++;
     Mesh *m=&w->mesh;
     const Color accents[MAP_COUNT]={{.9f,.39f,.15f},{.63f,.3f,.93f},{.26f,.76f,.66f}};
     Color accent=accents[id];
@@ -221,5 +233,16 @@ void world_set_map(World *w,int id) {
         Vec3 p=nav_center(i);p.y=.35f;
         w->passable[i]=!world_blocked(w,p,.8f,ENEMY_HEIGHT,-1);w->distance[i]=-1;
     }
+
+    memset(w->routes,0xff,sizeof(w->routes));
+    const Platform lifts[MAX_PLATFORMS]={
+        {{5,0,-9},{3,.28f,3},{0,3.2f,0},8,0},
+        {{-5,0,9},{3,.28f,3},{0,3.2f,0},10,0},
+        {{0,0,10},{3,.28f,3},{5,0,0},9,0}};
+    for(int k=0;k<MAX_PLATFORMS;k++) {
+        w->platforms[k]=lifts[k];w->platforms[k].solid=w->solid_count++;
+        w->platform_count++;
+    }
+    world_platforms_update(w,0);
 
 }
