@@ -1,10 +1,32 @@
 # FASTFPS — Secteur zéro
 
-**FPS 3D natif, style Doom, pensé pour le Raspberry Pi 4.** Base à améliorer progressivement : déplacement nerveux, quatre armes principales et survie dans trois arènes industrielles. Version **1.1.0** : bombardiers, progression des armes aux vagues 11 / 21 / 31, noms des alliés plus lisibles et attaques animées plus expressives.
+**FPS 3D natif, style Doom, pensé pour le Raspberry Pi 4.** Base à améliorer progressivement : déplacement nerveux, quatre armes principales et survie dans trois arènes industrielles. Version **1.1.1** : vérification des mises à jour au démarrage et notification en français.
 
 Application en **C11**, **SDL2** (fenêtre, clavier, souris et son) et **OpenGL ES 2** (rendu 3D). Graphismes, police et bruitages sont générés localement. Les musiques MP3 sont lues avec **mpg123**.
 
 Le mode solo fonctionne hors ligne. Pour jouer ensemble, sélectionne **Multijoueur** ; voir [MULTIJOUEUR.md](MULTIJOUEUR.md) pour la création, la connexion sur Internet et les limites de cette première version.
+
+## Nouveautés — version 1.1.1
+
+Au démarrage, le jeu vérifie **une seule fois, en arrière-plan**, si une version plus récente est publiée sur la branche `main` de GitHub. Une petite requête HTTPS lit la version dans `src/config.h` ; les nombres sont comparés séparément, donc 1.10.0 est bien plus récent que 1.9.0. Le menu reste utilisable pendant la vérification.
+
+Si une mise à jour est disponible, une fenêtre **« Mise à jour disponible »** affiche la version installée et la version proposée :
+
+- **Voir la mise à jour** : ouvre les explications en français. **Copier les commandes** prépare la commande pour le dossier réel de ton installation, avec `git pull --ff-only origin main` puis `./lancer.sh`.
+- Colle cette commande dans un terminal **sans valider**, ferme le jeu, puis appuie sur **Entrée** dans le terminal. La copie reste ainsi utilisable même sur un bureau qui ne conserve pas le presse-papiers après la fermeture d'une application.
+- **Plus tard**, **Fermer** ou **Échap** retire la fenêtre pour le reste de ce lancement. Elle pourra réapparaître au prochain lancement si le jeu n'a pas été mis à jour.
+
+La notification attend un menu si la vérification se termine pendant le combat ou le choix de modules. Une courte protection contre les clics accidentels impose le relâchement du bouton et un délai avant l'activation des boutons. Elle est locale à chaque ordinateur ; l'hôte et les autres joueurs continuent leur session.
+
+La requête utilise **curl**, avec vérification des certificats HTTPS, un délai de connexion de 2 s, une limite de 4 s et une réponse limitée à 8 Ko. Sans Internet, sans curl, en cas d'erreur ou si la version est déjà à jour, aucune fenêtre ne s'affiche. Pour activer la vérification sur un Pi qui ne dispose pas encore de curl :
+
+```bash
+sudo apt install curl ca-certificates
+```
+
+Pour jouer sans cette vérification : `./lancer.sh --no-update-check`. Les modes `--demo` et `--frames`, ainsi que `--help` et `--version`, ne lancent pas de requête. Aucun téléchargement du jeu ni installation automatique n'est effectué ; la commande copiée attend ton exécution dans le terminal.
+
+**Il faut installer la 1.1.1 une première fois pour recevoir ces notifications lors des mises à jour suivantes.** La 1.1.0 ne possède pas encore ce mécanisme. La 1.1.1 conserve le protocole 10 et les règles de gameplay de la 1.1.0 : les deux versions restent compatibles en coopération. Voir [VALIDATION.md](VALIDATION.md) pour les contrôles et essais restant à faire.
 
 ## Nouveautés — version 1.1.0
 
@@ -281,6 +303,7 @@ Cinq appels de dessin par image : décor, objets mobiles, arme, agrandissement a
 ./lancer.sh --quality balanced
 ./lancer.sh --retro
 ./lancer.sh --mute
+./lancer.sh --no-update-check
 ./lancer.sh --difficulty hard
 ./lancer.sh --multiplayer
 ./lancer.sh --join fastfps://100.101.102.103:27015
@@ -340,7 +363,7 @@ Carte et paramètres sont actuellement dans les sources. Aucune option de compil
 
 Trois cartes et un mode survie solo ou coopératif, quatre armes permanentes par run, un lance-roquettes temporaire et un rechargement par chargeur. Collisions par boîtes, trajectoires parfois anguleuses. Pas encore de rampes, accroupissement, sauvegarde de partie ou manette.
 
-La coopération utilise un joueur hôte qui fait autorité sur le monde, un état d’entrée `Input`, des identifiants d’ennemis stables, une prédiction du déplacement et une interpolation à l’affichage. La connexion se fait par IPv4 et port TCP, sans service central dans le jeu. Tailscale utilise ses propres services de connexion et éventuellement de relais. La validation entre deux machines et sur Internet reste à faire : voir [VALIDATION.md](VALIDATION.md). La version 1.1.0 utilise le protocole 10, incompatible avec les versions précédentes. Tous les joueurs doivent avoir la même version de gameplay.
+La coopération utilise un joueur hôte qui fait autorité sur le monde, un état d’entrée `Input`, des identifiants d’ennemis stables, une prédiction du déplacement et une interpolation à l’affichage. La connexion se fait par IPv4 et port TCP, sans service central dans le jeu. Tailscale utilise ses propres services de connexion et éventuellement de relais. La validation entre deux machines et sur Internet reste à faire : voir [VALIDATION.md](VALIDATION.md). Les versions 1.1.0 et 1.1.1 utilisent le protocole 10 et restent compatibles entre elles, mais pas avec les versions 0.9.x. Tous les joueurs doivent avoir une version de gameplay compatible.
 
 Voir [ROADMAP.md](ROADMAP.md). Le prototype navigateur est conservé dans `prototype-web/` comme archive ; le lanceur principal utilise **l’application native**.
 

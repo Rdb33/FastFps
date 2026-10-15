@@ -1,4 +1,5 @@
 #include "fastfps.h"
+#include "updates.h"
 #include <math.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -286,7 +287,7 @@ void renderer_draw(Renderer *r,const Game *g,const App *app) {
     glUniform3f(r->light_color,0,0,0);glUniform3f(r->sector_color,.75f,.85f,1);
     glUniform3f(r->light_color2,0,0,0);glUniform3f(r->eye,0,0,0);
     glClear(GL_DEPTH_BUFFER_BIT);upload(r->gun_buffer,m);draw(r,r->gun_buffer,m->count,projection,0,0);
-    ui_build(&r->ui,g,app);ui_teammates(&r->ui,g,app,matrix);upload(r->ui_buffer,&r->ui);
+    ui_build(&r->ui,g,app);ui_teammates(&r->ui,g,app,matrix);updates_build(&r->ui,app);upload(r->ui_buffer,&r->ui);
     /* L'interface est dessinée après l'agrandissement, à la résolution de la fenêtre. */
     glBindFramebuffer(GL_FRAMEBUFFER,0);
     int width,height;SDL_GL_GetDrawableSize(r->window,&width,&height);

@@ -141,6 +141,7 @@ typedef struct {
 } Renderer;
 typedef enum { STATE_MENU, STATE_PLAYING, STATE_PAUSED, STATE_DEAD, STATE_NETWORK, STATE_LOBBY, STATE_UPGRADE } State;
 struct Network;
+struct UpdateChecker;
 typedef struct {
     State state;
     bool running, fullscreen, sound, capture_error, motion, modern;
@@ -151,6 +152,7 @@ typedef struct {
     Uint32 upgrade_ready_at;
     bool upgrade_released, upgrade_confirm;
     struct Network *network;
+    struct UpdateChecker *updates;
     int editing;
     bool select_all, network_help, show_build, music_notice_shown;
     int upgrade_choice;

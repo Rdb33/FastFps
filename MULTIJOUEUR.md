@@ -1,8 +1,8 @@
-# Salons coopératifs — version 1.1.0
+# Salons coopératifs — version 1.1.1
 
 Un joueur héberge un salon sur son ordinateur ; jusqu’à trois amis le rejoignent. L’hôte lance la partie quand les joueurs sont prêts. Le jeu utilise une **adresse IPv4 et un port TCP**, sans service central ni frais d’hébergement.
 
-Les joueurs doivent utiliser la même version du jeu et la même carte. **Tous les ordinateurs doivent être en 1.1.0** pour les bombardiers, les bombes et les nouveaux seuils de déblocage des armes. Le mouvement des plaques et l’élan au saut restent simulés par l’hôte puis prédits localement. Les couleurs, numéros, armes, poses et étiquettes des alliés sont dérivés des états répliqués.
+Les joueurs doivent utiliser une version de gameplay compatible et la même carte. **Les versions 1.1.0 et 1.1.1 partagent le protocole 10** pour les bombardiers, les bombes et les nouveaux seuils de déblocage des armes. La notification de mise à jour de la 1.1.1 est locale à chaque ordinateur, attend un écran de menu et ne suspend pas la partie de l’équipe. Le mouvement des plaques et l’élan au saut restent simulés par l’hôte puis prédits localement. Les couleurs, numéros, armes, poses et étiquettes des alliés sont dérivés des états répliqués.
 
 ## Depuis le menu
 
@@ -121,7 +121,7 @@ Les états du monde sont transmis environ **20 fois par seconde**. L’encodage 
 
 Cette première version utilise **TCP**, avec des sockets non bloquantes et `TCP_NODELAY`, pour garder un transport simple et fiable. Les pertes de paquets peuvent toutefois provoquer des retards de livraison : le passage à UDP avec des messages fiables ciblés sera à étudier si les parties réelles le demandent. Voir les références [TCP](https://man7.org/linux/man-pages/man7/tcp.7.html) et [connexion non bloquante](https://man7.org/linux/man-pages/man2/connect.2.html).
 
-Il reste à mesurer la latence réelle, le débit et la charge sur le Pi 4, surtout lorsqu’il héberge et affiche le jeu simultanément. Les effets de particules des tirs et explosions sont répliqués, en respectant la limite du profil graphique de chaque invité. Les dégâts et éliminations sont décidés par l’hôte. Le ping affiché mesure l’aller-retour TCP, avec un léger lissage. La version 1.1.0 utilise le protocole 10, incompatible avec toutes les versions précédentes : mets à jour chaque ordinateur. Les profils graphiques peuvent différer entre les joueurs.
+Il reste à mesurer la latence réelle, le débit et la charge sur le Pi 4, surtout lorsqu’il héberge et affiche le jeu simultanément. Les effets de particules des tirs et explosions sont répliqués, en respectant la limite du profil graphique de chaque invité. Les dégâts et éliminations sont décidés par l’hôte. Le ping affiché mesure l’aller-retour TCP, avec un léger lissage. Les versions 1.1.0 et 1.1.1 utilisent le protocole 10, incompatible avec les versions 0.9.x : mets à jour les ordinateurs restés sur ces anciennes versions. Les profils graphiques peuvent différer entre les joueurs.
 
 ## Contrôles disponibles
 
@@ -130,7 +130,7 @@ make test
 make test-tcp
 ```
 
-`make test` contrôle le protocole, les messages fragmentés, quatre joueurs, les transitions de map et de manche, la prédiction, les chargeurs, la transmission du champion / de l’événement et une réanimation effectuée par un invité sur un autre invité, avec un transport en mémoire. Il contrôle aussi les vies solo, déblocages, modules, sliders, saisie numérique, interruptions de réanimation, dégâts de zone bloqués par les murs, rocket jump, phases du champion, IA, plateformes et leurs collisions. Les contrôles de saisie utilisent une fenêtre SDL fictive. **Ces tests n’ont pas été exécutés pour la 1.1.0 et ne couvrent pas encore les bombes du bombardier** ; voir [VALIDATION.md](VALIDATION.md).
+`make test` contrôle le protocole, les messages fragmentés, quatre joueurs, les transitions de map et de manche, la prédiction, les chargeurs, la transmission du champion / de l’événement et une réanimation effectuée par un invité sur un autre invité, avec un transport en mémoire. Il contrôle aussi les vies solo, déblocages, modules, sliders, saisie numérique, interruptions de réanimation, dégâts de zone bloqués par les murs, rocket jump, phases du champion, IA, plateformes et leurs collisions. Les contrôles de saisie utilisent une fenêtre SDL fictive. **Ces tests n’ont pas été exécutés pour la 1.1.0 ou la 1.1.1 et ne couvrent pas encore les bombes du bombardier** ; voir [VALIDATION.md](VALIDATION.md).
 
 `make test-tcp` ouvre réellement un hôte et un client sur `127.0.0.1:37991`, sans fenêtre, et vérifie la connexion et les échanges. Le port doit être libre. Ce contrôle doit être lancé dans un environnement qui autorise les sockets.
 

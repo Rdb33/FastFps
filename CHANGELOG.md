@@ -1,3 +1,13 @@
+# Version 1.1.1
+
+- Vérification de version une fois au démarrage, sur un thread dédié : lecture HTTPS de la version publiée sur GitHub, avec curl facultatif, réponse limitée et délais courts. Démarrage et jeu hors ligne conservés.
+- Fenêtre en français uniquement si une version stable plus récente est disponible ; versions installée / proposée, explications, copie d'une commande de mise à jour et bouton Plus tard.
+- Notification différée jusqu'à un menu si le joueur est déjà en combat ; délai et relâchement des boutons contre les clics accidentels. Aucun téléchargement ou lancement automatique d'une commande de mise à jour.
+- Commande copiée adaptée au chemin de l'installation, avec protection des espaces et apostrophes, sans retour à la ligne final. Consigne de coller sans valider, fermer le jeu puis appuyer sur Entrée.
+- Option `--no-update-check` ; aucune vérification en démonstration ou lancement limité par `--frames`. Annulation du téléchargement et attente du thread à la fermeture.
+- Protocole 10 et gameplay 1.1.0 conservés ; compatibilité coopérative entre 1.1.0 et 1.1.1. Pas de nouvelle bibliothèque à la compilation ni de passe de rendu supplémentaire.
+- Compilation C11 et revue du diff ; tests, requête HTTPS réelle, affichage et essais Raspberry Pi non exécutés pour cette version.
+
 # Version 1.1.0
 
 - Fusil à pompe à la vague 11, mitrailleuse à la 21 et lance rail à la 31 ; notifications et disponibilité partagées avec la coopération.

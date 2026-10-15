@@ -1,6 +1,16 @@
 # Contrôles de FASTFPS
 
-Historique des contrôles sur la machine de développement, du 12 au 14 octobre 2026.
+Historique des contrôles sur la machine de développement, du 12 au 15 octobre 2026.
+
+## Version 1.1.1 — 15 octobre 2026
+
+- Compilation C11 avec `-O2 -Wall -Wextra -Wpedantic`, sans avertissement, et contrôle du diff.
+- Revue du cycle de vie : vérification démarrée après l'initialisation réussie du jeu, communication du résultat par atomique SDL, puis récupération du thread ; annulation et terminaison du processus curl lors de la fermeture.
+- Lecture HTTPS à destination fixe, sans shell : certificats vérifiés par curl, configuration curl personnelle désactivée, redirections HTTPS uniquement, connexion limitée à 2 s et transfert à 4 s. Le thread impose aussi une échéance de 5 s et une limite de réponse de 8 Ko. Réponse refusée en cas d'erreur ; comparaison stricte des trois composantes numériques d'une version stable.
+- Notification locale affichée sur les écrans de menu ; saisie et clics interceptés, choix protégé par un délai et le relâchement des touches. La simulation et le protocole de coopération restent ceux de la 1.1.0.
+- Revue de la commande copiée : chemin de l'installation déduit du binaire, espaces et apostrophes protégés, absence de retour à la ligne final, `git pull --ff-only` et relance uniquement si les étapes précédentes réussissent. Aucune commande de mise à jour exécutée par le jeu.
+- Aucun appel réseau pour `--demo`, `--frames`, `--help`, `--version` ou `--no-update-check`. Sans curl ou en cas d'échec réseau, le jeu poursuit son fonctionnement sans notification.
+- **Aucun test exécuté pour cette version.** Requête HTTPS réelle, affichage / clavier / souris du popup, conservation du presse-papiers, mise à jour d'un clone et performances sur Raspberry Pi restent à vérifier en utilisation. Aucun changement du protocole 10 ni nouvelle mesure de latence.
 
 ## Version 1.1.0 — 14 octobre 2026
 

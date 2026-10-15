@@ -1,5 +1,6 @@
 #include "fastfps.h"
 #include "network.h"
+#include "updates.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -135,12 +136,13 @@ static void help(void) {
         "  --demo                        Demonstration automatique\n"
         "  --frames N                    Quitter apres N images rendues\n"
         "  --screenshot chemin.bmp       Enregistrer la derniere image\n"
+        "  --no-update-check             Desactiver la verification de version\n"
         "  --help                        Afficher cette aide\n"
         "  --version                     Afficher la version\n");
 }
 int main(int argc,char **argv) {
     App app={.state=STATE_MENU,.running=true,.sound=true,.motion=true,.modern=true,.sensitivity=1,.brightness=1,.music_volume=0,.difficulty=1,.numeric_edit=-1,.slider_drag=-1};
-    bool demo=false,cli_mute=false,cli_fullscreen=false;int cli_quality=-1,cli_difficulty=-1,cli_modern=-1,frame_limit=0;
+    bool demo=false,cli_mute=false,cli_fullscreen=false,no_update_check=false;int cli_quality=-1,cli_difficulty=-1,cli_modern=-1,frame_limit=0;
     const char *screenshot=NULL,*join_address=NULL,*player_name=NULL;
     bool host=false,multiplayer=false;int room_port=0;
     for(int i=1;i<argc;i++) {
@@ -157,6 +159,7 @@ int main(int argc,char **argv) {
         }
         else if(strcmp(argv[i],"--demo")==0)demo=true;
         else if(strcmp(argv[i],"--mute")==0)cli_mute=true;
+        else if(strcmp(argv[i],"--no-update-check")==0)no_update_check=true;
         else if(strcmp(argv[i],"--fullscreen")==0)cli_fullscreen=true;
         else if(strcmp(argv[i],"--retro")==0)cli_modern=0;
         else if(strcmp(argv[i],"--modern")==0)cli_modern=1;
@@ -217,12 +220,16 @@ int main(int argc,char **argv) {
             app.state=STATE_LOBBY;network->discovery_requested=false;
         }
     }
+    UpdateChecker updates={0};app.updates=&updates;
+    if(!demo&&!frame_limit&&!no_update_check)updates_start(&updates);
     double frequency=(double)SDL_GetPerformanceFrequency();
     double previous=(double)SDL_GetPerformanceCounter()/frequency,last_render=previous-1,fps_start=previous;
     double accumulator=0;int rendered=0,fps_frames=0;bool show_fps=true;
     while(app.running) {
+        updates_poll(&app);
         SDL_Event event;
         while(SDL_PollEvent(&event)) {
+            if(updates_event(&app,&renderer,&event))continue;
             if(settings_event(&app,&renderer,&event))continue;
             if(lobby_event(&app,&game,&renderer,&event))continue;
             if(upgrade_event(&app,&game,&renderer,&event))continue;
@@ -272,6 +279,7 @@ int main(int argc,char **argv) {
         double now=(double)SDL_GetPerformanceCounter()/frequency;
         net_discovery_poll(network,now);net_poll(network,&game,now);lobby_sync(&app,&game);
         upgrade_sync(&app,&game,demo);
+        updates_poll(&app);
         double elapsed=fmin(now-previous,.1);previous=now;
         app.ui_time=fmodf(app.ui_time+(float)elapsed,600);
         if(app.state==STATE_PLAYING||app.state==STATE_UPGRADE||network->phase==ROOM_PLAYING) {
@@ -329,5 +337,6 @@ int main(int argc,char **argv) {
     }
     if(!demo&&frame_limit==0){settings_write(&app);network_preferences(&app,true);}
     if(frame_limit)SDL_Log("%d images / vague %d / score %d / %d creatures / FPS %d",rendered,game.wave,game.score,game.enemy_count,app.fps);
+    updates_shutdown(&updates);
     net_close(network);free(network);audio_shutdown();renderer_shutdown(&renderer);mesh_free(&world.mesh);SDL_Quit();return exit_code;
 }
