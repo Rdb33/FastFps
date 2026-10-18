@@ -1,3 +1,18 @@
+# Version 1.2.0
+
+- Attaques lourdes coordonnées par cible, délai entre menaces et vérification des zones voisines pour espacer les bombes et sauts de champion.
+- Réserves coopératives et arrivées progressives : jusqu'à 54 ennemis par vague, 18 actifs maximum, groupes de trois espacés de deux secondes et positions libres à distance des joueurs. Bonus de PV coopératif réduit de 15 à 10 % par joueur supplémentaire.
+- Difficulté progressive : réserve solo / coopérative dès la vague 9, jusqu’à 12 ennemis de plus ; PV +5,5 % de base par vague, plafond ×4,25 ; dégâts jusqu’à +40 % à la vague 31 (+25 % en Découverte), projectiles des invocateurs de 14 à 16 m/s. Délais des bombes et préparations d’attaque conservés.
+- Directions, distances et étages des deux derniers ennemis lorsque la réserve est épuisée. Indicateur de dégâts à quatre directions, arcs et flèches de 1,15 s, distinct du flash de dégâts.
+- Intermission de 10 secondes, protection contre les clics accidentels et confirmation conservées.
+- Réacteur central : 12 éliminations pour charger, E sur le socle, +15 PV à l'équipe debout, vitesse +15 % et vitesse de recharge +25 % pendant 15 s ; recharge de 45 s. Réanimation prioritaire.
+- Quais : bonus individuels alternant bouclier 30 / 12 s, prochain tir +65 % / 12 s, vitesse +20 % / 8 s. Retour en 30 s, emplacement adapté à chaque map, modèles géométriques animés, état et délais affichés.
+- Dix modules : Précision (munitions sur tête fatale), Assaut (dégâts après esquive), Alternance (premier tir après changement) et Perforation (une seconde cible, 45 à 85 % des dégâts) ajoutés aux six existants ; cinq rangs.
+- Défis facultatifs : aucune mise à terre, trois attaques légères interrompues, champion en moins de 25 s. Récompense commune de 400 + 25 × vague points, bouclier 15 / 12 s et célérité 8 s ; pas de pénalité d'échec.
+- Bonus temporaires suspendus entre les vagues pour conserver les récompenses pendant le choix des modules ; résultat des défis affiché dans ce choix.
+- Protocole 11 : états explicitement encodés et bornés. Résolution des objectifs, réserves et bonus sur l'hôte, prédiction des déplacements et représentation côté invité. Tous les joueurs doivent mettre à jour le jeu.
+- Compilation C11 et revue de code ; aucun test ni essai en partie exécuté pour cette version. Équilibrage, affichage, connexion entre machines et performances Pi restent à essayer. Pas de dépendance ou passe de rendu ajoutée.
+
 # Version 1.1.1
 
 - Vérification de version une fois au démarrage, sur un thread dédié : lecture HTTPS de la version publiée sur GitHub, avec curl facultatif, réponse limitée et délais courts. Démarrage et jeu hors ligne conservés.

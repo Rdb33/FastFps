@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: "Signaler une vulnérabilité en privé"
+    url: "https://github.com/Rdb33/FastFps/blob/main/SECURITY.md"
+    about: "Lire la procédure avant de partager des détails sensibles."
+  - name: "Aide multijoueur"
+    url: "https://github.com/Rdb33/FastFps/blob/main/MULTIJOUEUR.md"
+    about: "Créer un salon, rejoindre un ami et comprendre les connexions LAN ou Internet."

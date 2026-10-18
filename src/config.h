@@ -2,7 +2,7 @@
 #define FASTFPS_CONFIG_H
 
 /* Réglages de la première base : gameplay proche d'un Doom moderne. */
-#define GAME_VERSION "1.1.1"
+#define GAME_VERSION "1.2.0"
 #define MAP_COUNT 3
 #define STANDARD_WEAPONS 4
 #define WEAPON_ROCKET 4
@@ -32,10 +32,14 @@
 #define UPPER_PICKUP_RESPAWN_TIME 30.0f
 #define UPPER_DECK_HEIGHT 3.48f
 #define MAX_BARRELS 6
-#define UPGRADE_COUNT 6
+#define UPGRADE_COUNT 10
 #define UPGRADE_MAX_LEVEL 5
 #define UPGRADE_CHOICES 3
-#define INTERMISSION_TIME 15.0f
+#define INTERMISSION_TIME 10.0f
+#define REACTOR_CHARGE 12
+#define REACTOR_DURATION 15.0f
+#define MAX_WAVE_ENEMIES 54
+#define DAMAGE_DIRECTIONS 4
 #define UPGRADE_LOCK_TIME 1.0f
 #define NAV_W 28
 #define NAV_H 24

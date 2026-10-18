@@ -27,7 +27,7 @@ run: all
 clean:
 	rm -rf build
 
-TEST_SOURCES := tests/network.c src/network.c src/discovery.c src/protocol.c src/game.c src/presets.c src/ai.c src/mobility.c src/routes.c src/poses.c src/weapons.c src/progression.c src/physics.c src/world.c src/math.c src/mesh.c
+TEST_SOURCES := tests/network.c src/network.c src/discovery.c src/protocol.c src/game.c src/presets.c src/ai.c src/mobility.c src/routes.c src/poses.c src/weapons.c src/progression.c src/encounters.c src/physics.c src/world.c src/math.c src/mesh.c
 build/test-network: $(TEST_SOURCES) src/fastfps.h src/network.h src/config.h | check-deps
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) -I src $(TEST_SOURCES) $(LDLIBS) -o $@

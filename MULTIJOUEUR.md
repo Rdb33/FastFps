@@ -1,8 +1,14 @@
-# Salons coopératifs — version 1.1.1
+# Salons coopératifs — version 1.2.0
 
 Un joueur héberge un salon sur son ordinateur ; jusqu’à trois amis le rejoignent. L’hôte lance la partie quand les joueurs sont prêts. Le jeu utilise une **adresse IPv4 et un port TCP**, sans service central ni frais d’hébergement.
 
-Les joueurs doivent utiliser une version de gameplay compatible et la même carte. **Les versions 1.1.0 et 1.1.1 partagent le protocole 10** pour les bombardiers, les bombes et les nouveaux seuils de déblocage des armes. La notification de mise à jour de la 1.1.1 est locale à chaque ordinateur, attend un écran de menu et ne suspend pas la partie de l’équipe. Le mouvement des plaques et l’élan au saut restent simulés par l’hôte puis prédits localement. Les couleurs, numéros, armes, poses et étiquettes des alliés sont dérivés des états répliqués.
+**Tous les joueurs doivent utiliser la v1.2.0 (protocole 11)** ; les versions précédentes sont incompatibles. L'hôte gère les renforts, la coordination des attaques lourdes, les défis facultatifs, le réacteur, les bonus des quais et les dégâts. Les états de bonus et de charge, les réserves et les directions des impacts sont transmis aux invités. Le déplacement des joueurs, y compris les bonus de vitesse et l'élan des plateformes, reste prédit localement. Les nouvelles règles ne changent pas la manière de rejoindre un salon.
+
+Le réacteur se charge en équipe avec 12 éliminations ; **E sur le socle central**, lorsque la charge est pleine, donne aux joueurs debout +15 PV, +15 % de vitesse et +25 % de vitesse de recharge pendant 15 s. Recharge de 45 s. La réanimation d'un allié à proximité prend la priorité sur l'activation. Les défis réussis récompensent toute l'équipe debout ; les bonus des quais sont individuels et consommés par le premier joueur à portée.
+
+Les renforts ajoutent des ennemis en réserve selon l'effectif et, dès la vague 9, selon l'avancement de la partie, jusqu'à 54 sur une vague, mais jamais plus de **18 actifs**. Ils arrivent au plus par trois toutes les deux secondes lorsqu'une position sûre et des places sont disponibles. La vague ne se termine qu'une fois la réserve vide et les derniers ennemis éliminés. Les PV augmentent de 10 % par joueur supplémentaire, avec une progression par vague de 5,5 % de leur base jusqu’à ×4,25. Les dégâts progressent jusqu’à +40 % (+25 % en Découverte) à la vague 31. Les durées des bonus temporaires sont suspendues pendant les intermissions. Les directions des deux derniers ennemis apparaissent quand la réserve est vide.
+
+La notification de mise à jour reste locale, attend un menu et ne suspend pas la partie de l'équipe. Les couleurs, numéros, armes, poses et étiquettes des alliés restent dérivés des états répliqués.
 
 ## Depuis le menu
 
@@ -89,7 +95,7 @@ Si la connexion de l’hôte est derrière un NAT d’opérateur (CGNAT), une re
 
 Chaque joueur reçoit ses propres propositions après une vague terminée et sélectionne son module avec les touches 1 / 2 / 3 ou un clic, après une seconde de blocage et le relâchement du tir. Entrée ou le bouton Valider confirme le choix. La sélection est envoyée à l’hôte, qui applique le bonus et confirme le nouvel état. Les autres joueurs continuent à voir la même arène pendant cette intermission.
 
-Le choix dure au maximum 15 secondes ; la première proposition est sélectionnée automatiquement si nécessaire. Quand toute l’équipe a choisi, il reste trois secondes avant la vague suivante. Les modules restent installés après une réanimation. Relancer une partie depuis le salon remet toutes les améliorations à zéro.
+Le choix dure au maximum 10 secondes ; la première proposition est sélectionnée automatiquement si nécessaire. Quand toute l’équipe a choisi, il reste trois secondes avant la vague suivante. Les modules restent installés après une réanimation. Relancer une partie depuis le salon remet toutes les améliorations à zéro.
 
 Les champions apparaissent toutes les cinq vagues pour toute l’équipe. La map change pour tous au début des rounds 6, 11, 16, etc., avec reconstruction locale des collisions et du décor. Les armes se débloquent aux rounds 11, 21 et 31 ; chargeurs et rechargements sont suivis séparément par joueur et confirmés par l’hôte. Les points restent partagés, tandis que la santé, les modules, les éliminations personnelles et les impacts à la tête sont suivis par joueur.
 
@@ -121,7 +127,7 @@ Les états du monde sont transmis environ **20 fois par seconde**. L’encodage 
 
 Cette première version utilise **TCP**, avec des sockets non bloquantes et `TCP_NODELAY`, pour garder un transport simple et fiable. Les pertes de paquets peuvent toutefois provoquer des retards de livraison : le passage à UDP avec des messages fiables ciblés sera à étudier si les parties réelles le demandent. Voir les références [TCP](https://man7.org/linux/man-pages/man7/tcp.7.html) et [connexion non bloquante](https://man7.org/linux/man-pages/man2/connect.2.html).
 
-Il reste à mesurer la latence réelle, le débit et la charge sur le Pi 4, surtout lorsqu’il héberge et affiche le jeu simultanément. Les effets de particules des tirs et explosions sont répliqués, en respectant la limite du profil graphique de chaque invité. Les dégâts et éliminations sont décidés par l’hôte. Le ping affiché mesure l’aller-retour TCP, avec un léger lissage. Les versions 1.1.0 et 1.1.1 utilisent le protocole 10, incompatible avec les versions 0.9.x : mets à jour les ordinateurs restés sur ces anciennes versions. Les profils graphiques peuvent différer entre les joueurs.
+Il reste à mesurer la latence réelle, le débit et la charge sur le Pi 4, surtout lorsqu’il héberge et affiche le jeu simultanément. Les effets de particules des tirs et explosions sont répliqués, en respectant la limite du profil graphique de chaque invité. Les dégâts et éliminations sont décidés par l’hôte. Le ping affiché mesure l’aller-retour TCP, avec un léger lissage. La version 1.2.0 utilise le protocole 11, incompatible avec toutes les versions précédentes : mets à jour tous les ordinateurs avant de jouer. Les profils graphiques peuvent différer entre les joueurs.
 
 ## Contrôles disponibles
 
@@ -130,7 +136,7 @@ make test
 make test-tcp
 ```
 
-`make test` contrôle le protocole, les messages fragmentés, quatre joueurs, les transitions de map et de manche, la prédiction, les chargeurs, la transmission du champion / de l’événement et une réanimation effectuée par un invité sur un autre invité, avec un transport en mémoire. Il contrôle aussi les vies solo, déblocages, modules, sliders, saisie numérique, interruptions de réanimation, dégâts de zone bloqués par les murs, rocket jump, phases du champion, IA, plateformes et leurs collisions. Les contrôles de saisie utilisent une fenêtre SDL fictive. **Ces tests n’ont pas été exécutés pour la 1.1.0 ou la 1.1.1 et ne couvrent pas encore les bombes du bombardier** ; voir [VALIDATION.md](VALIDATION.md).
+`make test` contrôle le protocole, les messages fragmentés, quatre joueurs, les transitions de map et de manche, la prédiction, les chargeurs, la transmission du champion / de l’événement et une réanimation effectuée par un invité sur un autre invité, avec un transport en mémoire. Il contrôle aussi les vies solo, déblocages, modules, sliders, saisie numérique, interruptions de réanimation, dégâts de zone bloqués par les murs, rocket jump, phases du champion, IA, plateformes et leurs collisions. Les contrôles de saisie utilisent une fenêtre SDL fictive. **Ces tests n’ont pas été exécutés pour la 1.1.0, la 1.1.1 ou la 1.2.0 et ne couvrent pas encore les bombes ni les nouvelles mécaniques de la 1.2.0** ; voir [VALIDATION.md](VALIDATION.md).
 
 `make test-tcp` ouvre réellement un hôte et un client sur `127.0.0.1:37991`, sans fenêtre, et vérifie la connexion et les échanges. Le port doit être libre. Ce contrôle doit être lancé dans un environnement qui autorise les sockets.
 

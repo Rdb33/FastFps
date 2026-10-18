@@ -127,9 +127,13 @@ static void reconcile(Network *n,Game *g,const uint8_t *data,size_t size,double 
     for(int i=0;i<MAX_PLAYERS;i++)if(i!=n->local_id&&snapshot.actors[i].shots!=n->previous.actors[i].shots)
         audio_play_at(snapshot.actors[i].player.weapon?SOUND_SHOTGUN:SOUND_SHOT,snapshot.actors[i].player.body.position);
     const Actor *local=&snapshot.actors[n->local_id],*old=&n->previous.actors[n->local_id];
-    if(local->player.health<old->player.health)audio_play(SOUND_HURT);
+    if(local->player.health<old->player.health||(local->player.shield<old->player.shield&&local->damage_time>old->damage_time+.02f))audio_play(SOUND_HURT);
     if(local->player.health>old->player.health&&!old->dead)audio_play(SOUND_PICKUP);
     if(player_level(&local->player)>player_level(&old->player))audio_play(SOUND_UPGRADE);
+    if(local->player.shield>old->player.shield||local->player.power_time>old->player.power_time+.2f
+        ||local->player.speed_time>old->player.speed_time+.2f)audio_play(SOUND_PICKUP);
+    if(snapshot.reactor_cooldown>n->previous.reactor_cooldown+.5f
+        ||(snapshot.challenge_state==1&&n->previous.challenge_state==0))audio_play(SOUND_UPGRADE);
     if(local->kill_time>old->kill_time+.02f)audio_play(SOUND_KILL);
     else if(local->headshot_time>old->headshot_time+.02f)audio_play(SOUND_HEADSHOT);
     else if(local->hit_time>old->hit_time+.02f)audio_play(SOUND_HIT);
@@ -403,6 +407,10 @@ void net_render(const Network *n,const Game *g,Game *view,double now) {
     if(n->mode!=NET_CLIENT||!n->has_snapshot)return;
     float age=clampf((float)(now-n->snapshot_time),0,.1f);
     view->time=n->current.time+age;
+    view->reactor_cooldown=fmaxf(0,view->reactor_cooldown-age);
+    view->challenge_deadline=fmaxf(0,view->challenge_deadline-age);
+    view->challenge_notice=fmaxf(0,view->challenge_notice-age);
+    for(int i=0;i<MAX_DECKS;i++)view->supplies[i].cooldown=fmaxf(0,view->supplies[i].cooldown-age);
     for(int i=0;i<view->bomb_count;i++)view->bombs[i].time=fmaxf(.001f,view->bombs[i].time-age);
     for(int i=0;i<view->enemy_count;i++)view->enemies[i].attack_timer=fmaxf(0,view->enemies[i].attack_timer-age);
     for(int i=0;i<view->barrel_count;i++)view->barrels[i].explosion_time=fmaxf(0,view->barrels[i].explosion_time-age);

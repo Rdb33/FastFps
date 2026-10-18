@@ -11,16 +11,18 @@ int player_level(const Player *p){int level=1;for(int i=0;i<UPGRADE_COUNT;i++)le
 float enemy_size(const Enemy *e){return (e->type==ENEMY_BRUTE?1.3f:(e->type==ENEMY_BOMBER?1.15f:1))*(e->elite?1.22f:1);}
 
 const char *upgrade_name(int id) {
-    static const char *names[]={"SURCHARGE","CADENCE","REFLEXES","VITALITE","BLINDAGE","VAMPIRISME"};
+    static const char *names[]={"SURCHARGE","CADENCE","REFLEXES","VITALITE","BLINDAGE","VAMPIRISME","PRECISION","ASSAUT","ALTERNANCE","PERFORATION"};
     return id>=0&&id<UPGRADE_COUNT?names[id]:"MODULE";
 }
 const char *upgrade_description(int id) {
     static const char *text[]={"DEGATS DES ARMES +12%","CADENCE DE TIR +10%","ESQUIVE -10% / VITESSE +3%",
-        "SANTE MAX +15 / SOIN +15","DEGATS RECUS -6%","ELIMINATION : +1 SANTE"};
+        "SANTE MAX +15 / SOIN +15","DEGATS RECUS -6%","ELIMINATION : +1 SANTE",
+        "TETE FATALE : +1 MUNITION", "APRES ESQUIVE : DEGATS +8%",
+        "CHANGER : PREMIER TIR +10%", "TRAVERSE 1 / 2E : 35% +10%"};
     return id>=0&&id<UPGRADE_COUNT?text[id]:"";
 }
 Color upgrade_color(int id) {
-    static const Color colors[]={{1,.46f,.18f},{1,.78f,.24f},{.27f,.83f,1},{.4f,1,.53f},{.54f,.63f,1},{.83f,.42f,1}};
+    static const Color colors[]={{1,.46f,.18f},{1,.78f,.24f},{.27f,.83f,1},{.4f,1,.53f},{.54f,.63f,1},{.83f,.42f,1},{.4f,1,1},{1,.35f,.22f},{1,.8f,.4f},{.7f,.55f,1}};
     return id>=0&&id<UPGRADE_COUNT?colors[id]:(Color){.7f,.7f,.6f};
 }
 
@@ -127,6 +129,10 @@ void upgrade_ui(Mesh *m,const Game *g,const App *app) {
     centered(m,67,3,(Color){.92f,.96f,1},"CHOISIS TON MODULE");
     snprintf(text,sizeof(text),"NIVEAU %d -> %d / UNE AMELIORATION POUR CETTE PARTIE",player_level(p),player_level(p)+1);
     centered(m,100,1,(Color){.6f,.72f,.79f},text);
+    if(g->challenge_state==1) {
+        snprintf(text,sizeof(text),"DEFI REUSSI / +%d POINTS / BONUS CONSERVES POUR LE COMBAT",400+25*g->wave);
+        centered(m,112,1,(Color){.45f,1,.65f},text);
+    }
     for(int i=0;i<UPGRADE_CHOICES;i++) {
         int id=p->offers[i];Color c=upgrade_color(id);float x=42+(float)i*188;
         bool selected=app->selected==i;

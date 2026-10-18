@@ -27,7 +27,8 @@ static void shadow(Mesh *m,const World *world,Vec3 p,float radius) {
 void animate_arena(Mesh *m,const Game *g,const App *app) {
     float time=g->time;
     if(app->state==STATE_MENU||app->state==STATE_NETWORK||app->state==STATE_LOBBY)time+=app->ui_time;
-    Color theme=sector_theme(g->wave);
+    Color theme=g->reactor_cooldown>30?(Color){.45f,1,.65f}:
+        (g->reactor_charge==REACTOR_CHARGE?(Color){1,.8f,.3f}:sector_theme(g->wave));
     Vec3 core={0,4.15f,0};
     float pulse=.88f+.12f*sinf(time*2.2f);
     Color glow={theme.r*pulse,theme.g*pulse,theme.b*pulse};
@@ -160,5 +161,6 @@ void animate_arena(Mesh *m,const Game *g,const App *app) {
         float age=2.8f-g->wave_clear_time;
         mesh_ring(m,(Vec3){0,1.86f,0},.4f+age*1.9f,.085f,(Color){.45f,.9f,.72f},32);
     }
+    encounters_draw(m,g);
     m->glow=0;
 }

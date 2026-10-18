@@ -4,3 +4,4 @@ __pycache__/
 build/
 *.bmp
 /sleep.sh
+/assets/music/*.mp3

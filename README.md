@@ -1,10 +1,67 @@
 # FASTFPS — Secteur zéro
 
-**FPS 3D natif, style Doom, pensé pour le Raspberry Pi 4.** Base à améliorer progressivement : déplacement nerveux, quatre armes principales et survie dans trois arènes industrielles. Version **1.1.1** : vérification des mises à jour au démarrage et notification en français.
+**FPS 3D natif, style Doom, pensé pour le Raspberry Pi 4.** Base à améliorer progressivement : déplacement nerveux, quatre armes principales et survie dans trois arènes industrielles. Version **1.2.0** : nouveaux modules, objectifs facultatifs, réacteur utile et coopération rééquilibrée.
 
-Application en **C11**, **SDL2** (fenêtre, clavier, souris et son) et **OpenGL ES 2** (rendu 3D). Graphismes, police et bruitages sont générés localement. Les musiques MP3 sont lues avec **mpg123**.
+Application en **C11**, **SDL2** (fenêtre, clavier, souris et son) et **OpenGL ES 2** (rendu 3D). Graphismes, police et bruitages sont générés localement. Les musiques MP3 locales et facultatives sont lues avec **mpg123**.
 
 Le mode solo fonctionne hors ligne. Pour jouer ensemble, sélectionne **Multijoueur** ; voir [MULTIJOUEUR.md](MULTIJOUEUR.md) pour la création, la connexion sur Internet et les limites de cette première version.
+
+## Licence et musiques
+
+Le code et la documentation originaux de FastFps sont sous [licence MIT](LICENSE). Les dépendances et les contenus tiers conservent leurs propres conditions ; voir [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+Les deux morceaux de **Buckshot Roulette** ne sont pas distribués dans la version actuelle du dépôt. Pour jouer avec de la musique, place des fichiers MP3 dont tu as les droits d'utilisation et de redistribution adaptés dans `assets/music/menu.mp3` et `assets/music/gameplay.mp3`. Ces fichiers locaux sont ignorés par Git. Le lecteur, le volume et les fondus restent disponibles ; sans ces fichiers, le jeu fonctionne avec ses bruitages.
+
+Si tu mets à jour un ancien clone contenant les morceaux, copie-les d'abord **hors du dépôt** si tu souhaites conserver tes fichiers personnels : Git retirera les anciennes copies suivies lors de la mise à jour. Les anciens commits peuvent encore contenir ces morceaux ; leur retrait de la version actuelle n'efface pas l'historique Git.
+
+## Participer au projet
+
+Les contributions et retours de jeu sont bienvenus. Consulte le [guide de contribution](CONTRIBUTING.md), le [code de conduite](CODE_OF_CONDUCT.md) et les [formulaires de bugs et propositions](https://github.com/Rdb33/FastFps/issues/new/choose). Les échanges peuvent être en français ou en anglais ; les textes du jeu restent en français.
+
+Pour un signalement sensible, suis la [politique de sécurité](SECURITY.md). Les [notices tierces](THIRD_PARTY_NOTICES.md) précisent notamment la provenance et les droits des musiques de Buckshot Roulette. Les [réglages GitHub de communauté](.github/COMMUNITY_SETUP.md) décrivent la description du dépôt et l'activation des signalements privés.
+
+## Nouveautés — version 1.2.0
+
+### Combats et rythme
+
+- **Attaques lourdes coordonnées** : bombes et sauts de champion ne commencent plus simultanément sur une même cible. Un délai par joueur et une vérification des zones proches espacent ces menaces ; les bombes déjà lancées restent dangereuses même après la mort de leur créateur. Se déplacer dans une zone déjà annoncée reste risqué.
+- **Renforts progressifs** : le groupe initial compte de 2 à 18 ennemis selon la vague et la difficulté. Dès la vague 9, une réserve de fin de partie augmente d’un ennemi toutes les deux vagues, jusqu’à 12, en solo comme en coopération. Chaque joueur supplémentaire ajoute aussi `3 + vague / 3` ennemis, avec un maximum de **54 ennemis sur la vague**. Les réservistes arrivent par groupes de trois au plus, espacés de deux secondes, lorsque des places et des positions sûres se libèrent. **18 ennemis actifs maximum** ; la réserve est affichée et la vague attend leur élimination. Les PV gagnent seulement **10 % par joueur supplémentaire**, contre 15 % auparavant.
+- **Deux derniers ennemis** : une indication « Devant / À gauche / À droite / Derrière », la distance et l'étage facilitent leur recherche lorsque la réserve est vide.
+- **Dégâts directionnels** : jusqu'à quatre arcs et flèches autour du viseur, orientés vers les sources et conservés pendant **1,15 s**. Leur orientation suit la caméra ; le flash de dégâts court reste séparé de l'indicateur.
+- **Choix de module en 10 secondes** : protection d'une seconde, relâchement du tir puis confirmation conservés. Quand toute l'équipe a choisi, l'attente est ramenée à trois secondes.
+
+### Une difficulté qui accompagne la progression
+
+La résistance progresse de **5,5 % de la santé de base par vague après la première**, jusqu'à un multiplicateur de **4,25**, au lieu de 4,5 % et d'un plafond à 3. Les dégâts reçus montent graduellement jusqu'à **+40 % à la vague 31** en Normal / Brutal, et **+25 % en Découverte**, avant l'armure et le bouclier. Les projectiles des invocateurs passent progressivement de **14 à 16 m/s**. Les trois secondes de chute des bombes, leur recharge de cinq secondes et les préparations d'attaques sont conservées pour permettre l'esquive.
+
+À difficulté normale, la vague 11 comporte **20 ennemis en solo / 38 à quatre**, la 21 **25 / 54**, et la 31 **30 / 54** ; jamais plus de 18 à la fois. Cette progression dépend de la vague et de l'effectif : elle ne retire pas le bénéfice du module choisi. L'équilibrage reste à ajuster d'après les retours de jeu.
+
+### Réacteur et bonus des plateformes
+
+Le réacteur central se charge avec **12 éliminations d'équipe**, y compris entre les vagues. Une fois prêt, monte sur son socle et appuie sur **E**, à moins de 3,4 m du centre. La réanimation d'un allié à proximité garde la priorité. Le réacteur soigne immédiatement chaque joueur debout de **15 PV**, puis donne **+15 % de vitesse et +25 % de vitesse de recharge pendant 15 secondes**. Il recharge pendant **45 s** avant de pouvoir accumuler de nouvelles éliminations. Les repères au sol et le cristal changent de couleur selon son état.
+
+Les deux quais en hauteur de chaque map proposent aussi des **bonus géométriques colorés**, distincts des soins :
+
+| Bonus | Effet |
+| --- | --- |
+| Bouclier bleu | Absorbe jusqu'à 30 points de dégâts pendant 12 s, après l'armure et le multiplicateur de difficulté |
+| Surtension rose | +65 % de dégâts au prochain tir, à utiliser sous 12 s ; tous les plombs d'un même tir en profitent |
+| Célérité verte | +20 % de vitesse pendant 8 s ; se combine avec le bonus du réacteur |
+
+Un bonus est consommé pour le joueur qui l'atteint. Il revient après **30 secondes**, en changeant de type. Les emplacements suivent les quais de chaque map. Les durées des bonus temporaires sont suspendues entre les vagues, pour conserver les récompenses pendant le choix des modules. Ces bonus sont retirés à la mise à terre ; les modules sont conservés.
+
+### Modules et défis facultatifs
+
+Quatre modules rejoignent les six existants, chacun jusqu'au rang 5 :
+
+- **Précision** : une élimination par tir à la tête rend une munition par rang, sans dépasser la capacité du chargeur.
+- **Assaut** : +8 % de dégâts par rang pendant les **1,25 s** suivant une esquive réussie.
+- **Alternance** : +10 % de dégâts par rang sur le premier tir après un changement d'arme, à utiliser sous **2,5 s**.
+- **Perforation** : les tirs instantanés peuvent traverser **un ennemi supplémentaire**. La seconde cible reçoit 35 % + 10 points de pourcentage par rang, soit **45 à 85 %** des dégâts ; les murs et barils arrêtent le tir. Les roquettes gardent leurs dégâts de zone.
+
+À partir de la vague 2, un défi d'équipe accompagne la vague : **aucune mise à terre**, **interrompre trois attaques**, ou **vaincre le champion en moins de 25 s** lors des vagues de champion. Toucher un ennemi pendant la préparation de son attaque légère annule cette attaque ; une bombe larguée ou un saut de champion ne peut pas être annulé ainsi. Une réussite rapporte **400 + 25 × vague points** et donne aux joueurs debout **15 points de bouclier pendant 12 s et 8 s de célérité**. Un échec n'arrête pas la partie et ne retire pas de points.
+
+**Multijoueur : protocole 11, v1.2.0 requise sur toutes les machines.** Renforts, objectifs, réacteur, objets et dégâts sont décidés par l'hôte ; les invités prédisent leur déplacement et affichent les états reçus. Les armes restent débloquées aux vagues **11 / 21 / 31**, et les maps changent toutes les cinq vagues. Aucun service réseau ni dépendance supplémentaire. Voir [VALIDATION.md](VALIDATION.md) pour les limites de validation.
 
 ## Nouveautés — version 1.1.1
 
@@ -104,7 +161,7 @@ La **0.8** utilisait le **protocole réseau 7** ; la **1.1.0** utilise le **prot
 - **Coopération : réanimation par un allié avec E ; game over dès que tous les joueurs actifs sont à terre simultanément.** Chaque joueur peut revenir au salon ; l’hôte peut lancer une nouvelle partie. Un joueur isolé dans un salon suit cette règle de coopération.
 - **Trois maps** : Réacteur (plateforme et piliers), Fonderie (lignes de machines et passages latéraux), Bastion (murs décalés et couvertures). Réacteur pour les rounds 1–5, Fonderie pour 6–10, Bastion pour 11–15, puis le cycle recommence. Chaque changement replace l’équipe à une position libre, avec deux secondes de protection.
 - **Difficulté accrue** : jusqu’à 18 ennemis, courses et projectiles plus rapides, résistance croissante et dégâts augmentés en Normal / Brutal. Les soins donnent 25 PV, reviennent après 18 secondes et les fins de vague rendent 10 PV.
-- **Modules protégés contre les clics accidentels** : une seconde de blocage, relâchement du tir, puis sélection d’une carte. Confirme avec **Entrée ou le bouton Valider**, situé sous les cartes. Cliquer plusieurs fois sur une carte ne l’installe pas. La sélection automatique après 15 secondes reste annoncée à l’écran ; le module installé apparaît par son nom.
+- **Modules protégés contre les clics accidentels** : une seconde de blocage, relâchement du tir, puis sélection d’une carte. Confirme avec **Entrée ou le bouton Valider**, situé sous les cartes. Cliquer plusieurs fois sur une carte ne l’installe pas. La sélection automatique après 10 secondes reste annoncée à l’écran ; le module installé apparaît par son nom.
 - **Luminosité de 50 à 200 %** et **sensibilité de 0,30 à 3,00** : glisse les sliders, clique sur la valeur pour la saisir, puis valide avec Entrée. Les valeurs dépassant les limites sont ramenées aux bornes ; une saisie invalide conserve le réglage précédent. Échap annule la saisie. Flèches gauche / droite pour ajuster au clavier, Entrée sur la ligne pour écrire. Réglages sauvegardés à la fermeture normale du jeu.
 
 ### Armes et rechargement
@@ -144,7 +201,7 @@ Pour essayer le nouveau compromis sur le Pi :
 
 ## Progression pendant la partie — version 0.5
 
-Après chaque vague terminée, chaque joueur choisit un module parmi trois propositions. Après le délai de protection, clique sur une carte ou utilise **1 / 2 / 3** pour la sélectionner ; confirme avec **Entrée ou le bouton Valider**. Les flèches permettent aussi de choisir avant Entrée. Tu as jusqu’à **15 secondes** ; à expiration, la première proposition est appliquée. Quand tous les joueurs ont choisi, la prochaine vague commence après un compte à rebours de trois secondes.
+Après chaque vague terminée, chaque joueur choisit un module parmi trois propositions. Après le délai de protection, clique sur une carte ou utilise **1 / 2 / 3** pour la sélectionner ; confirme avec **Entrée ou le bouton Valider**. Les flèches permettent aussi de choisir avant Entrée. Tu as jusqu’à **10 secondes** ; à expiration, la première proposition est appliquée. Quand tous les joueurs ont choisi, la prochaine vague commence après un compte à rebours de trois secondes.
 
 | Module | Bonus par rang |
 | --- | --- |
@@ -154,6 +211,10 @@ Après chaque vague terminée, chaque joueur choisit un module parmi trois propo
 | Vitalité | +15 santé maximum et +15 santé à l’installation |
 | Blindage | −6 % de dégâts reçus |
 | Vampirisme | +1 santé par élimination et par rang |
+| Précision | +1 munition par rang sur une élimination par tir à la tête |
+| Assaut | +8 % de dégâts par rang pendant 1,25 s après une esquive |
+| Alternance | +10 % de dégâts par rang sur le premier tir après changement, sous 2,5 s |
+| Perforation | Une cible supplémentaire ; 45 à 85 % des dégâts selon le rang |
 
 Chaque module a **cinq rangs**. Les bonus s’additionnent par rang ; tu peux ainsi orienter ton personnage vers les dégâts, la mobilité ou la survie. Le niveau du personnage augmente à chaque module installé. **Tab** affiche ta configuration actuelle. Les améliorations restent actives après une réanimation en coopération et sont remises à zéro au début d’une nouvelle partie.
 
@@ -230,6 +291,7 @@ Le Pi 4 possède un GPU compatible OpenGL ES ([documentation Raspberry Pi](https
 | Frappe au corps à corps | F ; une élimination rend 10 points de santé |
 | Choisir une arme disponible | 1 / 2 / 3 / 4 / 5 ; molette pour changer |
 | Réanimer un allié en coopération | E maintenu pendant 2,5 secondes, près du corps |
+| Activer le réacteur chargé | E sur le socle central ; priorité à la réanimation |
 | Recharger | R ; automatiquement lorsque le chargeur est vide |
 | Choisir un module entre les vagues | Clic, 1 / 2 / 3 ou flèches ; Entrée / bouton Valider pour confirmer |
 | Afficher / masquer les modules installés | Tab |
@@ -363,7 +425,7 @@ Carte et paramètres sont actuellement dans les sources. Aucune option de compil
 
 Trois cartes et un mode survie solo ou coopératif, quatre armes permanentes par run, un lance-roquettes temporaire et un rechargement par chargeur. Collisions par boîtes, trajectoires parfois anguleuses. Pas encore de rampes, accroupissement, sauvegarde de partie ou manette.
 
-La coopération utilise un joueur hôte qui fait autorité sur le monde, un état d’entrée `Input`, des identifiants d’ennemis stables, une prédiction du déplacement et une interpolation à l’affichage. La connexion se fait par IPv4 et port TCP, sans service central dans le jeu. Tailscale utilise ses propres services de connexion et éventuellement de relais. La validation entre deux machines et sur Internet reste à faire : voir [VALIDATION.md](VALIDATION.md). Les versions 1.1.0 et 1.1.1 utilisent le protocole 10 et restent compatibles entre elles, mais pas avec les versions 0.9.x. Tous les joueurs doivent avoir une version de gameplay compatible.
+La coopération utilise un joueur hôte qui fait autorité sur le monde, un état d’entrée `Input`, des identifiants d’ennemis stables, une prédiction du déplacement et une interpolation à l’affichage. La connexion se fait par IPv4 et port TCP, sans service central dans le jeu. Tailscale utilise ses propres services de connexion et éventuellement de relais. La validation entre deux machines et sur Internet reste à faire : voir [VALIDATION.md](VALIDATION.md). La **1.2.0 utilise le protocole 11**, incompatible avec les versions précédentes. Tous les joueurs doivent installer la 1.2.0.
 
 Voir [ROADMAP.md](ROADMAP.md). Le prototype navigateur est conservé dans `prototype-web/` comme archive ; le lanceur principal utilise **l’application native**.
 

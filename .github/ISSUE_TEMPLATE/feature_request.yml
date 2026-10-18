@@ -1,0 +1,30 @@
+name: "Proposer une amélioration"
+description: "Proposer une évolution du gameplay, de l'interface, des graphismes ou du réseau."
+title: "[Idée] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        FastFps vise un FPS nerveux, des graphismes géométriques et la compatibilité Raspberry Pi 4, en solo et en coopération. Explique le bénéfice pour les joueurs.
+  - type: textarea
+    id: problem
+    attributes:
+      label: "Besoin ou problème rencontré"
+      description: "Dans quelle situation cette amélioration aiderait-elle ?"
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: "Solution proposée"
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: "Raspberry Pi et coopération"
+      description: "Effets possibles sur les performances, les commandes, l'hôte / les invités et les textes français. Une estimation n'a pas besoin d'être une mesure."
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: "Alternatives, exemples ou maquettes"

@@ -2,6 +2,17 @@
 
 Historique des contrôles sur la machine de développement, du 12 au 15 octobre 2026.
 
+## Version 1.2.0 — 15 octobre 2026
+
+- Compilation C11 avec `-O2 -Wall -Wextra -Wpedantic`, sans avertissement ; revue du diff et des nouveaux fichiers.
+- Revue des limites : tableau de 18 ennemis actifs conservé, réserve bornée à 54 sur la vague, trois apparitions par fenêtre de deux secondes, recherche de positions libres hors du rayon de neuf mètres des joueurs. Une réserve non vide empêche la fin de vague.
+- Revue de la courbe de difficulté : PV +5,5 % de base par vague jusqu’à ×4,25, dégâts bornés à +40 % / +25 % selon la difficulté, vitesse des projectiles bornée à 16 m/s et réserve de fin de partie plafonnée à 12 avant le bonus d’effectif. Les bonus temporaires ne se consument pas pendant l’intermission.
+- Coordination des bombes / sauts à la création, par délai de cible et zones voisines. Les dangers déjà annoncés restent fixes et peuvent être traversés par un joueur ; le système n'empêche pas de rejoindre volontairement une zone dangereuse.
+- Réacteur, objets, défis, dégâts et bonus de modules résolus dans la simulation autoritaire ; seule la décroissance locale des bonus et le déplacement sont prédits. E utilise l'entrée existante, avec front d'appui pour le réacteur et priorité à la réanimation.
+- Protocole 11 avec encodage explicite des nouveaux compteurs, bonus, charge, objectifs et directions d'impacts ; contrôle de bornes avant acceptation et reconstruction des collisions. Buffers réseau et tableaux graphiques conservés.
+- Rendu ajouté aux maillages existants ; aucune texture téléchargée ni nouvelle dépendance. Textes en français ; panneau Tab adapté aux dix modules.
+- **Aucun test ni essai en partie exécuté pour cette version.** À essayer : les trois quais / maps et la collecte des bonus, réacteur en solo et avec plusieurs joueurs, modules combinés, armes aux vagues 11 / 21 / 31, difficulté des défis, vagues avec réserves, bouclier / mise à terre / réanimation, lisibilité des impacts et lissage des invités. Connexion réelle entre machines, débit et FPS Pi restent à mesurer.
+
 ## Version 1.1.1 — 15 octobre 2026
 
 - Compilation C11 avec `-O2 -Wall -Wextra -Wpedantic`, sans avertissement, et contrôle du diff.

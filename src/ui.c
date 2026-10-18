@@ -31,7 +31,7 @@ void ui_build(Mesh *m,const Game *g,const App *app) {
     if(app->state==STATE_PLAYING||app->state==STATE_UPGRADE) {
         mesh_rect(m,0,0,640,30,(Color){.05f,.055f,.045f});
         snprintf(text,sizeof(text),"FASTFPS / %s",world_map_name(g->map_id));mesh_text(m,12,11,1,orange,text);
-        snprintf(text,sizeof(text),"SECTEUR %02d / VAGUE %02d / %d ENNEMIS",(g->wave?g->wave-1:0)/5+1,g->wave,g->enemy_count);centered(m,11,1,ink,text);
+        snprintf(text,sizeof(text),"VAGUE %02d / %d ENNEMIS",g->wave,g->enemy_count+g->reinforcements);centered(m,11,1,ink,text);
         mesh_rect(m,0,30,640,2,(Color){.12f,.16f,.19f});
         mesh_rect(m,0,30,640*(float)(g->completed_waves%5)/5,2,(Color){.35f,.72f,.86f});
         snprintf(text,sizeof(text),"SCORE %05d",g->score);mesh_text(m,640-(float)strlen(text)*6-12,11,1,ink,text);
@@ -67,7 +67,7 @@ void ui_build(Mesh *m,const Game *g,const App *app) {
         if(g->cooperative) {
             int row=0;
             for(int i=0;i<MAX_PLAYERS;i++)if(g->actors[i].active&&i!=g->local_actor) {
-                if(g->actors[i].dead)snprintf(text,sizeof(text),"%s : A TERRE / REANIMER",g->actors[i].name);
+                if(g->actors[i].dead)snprintf(text,sizeof(text),"%s : A TERRE / E",g->actors[i].name);
                 else snprintf(text,sizeof(text),"%s : %.0f PV",g->actors[i].name,g->actors[i].player.health);
                 mesh_text(m,12,45+(float)row*13,1,g->actors[i].dead?orange:teammate_color(i),text);row++;
             }
@@ -154,18 +154,13 @@ void ui_build(Mesh *m,const Game *g,const App *app) {
             Color red={.65f*g->damage_time/.32f,.07f,.02f};
             mesh_rect(m,0,30,4,277,red);mesh_rect(m,636,30,4,277,red);
             mesh_rect(m,0,30,640,4,red);mesh_rect(m,0,303,640,4,red);
-            float angle=g->damage_yaw-g->player.yaw;
-            float x=320+sinf(angle)*42,y=180-cosf(angle)*42;
-            Vec3 tip={x+sinf(angle)*7,y-cosf(angle)*7,0};
-            Vec3 a={x-cosf(angle)*5,y-sinf(angle)*5,0},b={x+cosf(angle)*5,y+sinf(angle)*5,0};
-            mesh_triangle(m,tip,a,b,(Color){1,.28f,.12f},(Vec3){0,0,1});
         }
         if(g->player.health<30&&!g->dead) {
             float pulse=.6f+.4f*sinf(g->time*6);
             centered(m,276,1,(Color){pulse,.18f,.08f},"SANTE BASSE - CROIX VERTES / F : FRAPPE FATALE");
         }
         if(app->show_build&&app->state==STATE_PLAYING) {
-            mesh_rect(m,10,108,206,129,(Color){.04f,.065f,.08f});
+            mesh_rect(m,10,108,206,173,(Color){.04f,.065f,.08f});
             mesh_text(m,20,119,1,ink,"MODULES DE CETTE PARTIE");
             for(int i=0;i<UPGRADE_COUNT;i++) {
                 snprintf(text,sizeof(text),"%-11s %d/%d",upgrade_name(i),g->player.upgrades[i],UPGRADE_MAX_LEVEL);
@@ -198,6 +193,7 @@ void ui_build(Mesh *m,const Game *g,const App *app) {
             mesh_text(m,410+dx,241,1,orange,"LANCEUR PRETE POUR CE ROUND");
             mesh_text(m,410+dx,255,1,muted,"TOUCHE 5 / DEGATS DE ZONE");
         }
+        encounters_ui(m,g,app);
         if(app->state==STATE_PLAYING&&app->music_notice_time>0&&app->music_volume<=0&&!g->dead&&!app->show_build) {
             float slide=app->motion?clampf(fminf((8-app->music_notice_time)/.25f,app->music_notice_time/.25f),0,1):1;
             slide=slide*slide*(3-2*slide);

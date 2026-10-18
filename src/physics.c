@@ -58,9 +58,11 @@ void update_player(World *world,Player *p,Input input,float dt) {
         if(length==0){wx=sy;wz=-cy;}
         b->velocity.x=wx*DASH_SPEED;b->velocity.z=wz*DASH_SPEED;
         p->dash_timer=DASH_DURATION;p->dash_cooldown=player_dash_cooldown(p);
+        p->dash_power_time=1.25f;
         audio_play(SOUND_DASH);
     }
-    float mobility=1+.03f*(float)p->upgrades[UPGRADE_MOBILITY];
+    float mobility=(1+.03f*(float)p->upgrades[UPGRADE_MOBILITY])
+        *(p->speed_time>0?1.2f:1)*(p->reactor_time>0?1.15f:1);
     float speed=(input.sprint?PLAYER_SPRINT:PLAYER_SPEED)*mobility*(input.revive?.35f:1);
     float acceleration=p->boost_timer>0?8:(b->grounded?PLAYER_ACCELERATION:22);
     if(p->dash_timer==0&&(length>0||b->grounded)) {

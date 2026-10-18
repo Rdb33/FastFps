@@ -1,0 +1,73 @@
+name: "Signaler un bug"
+description: "Décrire un problème de jeu, de rendu, de performance ou de coopération."
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Merci de chercher un rapport existant avant de créer une issue.
+        Pour une vulnérabilité, utilise [la procédure de sécurité](https://github.com/Rdb33/FastFps/blob/main/SECURITY.md) et garde les détails dans un canal privé.
+  - type: input
+    id: version
+    attributes:
+      label: "Version ou commit"
+      description: "Le menu ou ./build/fastfps --version indique la version."
+      placeholder: "Exemple : 1.1.1 / 7d70f1d"
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: "Machine"
+      options:
+        - "Raspberry Pi 4"
+        - "PC Linux"
+        - "Autre — préciser dans l'environnement"
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: "Environnement"
+      description: "Système et version, session graphique, modèle / mémoire du Pi ou matériel du PC, profil et résolution."
+      placeholder: "Raspberry Pi OS…, Pi 4…, profil Pi / Pi+ / Équilibré / PC…"
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: "Mode de jeu"
+      options:
+        - "Solo"
+        - "Coopération — hôte"
+        - "Coopération — invité"
+        - "Menu / lancement"
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: "Étapes pour reproduire"
+      description: "Précise la map, la vague, les armes et modules si cela aide."
+      placeholder: |
+        1. Lancer…
+        2. Choisir…
+        3. Observer…
+    validations:
+      required: true
+  - type: textarea
+    id: expected_actual
+    attributes:
+      label: "Résultat attendu et résultat obtenu"
+    validations:
+      required: true
+  - type: textarea
+    id: network
+    attributes:
+      label: "Informations multijoueurs, si concerné"
+      description: "Nombre de joueurs, versions de chacun, LAN / Tailscale / redirection de port, rôle hôte / invité."
+  - type: textarea
+    id: evidence
+    attributes:
+      label: "Journaux, captures ou mesures"
+      description: "Indique la fréquence du problème, les FPS et la vague pour un souci de fluidité. Retire les informations personnelles."

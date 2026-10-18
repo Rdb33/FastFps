@@ -26,7 +26,7 @@ void game_reload(Game *g) {
     Player *p=&g->player;const Weapon *w=&WEAPONS[p->weapon];
     if(g->dead||g->round_over||p->upgrade_pending||p->reload_timer>0||p->weapon_switch>0
         ||p->melee_timer>0||p->ammo[p->weapon]>=w->magazine)return;
-    p->reload_duration=w->reload;p->reload_timer=w->reload;
+    p->reload_duration=w->reload/(p->reactor_time>0?1.25f:1);p->reload_timer=p->reload_duration;
     audio_play(SOUND_SWITCH);
 }
 void game_begin_rocket_event(Game *g) {

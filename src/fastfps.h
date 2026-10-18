@@ -19,7 +19,11 @@ typedef struct { Vec3 position; Color color; Vec3 normal; float glow; } Vertex;
 typedef struct { Vertex *data; int count, capacity; float glow; } Mesh;
 typedef struct { Vec3 position, velocity; bool grounded; } Body;
 typedef enum { UPGRADE_POWER, UPGRADE_HASTE, UPGRADE_MOBILITY,
-    UPGRADE_VITALITY, UPGRADE_ARMOR, UPGRADE_VAMPIRE } Upgrade;
+    UPGRADE_VITALITY, UPGRADE_ARMOR, UPGRADE_VAMPIRE,
+    UPGRADE_PRECISION, UPGRADE_DASH_POWER, UPGRADE_SWITCH_POWER, UPGRADE_PIERCE } Upgrade;
+typedef enum { CHALLENGE_NONE, CHALLENGE_SURVIVE, CHALLENGE_INTERRUPT, CHALLENGE_CHAMPION } Challenge;
+typedef enum { BONUS_SHIELD, BONUS_POWER, BONUS_SPEED } Bonus;
+typedef struct { Vec3 position; float cooldown; int kind; } Supply;
 typedef struct {
     Mesh mesh;
     int map_id;
@@ -43,6 +47,8 @@ typedef struct {
     uint8_t ammo[WEAPON_COUNT];
     float reload_timer, reload_duration, upgrade_lock;
     float boost_timer;
+    float shield, shield_time, speed_time, power_time, reactor_time;
+    float dash_power_time, switch_power_time;
     uint8_t previous_weapon;
     uint8_t upgrades[UPGRADE_COUNT], offers[UPGRADE_CHOICES];
     bool upgrade_pending;
@@ -54,6 +60,9 @@ typedef struct {
     float shot_cooldown, recoil, hit_time, damage_time, shot_age, combo_timer;
     float respawn_timer, invulnerable;
     float revive_progress;
+    bool interact_held;
+    float heavy_cooldown;
+    float damage_angles[DAMAGE_DIRECTIONS], damage_timers[DAMAGE_DIRECTIONS];
     bool revive_held;
     int revive_target;
     float headshot_time, kill_time, damage_yaw;
@@ -94,6 +103,13 @@ typedef struct {
     Barrel barrels[MAX_BARRELS]; int barrel_count;
     Blast blasts[MAX_BLASTS]; int blast_count;
     Bomb bombs[MAX_BOMBS]; int bomb_count;
+    Supply supplies[MAX_DECKS];
+    int wave_total, wave_spawned, reinforcements;
+    float reinforce_timer;
+    int reactor_charge;
+    float reactor_cooldown;
+    int challenge, challenge_state, challenge_progress;
+    float challenge_deadline, challenge_notice;
     bool rocket_event;
     int event_last_wave, unlock_weapon;
     uint32_t event_rng, event_serial;
@@ -245,6 +261,24 @@ void game_actor_select(Game *game, int id);
 void game_start_coop(Game *game, const bool active[MAX_PLAYERS], int local_actor);
 void game_update_coop(Game *game, const Input inputs[MAX_PLAYERS], float dt);
 void game_predict(Game *game, Input input, float dt);
+
+/* encounters.c : objectifs et bonus décidés par l'hôte. */
+void encounters_map(Game *game);
+void encounters_start(Game *game);
+void encounters_update(Game *game, float dt);
+void encounters_finish(Game *game);
+void encounters_interrupt(Game *game);
+void encounters_kill(Game *game, bool champion);
+void encounters_down(Game *game);
+void encounters_actor(Game *game, float dt);
+void encounters_reactor(Game *game);
+bool reactor_in_range(const Player *player);
+bool game_heavy_available(const Game *game, int target);
+float game_threat(const Game *game);
+const char *challenge_name(int challenge);
+Color supply_color(int kind);
+void encounters_draw(Mesh *mesh, const Game *game);
+void encounters_ui(Mesh *mesh, const Game *game, const App *app);
 
 /* progression.c : améliorations remises à zéro à chaque partie. */
 float player_max_health(const Player *player);

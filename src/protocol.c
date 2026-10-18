@@ -27,6 +27,7 @@ static void player_write(Writer *w,const Player *p) {
     F(yaw);F(pitch);F(health);F(bob);F(pad_cooldown);F(movement_blend);F(strafe_blend);
     F(landing);F(sway_x);F(sway_y);F(step_timer);F(dash_timer);F(dash_cooldown);
     F(weapon_switch);F(melee_timer);F(reload_timer);F(reload_duration);F(upgrade_lock);F(boost_timer);
+    F(shield);F(shield_time);F(speed_time);F(power_time);F(reactor_time);F(dash_power_time);F(switch_power_time);
     #undef F
     w8(w,(uint8_t)p->weapon);w8(w,(uint8_t)p->weapon_target);w8(w,p->previous_weapon);
     for(int i=0;i<WEAPON_COUNT;i++)w8(w,p->ammo[i]);
@@ -40,7 +41,12 @@ static void player_read(Reader *r,Player *p) {
     F(yaw);F(pitch);F(health);F(bob);F(pad_cooldown);F(movement_blend);F(strafe_blend);
     F(landing);F(sway_x);F(sway_y);F(step_timer);F(dash_timer);F(dash_cooldown);
     F(weapon_switch);F(melee_timer);F(reload_timer);F(reload_duration);F(upgrade_lock);F(boost_timer);
+    F(shield);F(shield_time);F(speed_time);F(power_time);F(reactor_time);F(dash_power_time);F(switch_power_time);
     #undef F
+    if(p->shield<0||p->shield>30||p->shield_time<0||p->shield_time>12.01f
+        ||p->speed_time<0||p->speed_time>8.01f||p->power_time<0||p->power_time>12.01f
+        ||p->reactor_time<0||p->reactor_time>REACTOR_DURATION+.01f||p->dash_power_time<0||p->dash_power_time>1.26f
+        ||p->switch_power_time<0||p->switch_power_time>2.51f)r->ok=false;
     p->weapon=r8(r);p->weapon_target=r8(r);p->previous_weapon=r8(r);
     if(p->previous_weapon>=STANDARD_WEAPONS||p->boost_timer<0||p->boost_timer>.7f)r->ok=false;
     for(int i=0;i<WEAPON_COUNT;i++){p->ammo[i]=r8(r);if(p->ammo[i]>WEAPONS[i].magazine)r->ok=false;}
@@ -60,6 +66,8 @@ static void actor_write(Writer *w,const Actor *a) {
     F(shot_cooldown);F(recoil);F(hit_time);F(damage_time);F(shot_age);F(combo_timer);F(respawn_timer);F(invulnerable);F(revive_progress);
     F(headshot_time);F(kill_time);F(damage_yaw);
     #undef F
+    w8(w,a->interact_held);wf(w,a->heavy_cooldown);
+    for(int i=0;i<DAMAGE_DIRECTIONS;i++){wf(w,a->damage_angles[i]);wf(w,a->damage_timers[i]);}
     w8(w,(uint8_t)a->revive_target);
     w32(w,(uint32_t)a->combo);w32(w,a->input_ack);w32(w,a->shots);
     w32(w,(uint32_t)a->run_kills);w32(w,(uint32_t)a->run_headshots);w32(w,(uint32_t)a->reward_points);wf(w,a->reward_time);
@@ -72,6 +80,12 @@ static void actor_read(Reader *r,Actor *a) {
     F(shot_cooldown);F(recoil);F(hit_time);F(damage_time);F(shot_age);F(combo_timer);F(respawn_timer);F(invulnerable);F(revive_progress);
     F(headshot_time);F(kill_time);F(damage_yaw);
     #undef F
+    unsigned interact=r8(r);a->interact_held=interact!=0;a->heavy_cooldown=rf(r);
+    if(interact>1||a->heavy_cooldown<0||a->heavy_cooldown>5.01f)r->ok=false;
+    for(int i=0;i<DAMAGE_DIRECTIONS;i++) {
+        a->damage_angles[i]=rf(r);a->damage_timers[i]=rf(r);
+        if(fabsf(a->damage_angles[i])>PI_F+.01f||a->damage_timers[i]<0||a->damage_timers[i]>1.16f)r->ok=false;
+    }
     unsigned target=r8(r);a->revive_target=target==255?-1:(int)target;
     if((target>=MAX_PLAYERS&&target!=255)||a->revive_progress<0||a->revive_progress>REVIVE_TIME+.001f)r->ok=false;
     uint32_t combo=r32(r);if(combo>1000000)r->ok=false;a->combo=(int)combo;
@@ -132,6 +146,12 @@ size_t protocol_snapshot_write(uint8_t *data,size_t capacity,const Game *g) {
     w32(&w,(uint32_t)g->completed_waves);wf(&w,g->wave_clear_time);
     w8(&w,g->rocket_event);w32(&w,g->event_serial);wf(&w,g->event_notice_time);
     w8(&w,(uint8_t)g->unlock_weapon);wf(&w,g->unlock_time);
+    w8(&w,(uint8_t)g->wave_total);w8(&w,(uint8_t)g->wave_spawned);w8(&w,(uint8_t)g->reinforcements);
+    wf(&w,g->reinforce_timer);
+    w8(&w,(uint8_t)g->reactor_charge);wf(&w,g->reactor_cooldown);
+    w8(&w,(uint8_t)g->challenge);w8(&w,(uint8_t)g->challenge_state);w8(&w,(uint8_t)g->challenge_progress);
+    wf(&w,g->challenge_deadline);wf(&w,g->challenge_notice);
+    for(int i=0;i<MAX_DECKS;i++){wv(&w,g->supplies[i].position);wf(&w,g->supplies[i].cooldown);w8(&w,(uint8_t)g->supplies[i].kind);}
     w8(&w,(uint8_t)g->blast_count);
     for(int i=0;i<g->blast_count;i++){wv(&w,g->blasts[i].position);wf(&w,g->blasts[i].time);wf(&w,g->blasts[i].radius);}
     w8(&w,(uint8_t)g->bomb_count);
@@ -174,6 +194,20 @@ bool protocol_snapshot_read(Game *g,const uint8_t *data,size_t size) {
     unsigned unlock=r8(&r);out.unlock_weapon=unlock==255?-1:(int)unlock;out.unlock_time=rf(&r);
     if(event>1||(unlock!=255&&(unlock<1||unlock>=STANDARD_WEAPONS))||out.unlock_time<0||out.unlock_time>6.01f
         ||out.event_notice_time<0||out.event_notice_time>6.01f||out.time<0)return false;
+    out.wave_total=r8(&r);out.wave_spawned=r8(&r);out.reinforcements=r8(&r);
+    out.reinforce_timer=rf(&r);
+    out.reactor_charge=r8(&r);out.reactor_cooldown=rf(&r);
+    out.challenge=r8(&r);out.challenge_state=r8(&r);out.challenge_progress=r8(&r);
+    out.challenge_deadline=rf(&r);out.challenge_notice=rf(&r);
+    if(out.wave_total>MAX_WAVE_ENEMIES||out.wave_spawned+out.reinforcements!=out.wave_total
+        ||out.reinforce_timer<0||out.reinforce_timer>2.01f
+        ||out.reactor_charge>REACTOR_CHARGE||out.reactor_cooldown<0||out.reactor_cooldown>45.01f
+        ||out.challenge>CHALLENGE_CHAMPION||out.challenge_state>2||out.challenge_progress>3
+        ||out.challenge_deadline<0||out.challenge_deadline>25.01f||out.challenge_notice<0||out.challenge_notice>5.01f)return false;
+    for(int i=0;i<MAX_DECKS;i++) {
+        Supply *s=&out.supplies[i];s->position=rv(&r);s->cooldown=rf(&r);s->kind=r8(&r);
+        if(s->kind>BONUS_SPEED||s->cooldown<0||s->cooldown>30.01f)r.ok=false;
+    }
     out.blast_count=r8(&r);if(out.blast_count>MAX_BLASTS)return false;
     for(int i=0;i<out.blast_count;i++) {
         Blast *b=&out.blasts[i];b->position=rv(&r);b->time=rf(&r);b->radius=rf(&r);
@@ -196,7 +230,7 @@ bool protocol_snapshot_read(Game *g,const uint8_t *data,size_t size) {
     for(int i=0;i<out.projectile_count;i++){Projectile *p=&out.projectiles[i];p->position=rv(&r);p->velocity=rv(&r);p->life=rf(&r);p->color=rc(&r);p->kind=r8(&r);
         unsigned owner=r8(&r);p->owner=owner==255?-1:(int)owner;p->damage=rf(&r);
         if(p->kind>1||(owner>=MAX_PLAYERS&&owner!=255)||(p->kind==1&&owner>=MAX_PLAYERS)
-            ||p->damage<0||p->damage>400||p->life<0||p->life>5.01f)r.ok=false;
+            ||p->damage<0||p->damage>1000||p->life<0||p->life>5.01f)r.ok=false;
     }
     out.pickup_count=r8(&r);if(out.pickup_count>MAX_PICKUPS)return false;
     for(int i=0;i<out.pickup_count;i++){out.pickups[i].position=rv(&r);out.pickups[i].cooldown=rf(&r);}
