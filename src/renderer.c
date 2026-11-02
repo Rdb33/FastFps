@@ -1,5 +1,6 @@
 #include "fastfps.h"
 #include "updates.h"
+#include "feedback.h"
 #include <math.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -9,7 +10,7 @@
 static const char *vertex_source=
     "attribute vec3 aPosition;attribute vec3 aColor;attribute vec3 aNormal;attribute float aGlow;"
     "uniform mat4 uMatrix;uniform float uFog;uniform mediump float uUnlit;"
-    "uniform mediump vec3 uLightPosition;uniform mediump vec3 uLightColor;uniform mediump vec3 uLightPosition2;uniform mediump vec3 uLightColor2;uniform mediump vec3 uSectorColor;"
+    "uniform mediump vec3 uLightPosition;uniform mediump vec3 uLightColor;uniform mediump vec3 uLightPosition2;uniform mediump vec3 uLightColor2;uniform mediump vec3 uSectorColor;uniform mediump vec2 uPulse;"
     "varying mediump vec3 vColor;varying mediump vec3 vBase;varying mediump vec3 vPosition;varying mediump vec3 vNormal;varying mediump float vGlow;varying mediump float vFog;"
     "void main(){gl_Position=uMatrix*vec4(aPosition,1.0);"
     "vBase=aColor;vPosition=aPosition;vNormal=aNormal;vGlow=aGlow;"
@@ -26,7 +27,7 @@ static const char *vertex_source=
 static const char *fragment_source=
     "precision mediump float;"
     "uniform mediump float uUnlit;uniform float uDetail;uniform float uSurface;uniform vec3 uEye;"
-    "uniform mediump vec3 uLightPosition;uniform mediump vec3 uLightColor;uniform mediump vec3 uLightPosition2;uniform mediump vec3 uLightColor2;uniform mediump vec3 uSectorColor;"
+    "uniform mediump vec3 uLightPosition;uniform mediump vec3 uLightColor;uniform mediump vec3 uLightPosition2;uniform mediump vec3 uLightColor2;uniform mediump vec3 uSectorColor;uniform mediump vec2 uPulse;"
     "varying mediump vec3 vColor;varying mediump vec3 vBase;varying mediump vec3 vPosition;varying mediump vec3 vNormal;varying mediump float vGlow;varying mediump float vFog;"
     "float noise(vec2 p){p=mod(p,vec2(32.0));return fract(sin(dot(p,vec2(17.13,43.71)))*157.37);}"
     "void main(){vec3 color=vColor;"
@@ -51,13 +52,14 @@ static const char *fragment_source=
     "color*=1.0-seam*0.35;"
     "if(uDetail>0.5){color*=0.94+noise(floor(uv*8.0))*0.10;"
     "float panel=noise(floor(uv*0.5));color*=0.92+panel*0.14;}}"
+    "if(uUnlit<0.5&&uPulse.y>0.0){float pulse=max(0.0,1.0-abs(length(vPosition.xz)-uPulse.x)*0.65);color+=vec3(0.16,0.65,0.38)*pulse*uPulse.y;}"
     "vec3 fogColor=vec3(0.034,0.044,0.057)+uSectorColor*0.012;"
     "gl_FragColor=vec4(mix(color,fogColor,vFog),1.0);}";
 static const char *composite_vertex=
     "attribute vec2 aPosition;attribute vec2 aUV;varying mediump vec2 vUV;"
     "void main(){vUV=aUV;gl_Position=vec4(aPosition,0.0,1.0);}";
 static const char *composite_fragment=
-    "precision mediump float;uniform sampler2D uTexture;uniform vec2 uTexel;uniform vec2 uEffects;uniform float uBrightness;varying mediump vec2 vUV;"
+    "precision mediump float;uniform sampler2D uTexture;uniform vec2 uTexel;uniform vec2 uEffects;uniform float uBrightness;uniform vec4 uImpact;varying mediump vec2 vUV;"
     "void main(){vec3 color=texture2D(uTexture,vUV).rgb;"
     "if(uEffects.y>0.0){vec2 d=uTexel*2.5;vec3 glow=vec3(0.0);"
     "glow+=max(texture2D(uTexture,vUV+vec2(d.x,0.0)).rgb-vec3(0.68),vec3(0.0));"
@@ -66,6 +68,9 @@ static const char *composite_fragment=
     "glow+=max(texture2D(uTexture,vUV-vec2(0.0,d.y)).rgb-vec3(0.68),vec3(0.0));"
     "color+=glow*uEffects.y;}"
     "if(uEffects.x>0.5){color=pow(max(color*1.08,vec3(0.0)),vec3(0.80));color=(color-vec3(0.5))*1.05+vec3(0.5);}"
+    "if(uImpact.w>0.0){float luminance=dot(color,vec3(0.2126,0.7152,0.0722));"
+    "float shape=smoothstep(0.32,0.63,luminance);vec3 ink=mix(vec3(0.016,0.022,0.029),uImpact.rgb,shape);"
+    "color=mix(color,ink,uImpact.w);}"
     "vec2 edge=vUV-vec2(0.5);color*=1.0-dot(edge,edge)*0.22;gl_FragColor=vec4(pow(max(color,vec3(0.0)),vec3(1.0/uBrightness)),1.0);}";
 
 static GLuint compile(GLenum type,const char *source) {
@@ -128,13 +133,16 @@ bool renderer_init(Renderer *r,World *world,const Preset *preset) {
     r->light_position=glGetUniformLocation(r->program,"uLightPosition");r->light_color=glGetUniformLocation(r->program,"uLightColor");
     r->sector_color=glGetUniformLocation(r->program,"uSectorColor");
     r->light_position2=glGetUniformLocation(r->program,"uLightPosition2");r->light_color2=glGetUniformLocation(r->program,"uLightColor2");
+    r->pulse=glGetUniformLocation(r->program,"uPulse");
     r->eye=glGetUniformLocation(r->program,"uEye");r->detail=glGetUniformLocation(r->program,"uDetail");r->surface=glGetUniformLocation(r->program,"uSurface");
     r->composite_position=glGetAttribLocation(r->composite_program,"aPosition");
     r->composite_uv=glGetAttribLocation(r->composite_program,"aUV");
     r->composite_texture=glGetUniformLocation(r->composite_program,"uTexture");
     r->composite_brightness=glGetUniformLocation(r->composite_program,"uBrightness");
+    r->composite_impact=glGetUniformLocation(r->composite_program,"uImpact");
+    r->feedback=calloc(1,sizeof(*r->feedback));if(!r->feedback)return false;
     r->composite_texel=glGetUniformLocation(r->composite_program,"uTexel");r->composite_effects=glGetUniformLocation(r->composite_program,"uEffects");
-    if(!mesh_init(&r->dynamic,90000)||!mesh_init(&r->gun,3200)||!mesh_init(&r->ui,131072))return false;
+    if(!mesh_init(&r->dynamic,90000)||!mesh_init(&r->gun,4000)||!mesh_init(&r->ui,131072))return false;
     r->world_vertices=world->mesh.count;
     allocate_buffer(&r->world_buffer,world->mesh.count,GL_STATIC_DRAW,world->mesh.data);
     allocate_buffer(&r->dynamic_buffer,r->dynamic.capacity,GL_DYNAMIC_DRAW,NULL);
@@ -179,6 +187,7 @@ static void composite(Renderer *r,GLuint target,int x,int y,int width,int height
 }
 void renderer_draw(Renderer *r,const Game *g,const App *app) {
     r->modern=app->modern;r->brightness=app->brightness;
+    feedback_update(r->feedback,g,app);
     if(r->world_revision!=g->world->revision) {
         glBindBuffer(GL_ARRAY_BUFFER,r->world_buffer);
         glBufferData(GL_ARRAY_BUFFER,(GLsizeiptr)g->world->mesh.count*(GLsizeiptr)sizeof(Vertex),g->world->mesh.data,GL_STATIC_DRAW);
@@ -200,6 +209,8 @@ void renderer_draw(Renderer *r,const Game *g,const App *app) {
     Color theme=sector_theme(g->wave);glUniform3f(r->sector_color,theme.r,theme.g,theme.b);
     Vec3 eye=player_eye(p,app->motion);glUniform3f(r->eye,eye.x,eye.y,eye.z);
     glUniform1f(r->detail,r->modern&&r->detail_level>0?1:0);glUniform1f(r->surface,1);
+    float pulse=r->feedback->reactor_pulse;
+    glUniform2f(r->pulse,(1.2f-pulse)*32/1.2f,pulse>0?pulse/1.2f*app->impact_intensity:0);
     Vec3 light=player_eye(p,app->motion);Color flash={0,0,0};float strength=0;
     if(g->shot_age<.10f) {
         strength=1-g->shot_age/.10f;light=vadd(light,vscale(look_direction(p->yaw,p->pitch),.65f));
@@ -228,8 +239,14 @@ void renderer_draw(Renderer *r,const Game *g,const App *app) {
     Mesh *m=&r->dynamic;m->count=0;m->glow=0;glUniform1f(r->surface,0);
     animate_arena(m,g,app);
     for(int i=0;i<g->barrel_count;i++)animate_barrel(m,&g->barrels[i],g->time);
-    for(int i=0;i<g->enemy_count;i++)animate_creature(m,&g->enemies[i],g->time);
-    for(int i=0;i<g->corpse_count;i++)animate_creature(m,&g->corpses[i],g->time);
+    for(int i=0;i<g->enemy_count;i++) {
+        int first=m->count;animate_creature(m,&g->enemies[i],g->time);
+        feedback_tint(r->feedback,m,first,g->enemies[i].id,app->impact_intensity);
+    }
+    for(int i=0;i<g->corpse_count;i++) {
+        int first=m->count;animate_creature(m,&g->corpses[i],g->time);
+        feedback_tint(r->feedback,m,first,g->corpses[i].id,app->impact_intensity);
+    }
     float pose_dt=app->ui_time-r->pose_time;if(pose_dt<0)pose_dt+=600;
     pose_dt=clampf(pose_dt,0,.1f);r->pose_time=app->ui_time;
     if(g->tick<r->pose_tick||app->state==STATE_MENU||!g->cooperative)memset(r->down_blend,0,sizeof(r->down_blend));
@@ -240,7 +257,7 @@ void renderer_draw(Renderer *r,const Game *g,const App *app) {
         else r->down_blend[i]=fmaxf(target,r->down_blend[i]-pose_dt/.35f);
     }
     if(g->cooperative)for(int i=0;i<MAX_PLAYERS;i++)if(g->actors[i].active&&i!=g->local_actor)
-        animate_teammate(m,&g->actors[i],i,g->time,r->detail_level,r->down_blend[i]);
+        animate_teammate(m,&g->actors[i],i,app->motion?g->time:0,r->detail_level,r->down_blend[i],app->impact_intensity);
     for(int i=0;i<g->projectile_count;i++) {
         const Projectile *bolt=&g->projectiles[i];
         m->glow=1;
@@ -282,8 +299,13 @@ void renderer_draw(Renderer *r,const Game *g,const App *app) {
         mesh_pose(m,first,base,g->time*.7f,0,1);
         m->glow=0;
     }
+    feedback_draw(r->feedback,m,g,app);
     upload(r->dynamic_buffer,m);draw(r,r->dynamic_buffer,m->count,matrix,1,0);
-    m=&r->gun;animate_weapon(m,g,app);
+    m=&r->gun;
+    bool hold=feedback_hold_weapon(r->feedback,g,app);
+    if(!hold||!r->feedback->hold_drawn||m->count==0)animate_weapon(m,g,app);
+    if(hold)r->feedback->hold_drawn=true;
+    glUniform2f(r->pulse,0,0);
     glUniform3f(r->light_color,0,0,0);glUniform3f(r->sector_color,.75f,.85f,1);
     glUniform3f(r->light_color2,0,0,0);glUniform3f(r->eye,0,0,0);
     glClear(GL_DEPTH_BUFFER_BIT);upload(r->gun_buffer,m);draw(r,r->gun_buffer,m->count,projection,0,0);
@@ -294,6 +316,11 @@ void renderer_draw(Renderer *r,const Game *g,const App *app) {
     glViewport(0,0,width,height);glClearColor(0,0,0,1);glClear(GL_COLOR_BUFFER_BIT);
     int target_width=width,target_height=width*9/16;
     if(target_height>height){target_height=height;target_width=height*16/9;}
+    /* L'intensité n'altère pas l'interface, composée après la scène. */
+    glUseProgram(r->composite_program);
+    float impact_strength=feedback_impact(r->feedback,app);Color ink=r->feedback->impact_color;
+    glUniform4f(r->composite_impact,ink.r,ink.g,ink.b,impact_strength);
+    if(impact_strength>0)r->feedback->impact_drawn=true;
     composite(r,0,(width-target_width)/2,(height-target_height)/2,target_width,target_height);
     glUseProgram(r->program);draw(r,r->ui_buffer,r->ui.count,ui_matrix(),0,1);
     SDL_GL_SwapWindow(r->window);
@@ -327,6 +354,7 @@ void renderer_shutdown(Renderer *r) {
         if(r->composite_program)glDeleteProgram(r->composite_program);
         SDL_GL_DeleteContext(r->context);
     }
+    free(r->feedback);
     mesh_free(&r->dynamic);mesh_free(&r->gun);mesh_free(&r->ui);
     if(r->window)SDL_DestroyWindow(r->window);
     memset(r,0,sizeof(*r));

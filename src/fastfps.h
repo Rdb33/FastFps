@@ -135,6 +135,7 @@ typedef struct { const char *name; int magazine, unlock_wave; float interval, re
 extern const Weapon WEAPONS[WEAPON_COUNT];
 typedef struct { float progress, lower, extract, seat, rack; bool active; } ReloadPose;
 typedef struct { int width, height, fps, particles; const char *name; } Preset;
+struct Feedback;
 typedef struct {
     SDL_Window *window; SDL_GLContext context;
     GLuint program, composite_program;
@@ -143,7 +144,8 @@ typedef struct {
     GLint light_position2, light_color2, glow, eye, detail, surface;
     GLint composite_position, composite_uv, composite_texture;
     GLint composite_texel, composite_effects;
-    GLint composite_brightness;
+    GLint composite_brightness, composite_impact, pulse;
+    struct Feedback *feedback;
     float brightness;
     uint32_t world_revision;
     GLuint world_buffer, dynamic_buffer, gun_buffer, ui_buffer, quad_buffer;
@@ -162,7 +164,7 @@ typedef struct {
     State state;
     bool running, fullscreen, sound, capture_error, motion, modern;
     int selected, quality, best_score, fps, difficulty;
-    float sensitivity, brightness, music_volume;
+    float sensitivity, brightness, music_volume, impact_intensity;
     int numeric_edit, slider_drag;
     char numeric_text[16];
     Uint32 upgrade_ready_at;
@@ -317,7 +319,9 @@ bool renderer_screenshot(Renderer *renderer, const char *path);
 void animate_creature(Mesh *mesh, const Enemy *enemy, float time);
 void animate_weapon(Mesh *mesh, const Game *game, const App *app);
 Color teammate_color(int id);
-void animate_teammate(Mesh *mesh, const Actor *actor, int id, float time, int detail, float down_blend);
+void animate_teammate(Mesh *mesh, const Actor *actor, int id, float time, int detail, float down_blend, float effects);
+void animate_weapon_effects(Mesh *mesh, const Player *player, Vec3 origin, float muzzle,
+    float time, int detail, float intensity);
 ReloadPose weapon_reload_pose(const Player *player);
 void animate_barrel(Mesh *mesh, const Barrel *barrel, float time);
 void animate_arena(Mesh *mesh, const Game *game, const App *app);

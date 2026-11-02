@@ -1,3 +1,15 @@
+# Snapshot 1.2.1
+
+- Impact frames locales : cyan pour une tête fatale, orange pour une interruption, violet pour des éliminations alignées avec Perforation, contraste noir et blanc pour le champion. Durées de 45 / 60 ms, délai partagé et priorité aux événements majeurs ; interface composée après les effets.
+- Arrêt visuel jusqu'à 40 ms sur la pose de l'arme et les particules locales ; simulation et réseau continuent. Recharge et changement d'arme prioritaires ; F4 supprime cet arrêt.
+- Armures à trois éléments, plaques du torse perdues à 70 / 35 % de santé, épaulières des brutes et fissures lumineuses des champions ; débris colorés et onde dorée à la mort d'un champion. Collisions et statistiques conservées.
+- Poussière sur le sol, étincelles et copeaux sur les structures ; marques temporaires suivant les plateformes mobiles. Traînées d'esquive aux couleurs des joueurs, poussière de réception et impulsion verte du réacteur sur l'arène.
+- Effets d'armes en première et troisième personne : Assaut orange, Alternance dorée, Perforation violette, Surtension rose et témoins verts du réacteur.
+- Réglage « Intensité des impacts », slider et saisie 0–100 %, défaut 50 %, persistance compatible avec les anciens réglages. Menu adapté à onze lignes ; coordonnée d'une fixture de saisie existante ajustée au nouvel espacement.
+- Présentation des modules différée de 0,22 s pour laisser apparaître la dernière confirmation ; délai autoritaire de dix secondes et protection contre les clics conservés.
+- Protocole 11 conservé et états sérialisés inchangés : compatibilité de gameplay avec 1.2.0. Effets déduits localement des états reçus, RNG cosmétique séparé ; limites propres au Pi, aucune allocation par image, texture ou passe de rendu supplémentaire.
+- Compilation C11 et revue de code. Aucun test ni essai en partie ou sur Pi exécuté pour ce snapshot ; coût réel, lisibilité et effets en coopération restent à observer.
+
 # Version 1.2.0
 
 - Attaques lourdes coordonnées par cible, délai entre menaces et vérification des zones voisines pour espacer les bombes et sauts de champion.

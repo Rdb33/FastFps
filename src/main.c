@@ -89,6 +89,7 @@ static void menu_action(App *app,Game *game,Renderer *renderer,int direction) {
         case 11:app->menu_page=1;app->selected=2;break;
         case 12:app->menu_page=0;app->selected=11;break;
         case 13:app->music_volume=clampf(app->music_volume+.05f*(float)direction,0,1);break;
+        case 14:app->impact_intensity=clampf(app->impact_intensity+.05f*(float)direction,0,1);break;
     }
 }
 static Input read_input(void) {
@@ -141,7 +142,7 @@ static void help(void) {
         "  --version                     Afficher la version\n");
 }
 int main(int argc,char **argv) {
-    App app={.state=STATE_MENU,.running=true,.sound=true,.motion=true,.modern=true,.sensitivity=1,.brightness=1,.music_volume=0,.difficulty=1,.numeric_edit=-1,.slider_drag=-1};
+    App app={.state=STATE_MENU,.running=true,.sound=true,.motion=true,.modern=true,.sensitivity=1,.brightness=1,.music_volume=0,.impact_intensity=.5f,.difficulty=1,.numeric_edit=-1,.slider_drag=-1};
     bool demo=false,cli_mute=false,cli_fullscreen=false,no_update_check=false;int cli_quality=-1,cli_difficulty=-1,cli_modern=-1,frame_limit=0;
     const char *screenshot=NULL,*join_address=NULL,*player_name=NULL;
     bool host=false,multiplayer=false;int room_port=0;

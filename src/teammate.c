@@ -51,7 +51,7 @@ static float held_weapon(Mesh *m,int weapon,int sides,Color accent,ReloadPose re
     }
     return muzzle;
 }
-void animate_teammate(Mesh *m,const Actor *actor,int id,float time,int detail,float down_blend) {
+void animate_teammate(Mesh *m,const Actor *actor,int id,float time,int detail,float down_blend,float effects) {
     const Player *p=&actor->player;int first=m->count;
     Color armor=teammate_color(id),dark={.10f,.16f,.21f},metal={.34f,.41f,.45f},trim={.76f,.84f,.88f};
     bool dead=actor->dead,helping=!dead&&actor->revive_held&&actor->revive_target>=0;
@@ -121,6 +121,7 @@ void animate_teammate(Mesh *m,const Actor *actor,int id,float time,int detail,fl
     if(!dead) {
         int gun=m->count;
         Color accent=WEAPONS[p->weapon].color;float muzzle=held_weapon(m,p->weapon,sides,accent,gesture);
+        animate_weapon_effects(m,p,(Vec3){0,0,0},muzzle,time,detail,effects);
         if(actor->shot_age<.06f&&p->reload_timer<=0&&p->weapon_switch<=0&&!helping) {
             float size=.10f*(1-actor->shot_age/.06f);m->glow=1;
             mesh_diamond(m,(Vec3){0,.03f,-muzzle},size,(Color){1,.79f,.35f});

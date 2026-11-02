@@ -1,14 +1,20 @@
-# Salons coopératifs — version 1.2.0
+# Salons coopératifs — version 1.2.1
 
 Un joueur héberge un salon sur son ordinateur ; jusqu’à trois amis le rejoignent. L’hôte lance la partie quand les joueurs sont prêts. Le jeu utilise une **adresse IPv4 et un port TCP**, sans service central ni frais d’hébergement.
 
-**Tous les joueurs doivent utiliser la v1.2.0 (protocole 11)** ; les versions précédentes sont incompatibles. L'hôte gère les renforts, la coordination des attaques lourdes, les défis facultatifs, le réacteur, les bonus des quais et les dégâts. Les états de bonus et de charge, les réserves et les directions des impacts sont transmis aux invités. Le déplacement des joueurs, y compris les bonus de vitesse et l'élan des plateformes, reste prédit localement. Les nouvelles règles ne changent pas la manière de rejoindre un salon.
+**Les versions 1.2.0 et 1.2.1 partagent le protocole 11** ; les versions 1.1.x et antérieures sont incompatibles. L'hôte gère les renforts, la coordination des attaques lourdes, les défis facultatifs, le réacteur, les bonus des quais et les dégâts. Les états de bonus et de charge, les réserves et les directions des impacts sont transmis aux invités. Le déplacement des joueurs, y compris les bonus de vitesse et l'élan des plateformes, reste prédit localement. Les nouvelles règles ne changent pas la manière de rejoindre un salon.
 
 Le réacteur se charge en équipe avec 12 éliminations ; **E sur le socle central**, lorsque la charge est pleine, donne aux joueurs debout +15 PV, +15 % de vitesse et +25 % de vitesse de recharge pendant 15 s. Recharge de 45 s. La réanimation d'un allié à proximité prend la priorité sur l'activation. Les défis réussis récompensent toute l'équipe debout ; les bonus des quais sont individuels et consommés par le premier joueur à portée.
 
 Les renforts ajoutent des ennemis en réserve selon l'effectif et, dès la vague 9, selon l'avancement de la partie, jusqu'à 54 sur une vague, mais jamais plus de **18 actifs**. Ils arrivent au plus par trois toutes les deux secondes lorsqu'une position sûre et des places sont disponibles. La vague ne se termine qu'une fois la réserve vide et les derniers ennemis éliminés. Les PV augmentent de 10 % par joueur supplémentaire, avec une progression par vague de 5,5 % de leur base jusqu’à ×4,25. Les dégâts progressent jusqu’à +40 % (+25 % en Découverte) à la vague 31. Les durées des bonus temporaires sont suspendues pendant les intermissions. Les directions des deux derniers ennemis apparaissent quand la réserve est vide.
 
 La notification de mise à jour reste locale, attend un menu et ne suspend pas la partie de l'équipe. Les couleurs, numéros, armes, poses et étiquettes des alliés restent dérivés des états répliqués.
+
+## Effets visuels du snapshot 1.2.1
+
+Les impact frames, débris, marques, traînées et impulsions sont calculés sur chaque ordinateur à partir des états reçus. Les mêmes coups peuvent donc être présentés avec une intensité différente selon les réglages du joueur. Les animations et délais réseau continuent pendant les arrêts visuels de l'arme. Aucun événement de combat supplémentaire n'est envoyé ; certaines confirmations peuvent être simplifiées ou légèrement décalées lorsque plusieurs actions arrivent dans un même instantané.
+
+Les effets des modules apparaissent aussi sur les armes des alliés. L'état abîmé des armures découle des PV partagés. Réglages → Intensité des impacts permet de réduire ou couper les nouveaux effets sans modifier la partie des autres joueurs. Le protocole, la découverte des salons et les invitations restent identiques à 1.2.0.
 
 ## Depuis le menu
 
@@ -127,7 +133,7 @@ Les états du monde sont transmis environ **20 fois par seconde**. L’encodage 
 
 Cette première version utilise **TCP**, avec des sockets non bloquantes et `TCP_NODELAY`, pour garder un transport simple et fiable. Les pertes de paquets peuvent toutefois provoquer des retards de livraison : le passage à UDP avec des messages fiables ciblés sera à étudier si les parties réelles le demandent. Voir les références [TCP](https://man7.org/linux/man-pages/man7/tcp.7.html) et [connexion non bloquante](https://man7.org/linux/man-pages/man2/connect.2.html).
 
-Il reste à mesurer la latence réelle, le débit et la charge sur le Pi 4, surtout lorsqu’il héberge et affiche le jeu simultanément. Les effets de particules des tirs et explosions sont répliqués, en respectant la limite du profil graphique de chaque invité. Les dégâts et éliminations sont décidés par l’hôte. Le ping affiché mesure l’aller-retour TCP, avec un léger lissage. La version 1.2.0 utilise le protocole 11, incompatible avec toutes les versions précédentes : mets à jour tous les ordinateurs avant de jouer. Les profils graphiques peuvent différer entre les joueurs.
+Il reste à mesurer la latence réelle, le débit et la charge sur le Pi 4, surtout lorsqu’il héberge et affiche le jeu simultanément. Les effets de particules des tirs et explosions sont répliqués, en respectant la limite du profil graphique de chaque invité. Les dégâts et éliminations sont décidés par l’hôte. Le ping affiché mesure l’aller-retour TCP, avec un léger lissage. Les versions 1.2.0 et 1.2.1 utilisent le protocole 11, incompatible avec 1.1.x et les versions antérieures. Les profils graphiques peuvent différer entre les joueurs.
 
 ## Contrôles disponibles
 

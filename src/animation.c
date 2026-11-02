@@ -36,9 +36,27 @@ void animate_creature(Mesh *mesh, const Enemy *e, float time) {
     }
     if(e->flash>0)skin=(Color){1,.88f,.67f};
     if(e->elite){armor=(Color){.88f,.59f,.18f};eye=(Color){1,.87f,.36f};skin=(Color){.37f,.26f,.16f};}
+    float health=clampf(e->health/fmaxf(1,e->max_health),0,1);
     float stagger=dead?0:e->stagger*.24f;
     mesh_beveled_box(mesh,(Vec3){0,.50f+shoulder,stagger},(Vec3){width,.65f,.55f},.065f,skin);
-    mesh_beveled_box(mesh,(Vec3){0,.95f+shoulder,-.02f+stagger},(Vec3){width+.13f,.28f,.61f},.08f,armor);
+    /* Les plaques disparaissent aux seuils de dégâts ; le torse et les
+       silhouettes de classe restent présents pour conserver la lisibilité. */
+    mesh_beveled_box(mesh,(Vec3){0,.95f+shoulder,-.02f+stagger},(Vec3){.28f,.28f,.61f},.05f,armor);
+    if(health>.70f)mesh_beveled_box(mesh,(Vec3){-(width+.13f)*.33f,.95f+shoulder,-.02f+stagger},
+        (Vec3){(width+.13f)*.34f,.28f,.61f},.045f,armor);
+    if(health>.35f)mesh_beveled_box(mesh,(Vec3){(width+.13f)*.33f,.95f+shoulder,-.02f+stagger},
+        (Vec3){(width+.13f)*.34f,.28f,.61f},.045f,armor);
+    if(health<=.70f) {
+        Color crack=e->elite?(Color){1,.54f,.12f}:(Color){.12f,.10f,.08f};
+        mesh->glow=e->elite&&!dead?.8f:0;
+        mesh_box(mesh,(Vec3){-.07f,.80f+shoulder,-.285f+stagger},(Vec3){.027f,.23f,.018f},crack);
+        mesh_box(mesh,(Vec3){.02f,.91f+shoulder,-.29f+stagger},(Vec3){.17f,.025f,.018f},crack);
+        if(health<=.35f) {
+            mesh_box(mesh,(Vec3){.10f,.69f+shoulder,-.285f+stagger},(Vec3){.026f,.26f,.018f},crack);
+            mesh_box(mesh,(Vec3){.02f,.69f+shoulder,-.29f+stagger},(Vec3){.17f,.025f,.018f},crack);
+        }
+        mesh->glow=0;
+    }
     mesh_beveled_box(mesh,(Vec3){0,1.22f+shoulder,stagger},(Vec3){.57f,.38f,.51f},.075f,skin);
     mesh->glow=dead?0:.8f;
     mesh_box(mesh,(Vec3){-.14f,1.40f+shoulder,-.268f+stagger},(Vec3){.105f,.075f,.04f},eye);
@@ -51,8 +69,8 @@ void animate_creature(Mesh *mesh, const Enemy *e, float time) {
         mesh_diamond(mesh,(Vec3){0,1.69f+shoulder,.015f},.19f,armor);
         mesh_box(mesh,(Vec3){0,.54f+shoulder,.10f},(Vec3){.53f,.48f,.42f},armor);
     } else if(e->type==ENEMY_BRUTE) {
-        mesh_beveled_box(mesh,(Vec3){-.55f,1.02f+shoulder,0},(Vec3){.35f,.27f,.68f},.06f,armor);
-        mesh_beveled_box(mesh,(Vec3){.55f,1.02f+shoulder,0},(Vec3){.35f,.27f,.68f},.06f,armor);
+        if(health>.70f)mesh_beveled_box(mesh,(Vec3){-.55f,1.02f+shoulder,0},(Vec3){.35f,.27f,.68f},.06f,armor);
+        if(health>.35f)mesh_beveled_box(mesh,(Vec3){.55f,1.02f+shoulder,0},(Vec3){.35f,.27f,.68f},.06f,armor);
         mesh_diamond(mesh,(Vec3){-.34f,1.68f+shoulder,0},.20f,armor);
         mesh_diamond(mesh,(Vec3){.34f,1.68f+shoulder,0},.20f,armor);
     } else if(e->type==ENEMY_BOMBER) {
@@ -316,6 +334,8 @@ void animate_weapon(Mesh *mesh, const Game *g, const App *app) {
         }
         mesh->glow=0;
     }
+    animate_weapon_effects(mesh,p,vadd(base,(Vec3){0,.06f,0}),p->weapon>=2?.66f:.45f,
+        app->motion?g->time:0,graphics_detail(app->quality),app->impact_intensity);
     float air=motion&&!p->body.grounded?clampf(-p->body.velocity.y*.002f,-.03f,.03f):0;
     mesh_rotate(mesh,0,vadd(base,(Vec3){0,.08f,.15f}),
         g->recoil*(p->weapon==1?.12f:.08f)+reload_pose*.14f+gesture.rack*.04f+hurry*.025f*motion+air,

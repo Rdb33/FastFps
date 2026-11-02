@@ -1,6 +1,17 @@
 # Contrôles de FASTFPS
 
-Historique des contrôles sur la machine de développement, du 12 au 15 octobre 2026.
+Historique des contrôles sur la machine de développement ; les résultats sont datés par version.
+
+## Snapshot 1.2.1 — 2 novembre 2026
+
+- Compilation C11 avec `-O2 -Wall -Wextra -Wpedantic`, sans avertissement, et revue des changements.
+- Les tableaux de présentation sont propres au Renderer. Les nouvelles fonctions reçoivent Game en lecture seule ; aucune utilisation du RNG de gameplay. Dégâts, collisions et état réseau sont conservés.
+- Protocole 11 et fonctions d'encodage / décodage inchangés. Les états sérialisés Player, Actor et Enemy n'ont pas de nouveau champ. Les confirmations sont déduites des états observés ; une image ou un instantané qui regroupe plusieurs événements peut simplifier le retour visuel.
+- Revue des remises à zéro lors d'une nouvelle partie / map et des caches de créatures identifiés par ID. Les effets d'écran et la retenue de l'arme sont désactivés dans les menus ; les corps et bonus continuent d'être simulés par le monde.
+- Temporisations cosmétiques séparées du pas fixe et du réseau ; priorité à la recharge, au changement d'arme et à la mise à terre. Le choix des modules attend 0,22 s pour laisser le dernier impact visible sans retarder l'échéance autoritaire.
+- Buffers de particules / marques bornés : 40 / 8 sur Pi, 112 / 20 sur les autres profils. Anneaux limités à six ; réserve de sommets pour les autres maillages, aucun dépassement demandé aux buffers. Buffer d'arme augmenté à 4 000 sommets. Une allocation de l'état cosmétique à l'initialisation, libérée à la fermeture.
+- Contraste et éclairage ajoutés aux shaders existants, interface composée après le traitement. Pas de texture ou dépendance ajoutée. Réglage 0–100 % sauvegardé en fin de ligne pour relire les anciens fichiers ; retour aux valeurs par défaut et bornes en cas de valeur non finie.
+- Coordonnée de la fixture de luminosité existante adaptée à SETTINGS_ROW_HEIGHT. **Aucun test exécuté, aucune capture ou session réelle lancée pour ce snapshot.** À essayer : impact frames aux fréquences 30 / 60 FPS, cartes après dernier coup, marques sur les plaques, pauses / reprise / nouvelle partie, réglage zéro, F4, armes et alliés, événement de roquettes et effets reçus avec latence. Mesures FPS sur Pi et coopération entre machines restent à faire.
 
 ## Version 1.2.0 — 15 octobre 2026
 

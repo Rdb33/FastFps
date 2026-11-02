@@ -3,13 +3,13 @@
 #include <stdio.h>
 #include <string.h>
 
-int menu_count(const App *a){return a->menu_page?10:4;}
+int menu_count(const App *a){return a->menu_page?11:4;}
 static float ease(float t){t=clampf(t,0,1);return t*t*(3-2*t);}
 static Color mix(Color a,Color b,float t){return (Color){a.r+(b.r-a.r)*t,a.g+(b.g-a.g)*t,a.b+(b.b-a.b)*t};}
 int menu_row_id(const App *a,int row) {
     static const int main_ids[4]={0,1,11,10};
     if(row<0||row>=menu_count(a))return -1;
-    return a->menu_page?(row<8?row+2:(row==8?13:12)):main_ids[row];
+    return a->menu_page?(row<8?row+2:(row==8?13:(row==9?14:12))):main_ids[row];
 }
 void menu_move(App *a,int direction) {
     int count=menu_count(a),row=0;
@@ -33,7 +33,7 @@ int menu_hit(const App *a,Renderer *r,int x,int y) {
     float dw=(float)width,dh=dw*9/16;if(dh>height){dh=(float)height;dw=dh*16/9;}
     float px=((float)x-((float)width-dw)/2)*640/dw,py=((float)y-((float)height-dh)/2)*360/dh;
     if(px<64||px>(a->menu_page?576:342)||py<128)return -1;
-    float step=a->menu_page?18:42;int row=(int)((py-128)/step);
+    float step=a->menu_page?SETTINGS_ROW_HEIGHT:42;int row=(int)((py-128)/step);
     if(!a->menu_page&&py-128-(float)row*step>38)return -1;
     return menu_row_id(a,row);
 }
@@ -97,10 +97,10 @@ void menu_build(Mesh *m,const Game *g,const App *a) {
         mesh_text(m,376,275,1,blue,world_route_name(g->map_id));
         center(m,312,1,muted,"FLECHES OU SOURIS / ENTREE POUR JOUER");
     }else {
-        mesh_rect(m,64,128+a->menu_highlight*18,512,17,(Color){.1f,.2f,.26f});
-        mesh_rect(m,64,128+a->menu_highlight*18,2,17,blue);
+        mesh_rect(m,64,128+a->menu_highlight*SETTINGS_ROW_HEIGHT,512,15,(Color){.1f,.2f,.26f});
+        mesh_rect(m,64,128+a->menu_highlight*SETTINGS_ROW_HEIGHT,2,15,blue);
         for(int row=0;row<menu_count(a);row++) {
-            int id=menu_row_id(a,row);float y=133+(float)row*18;bool selected=id==a->selected;
+            int id=menu_row_id(a,row);float y=133+(float)row*SETTINGS_ROW_HEIGHT;bool selected=id==a->selected;
             switch(id) {
                 case 2:snprintf(text,sizeof(text),"RENDU : %s / %d X %d / %d FPS",PRESETS[a->quality].name,PRESETS[a->quality].width,PRESETS[a->quality].height,PRESETS[a->quality].fps);break;
                 case 3:snprintf(text,sizeof(text),"SENSIBILITE (0.30-3.00)");break;
@@ -111,6 +111,7 @@ void menu_build(Mesh *m,const Game *g,const App *a) {
                 case 8:snprintf(text,sizeof(text),"VISUEL : %s / F5",a->modern?"MODERNE":"RETRO");break;
                 case 9:snprintf(text,sizeof(text),"LUMINOSITE (50-200%%)");break;
                 case 13:snprintf(text,sizeof(text),"MUSIQUE (0-100%%)");break;
+                case 14:snprintf(text,sizeof(text),"INTENSITE DES IMPACTS");break;
                 default:snprintf(text,sizeof(text),"RETOUR");break;
             }
             mesh_text(m,74,y,1,selected?blue:muted,selected?">":" ");

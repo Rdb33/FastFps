@@ -113,7 +113,7 @@ static void controls(World *w) {
     SDL_Event e=mouse(SDL_MOUSEBUTTONDOWN,395,151);assert(settings_event(&a,&r,&e)&&a.slider_drag==3);
     e=(SDL_Event){.type=SDL_MOUSEMOTION};e.motion.x=-10;e.motion.y=151;assert(settings_event(&a,&r,&e)&&a.sensitivity==.3f);
     e=mouse(SDL_MOUSEBUTTONUP,0,151);assert(settings_event(&a,&r,&e)&&a.slider_drag==-1);
-    e=mouse(SDL_MOUSEBUTTONDOWN,505,259);assert(settings_event(&a,&r,&e)&&a.numeric_edit==9);
+    e=mouse(SDL_MOUSEBUTTONDOWN,505,133+7*(int)SETTINGS_ROW_HEIGHT);assert(settings_event(&a,&r,&e)&&a.numeric_edit==9);
     e=(SDL_Event){.type=SDL_TEXTINPUT};strcpy(e.text.text,"900");assert(settings_event(&a,&r,&e));
     e=(SDL_Event){.type=SDL_KEYDOWN};e.key.keysym.scancode=SDL_SCANCODE_RETURN;
     assert(settings_event(&a,&r,&e)&&a.brightness==2&&a.numeric_edit==-1);

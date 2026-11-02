@@ -11,8 +11,8 @@ static void settings_path(char *out,size_t size) {
 void settings_read(App *app) {
     char path[2048];settings_path(path,sizeof(path));if(!path[0])return;
     FILE *file=fopen(path,"r");if(!file)return;
-    int quality=0,sound=1,best=0,motion=1,difficulty=1,modern=1;float sensitivity=1,brightness=1,music_volume=0;
-    if(fscanf(file,"%d %f %d %d %d %d %d %f %f",&quality,&sensitivity,&sound,&best,&motion,&difficulty,&modern,&brightness,&music_volume)>=4) {
+    int quality=0,sound=1,best=0,motion=1,difficulty=1,modern=1;float sensitivity=1,brightness=1,music_volume=0,impact_intensity=.5f;
+    if(fscanf(file,"%d %f %d %d %d %d %d %f %f %f",&quality,&sensitivity,&sound,&best,&motion,&difficulty,&modern,&brightness,&music_volume,&impact_intensity)>=4) {
         app->quality=quality>=0&&quality<PRESET_COUNT?quality:0;
         app->sensitivity=isfinite(sensitivity)?clampf(sensitivity,.3f,3):1;
         app->sound=sound!=0;app->best_score=best>=0?best:0;
@@ -20,13 +20,14 @@ void settings_read(App *app) {
         app->difficulty=difficulty>=0&&difficulty<=2?difficulty:1;
         app->modern=modern!=0;app->brightness=isfinite(brightness)?clampf(brightness,.5f,2):1;
         app->music_volume=isfinite(music_volume)?clampf(music_volume,0,1):0;
+        app->impact_intensity=isfinite(impact_intensity)?clampf(impact_intensity,0,1):.5f;
     }
     fclose(file);
 }
 void settings_write(const App *app) {
     char path[2048];settings_path(path,sizeof(path));if(!path[0])return;
     FILE *file=fopen(path,"w");if(!file)return;
-    fprintf(file,"%d %.2f %d %d %d %d %d %.2f %.2f\n",app->quality,app->sensitivity,app->sound,app->best_score,app->motion,app->difficulty,app->modern,app->brightness,app->music_volume);fclose(file);
+    fprintf(file,"%d %.2f %d %d %d %d %d %.2f %.2f %.2f\n",app->quality,app->sensitivity,app->sound,app->best_score,app->motion,app->difficulty,app->modern,app->brightness,app->music_volume,app->impact_intensity);fclose(file);
 }
 /* Coordonnées communes à l'affichage et aux zones interactives du menu. */
 static bool coordinates(Renderer *r,int x,int y,float *px,float *py) {
@@ -34,15 +35,16 @@ static bool coordinates(Renderer *r,int x,int y,float *px,float *py) {
     float dw=(float)w,dh=dw*9/16;if(dh>h){dh=(float)h;dw=dh*16/9;}
     *px=((float)x-((float)w-dw)/2)*640/dw;*py=((float)y-((float)h-dh)/2)*360/dh;return true;
 }
-static bool numeric_row(int row){return row==3||row==9||row==13;}
-static float value(const App *a,int row){return row==3?a->sensitivity:(row==9?a->brightness:a->music_volume)*100;}
+static bool numeric_row(int row){return row==3||row==9||row==13||row==14;}
+static float value(const App *a,int row){return row==3?a->sensitivity:(row==9?a->brightness:(row==13?a->music_volume:a->impact_intensity))*100;}
 static float minimum(int row){return row==3?.3f:(row==9?50:0);}
 static float maximum(int row){return row==3?3:(row==9?200:100);}
 static void assign(App *a,int row,float n) {
     n=clampf(n,minimum(row),maximum(row));
     if(row==3)a->sensitivity=roundf(n*100)/100;
     else if(row==9)a->brightness=roundf(n)/100;
-    else a->music_volume=roundf(n)/100;
+    else if(row==13)a->music_volume=roundf(n)/100;
+    else a->impact_intensity=roundf(n)/100;
 }
 static void finish(App *a,bool commit) {
     if(a->numeric_edit<0)return;
@@ -95,7 +97,7 @@ bool settings_event(App *a,Renderer *r,const SDL_Event *e) {
     if(e->type==SDL_MOUSEBUTTONDOWN&&e->button.button==SDL_BUTTON_LEFT) {
         float x,y;if(!coordinates(r,e->button.x,e->button.y,&x,&y))return false;
         finish(a,true);
-        int row=menu_row_id(a,(int)floorf((y-128)/18));
+        int row=menu_row_id(a,(int)floorf((y-128)/SETTINGS_ROW_HEIGHT));
         if(x<64||x>576||y<128||row<0||!numeric_row(row))return false;
         a->selected=row;
         if(x>=308&&x<=476) {

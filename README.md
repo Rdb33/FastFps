@@ -1,6 +1,6 @@
 # FASTFPS — Secteur zéro
 
-**FPS 3D natif, style Doom, pensé pour le Raspberry Pi 4.** Base à améliorer progressivement : déplacement nerveux, quatre armes principales et survie dans trois arènes industrielles. Version **1.2.0** : nouveaux modules, objectifs facultatifs, réacteur utile et coopération rééquilibrée.
+**FPS 3D natif, style Doom, pensé pour le Raspberry Pi 4.** Base à améliorer progressivement : déplacement nerveux, quatre armes principales et survie dans trois arènes industrielles. Snapshot **1.2.1** : impact frames, armures abîmées, effets des modules sur les armes et débris géométriques.
 
 Application en **C11**, **SDL2** (fenêtre, clavier, souris et son) et **OpenGL ES 2** (rendu 3D). Graphismes, police et bruitages sont générés localement. Les musiques MP3 locales et facultatives sont lues avec **mpg123**.
 
@@ -19,6 +19,48 @@ Si tu mets à jour un ancien clone contenant les morceaux, copie-les d'abord **h
 Les contributions et retours de jeu sont bienvenus. Consulte le [guide de contribution](CONTRIBUTING.md), le [code de conduite](CODE_OF_CONDUCT.md) et les [formulaires de bugs et propositions](https://github.com/Rdb33/FastFps/issues/new/choose). Les échanges peuvent être en français ou en anglais ; les textes du jeu restent en français.
 
 Pour un signalement sensible, suis la [politique de sécurité](SECURITY.md). Les [notices tierces](THIRD_PARTY_NOTICES.md) précisent notamment la provenance et les droits des musiques de Buckshot Roulette. Les [réglages GitHub de communauté](.github/COMMUNITY_SETUP.md) décrivent la description du dépôt et l'activation des signalements privés.
+
+## Nouveautés — snapshot 1.2.1
+
+### Des coups marquants
+
+Les coups spéciaux peuvent déclencher une **impact frame** : une variation brève du contraste de la scène, avec une silhouette accentuée de la cible. L'interface conserve ses couleurs et sa lisibilité.
+
+| Événement visible | Présentation |
+| --- | --- |
+| Élimination par tir à la tête | Accent cyan, contraste pendant environ 45 ms |
+| Attaque légère interrompue | Accent orange et éclats, environ 45 ms |
+| Deux éliminations alignées avec Perforation | Accent violet et liaison géométrique entre les cibles, environ 45 ms |
+| Champion vaincu | Contraste noir et blanc, environ 60 ms, fragments dorés et onde au sol |
+
+Un délai partagé de **0,4 s**, porté à **0,8 s pour le champion**, espace les effets. Une confirmation plus importante peut prendre la priorité. Les durées sont quantifiées par les images réellement affichées : sur un écran à 30 FPS, une image dure environ 33 ms.
+
+Un **arrêt visuel allant jusqu'à 40 ms** peut retenir la pose de l'arme et l'évolution des nouvelles particules locales. La simulation continue : déplacements, tirs, recharges, réanimations et chronomètres réseau ne sont pas figés. La recharge et le changement d'arme gardent la priorité sur cet arrêt. Le choix de modules apparaît environ 0,22 s après la fin de vague pour laisser voir le dernier impact ; le compte à rebours de dix secondes continue normalement.
+
+### Armures, surfaces et mouvement
+
+- Les plaques du torse se retirent aux seuils de **70 % et 35 % de santé**, avec des débris de la couleur de la créature. Les brutes perdent aussi leurs protections d'épaules ; les champions montrent des fissures lumineuses. Ce sont des changements de présentation : les PV et collisions restent identiques.
+- Les tirs vers le sol produisent un éventail de poussière ; les panneaux et structures produisent des étincelles et des copeaux métalliques. Des marques géométriques rétrécissent puis disparaissent. Les marques sur une plaque mobile suivent son déplacement.
+- Les esquives laissent de courtes traînées de la couleur du joueur. Une réception après une chute produit une bouffée de poussière.
+- L'activation du réacteur envoie une onde verte dans l'arène et éclaire brièvement les surfaces traversées.
+
+### Les modules se voient sur les armes
+
+Ces effets apparaissent à la première personne et sur les armes des alliés :
+
+- **Assaut** : rails orange pendant le bonus suivant l'esquive.
+- **Alternance** : chambre dorée tant que le premier tir renforcé est disponible.
+- **Perforation** : anneaux violets sur les armes à tir instantané.
+- **Surtension** : cœur rose et petits arcs électriques tant que le tir renforcé est disponible.
+- **Réacteur** : petits témoins verts pendant le bonus d'équipe.
+
+### Réglage et coopération
+
+**Échap → Réglages → Intensité des impacts** : slider, saisie numérique et flèches, de **0 à 100 %**, réglé sur **50 % par défaut**. La valeur est sauvegardée ; les anciens fichiers de réglages restent lisibles. À zéro, les nouveaux flashes, arrêts visuels, particules et effets d'arme sont coupés ; l'état des armures reste visible. **F4 / mouvements réduits** supprime l'arrêt visuel, les traînées d'esquive et l'animation des effets sur les armes.
+
+Les effets sont calculés **localement** depuis les états et compteurs de combat déjà reçus. Ils ne changent ni le gameplay ni le générateur aléatoire de la simulation. Les marques de tir sont une représentation cosmétique de la visée observée ; en coopération, la réception des instantanés et les variations de fréquence d'image peuvent simplifier ou décaler certaines confirmations.
+
+**Protocole 11 conservé : 1.2.0 et 1.2.1 restent compatibles en coopération.** Chaque ordinateur choisit son intensité. Les nouveaux effets n'ajoutent ni texture, ni bibliothèque, ni passe de rendu. Le profil Pi borne les nouvelles particules à **40**, et les marques à **8** ; les autres profils utilisent au plus **112 particules et 20 marques**. Le buffer d'arme réserve 4 000 sommets pour les nouveaux détails. Compilation et revue réalisées ; rendu en partie, connexion réelle et performances Pi restent à essayer, voir [VALIDATION.md](VALIDATION.md).
 
 ## Nouveautés — version 1.2.0
 
@@ -301,6 +343,7 @@ Le Pi 4 possède un GPU compatible OpenGL ES ([documentation Raspberry Pi](https
 | Changer le profil de rendu | F2, ou le menu |
 | Activer / couper les bruitages | F3, ou le menu |
 | Volume de la musique | Réglages → Musique, slider ou saisie de 0 à 100 % |
+| Intensité des nouveaux effets | Réglages → Intensité des impacts, 0 à 100 % ; défaut 50 % |
 | Réduire les mouvements de caméra | F4, ou le menu |
 | Style Moderne / Rétro | F5, ou le menu |
 
@@ -425,7 +468,7 @@ Carte et paramètres sont actuellement dans les sources. Aucune option de compil
 
 Trois cartes et un mode survie solo ou coopératif, quatre armes permanentes par run, un lance-roquettes temporaire et un rechargement par chargeur. Collisions par boîtes, trajectoires parfois anguleuses. Pas encore de rampes, accroupissement, sauvegarde de partie ou manette.
 
-La coopération utilise un joueur hôte qui fait autorité sur le monde, un état d’entrée `Input`, des identifiants d’ennemis stables, une prédiction du déplacement et une interpolation à l’affichage. La connexion se fait par IPv4 et port TCP, sans service central dans le jeu. Tailscale utilise ses propres services de connexion et éventuellement de relais. La validation entre deux machines et sur Internet reste à faire : voir [VALIDATION.md](VALIDATION.md). La **1.2.0 utilise le protocole 11**, incompatible avec les versions précédentes. Tous les joueurs doivent installer la 1.2.0.
+La coopération utilise un joueur hôte qui fait autorité sur le monde, un état d’entrée `Input`, des identifiants d’ennemis stables, une prédiction du déplacement et une interpolation à l’affichage. La connexion se fait par IPv4 et port TCP, sans service central dans le jeu. Tailscale utilise ses propres services de connexion et éventuellement de relais. La validation entre deux machines et sur Internet reste à faire : voir [VALIDATION.md](VALIDATION.md). Les **1.2.0 et 1.2.1 utilisent le protocole 11**, incompatible avec les versions 1.1.x et antérieures. Tous les joueurs doivent utiliser une version de gameplay compatible.
 
 Voir [ROADMAP.md](ROADMAP.md). Le prototype navigateur est conservé dans `prototype-web/` comme archive ; le lanceur principal utilise **l’application native**.
 
