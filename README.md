@@ -1,6 +1,6 @@
 # FASTFPS — Secteur zéro
 
-**FPS 3D natif, style Doom, pensé pour le Raspberry Pi 4.** Base à améliorer progressivement : déplacement nerveux, quatre armes principales et survie dans trois arènes industrielles. Snapshot **1.2.2** : parallaxe du menu à la souris, tremblements événementiels et visualiseur musical, après les effets de combat du snapshot 1.2.1.
+**FPS 3D natif, style Doom, pensé pour le Raspberry Pi 4.** Base à améliorer progressivement : déplacement nerveux, quatre armes principales et survie dans trois arènes industrielles. Snapshot **1.2.3** : impacts en plusieurs images inversées noir/blanc ou noir/rouge, parallaxe du menu par profondeur et visualiseur musical plus contrasté.
 
 Application en **C11**, **SDL2** (fenêtre, clavier, souris et son) et **OpenGL ES 2** (rendu 3D). Graphismes, police et bruitages sont générés localement. Les musiques MP3 locales et facultatives sont lues avec **mpg123**.
 
@@ -20,34 +20,40 @@ Les contributions et retours de jeu sont bienvenus. Consulte le [guide de contri
 
 Pour un signalement sensible, suis la [politique de sécurité](SECURITY.md). Les [notices tierces](THIRD_PARTY_NOTICES.md) précisent notamment la provenance et les droits des musiques de Buckshot Roulette. Les [réglages GitHub de communauté](.github/COMMUNITY_SETUP.md) décrivent la description du dépôt et l'activation des signalements privés.
 
-## Nouveautés — snapshot 1.2.2
+## Nouveautés — snapshot 1.2.3
 
-Le titre, le réacteur et les décors du menu réagissent à la position de la souris avec des profondeurs et un lissage différents. Le décor 3D bouge aussi légèrement dans l'accueil et les salons. Les boutons, champs, sliders et zones de clic restent fixes ; le mouvement revient doucement au centre quand la souris quitte la fenêtre.
+### Impacts en plusieurs images
 
-Les explosions proches, frappes au sol des champions et activations du réacteur font brièvement trembler la vue. Une secousse plus légère accompagne les coups marquants, dégâts reçus, fins de vague, arrivées de champions, armes débloquées et événements de roquettes. L'amplitude diminue avec la distance pour les événements dans l'arène. Les secousses ne s'additionnent pas sans limite et ne changent ni la visée réelle ni les déplacements ; l'interface reste stable.
+Un coup marquant déclenche désormais une **séquence en trois phases** : image inversée en noir et blanc avec contours, image contrastée en noir/blanc ou noir/rouge selon l'événement, puis retour progressif aux couleurs normales. La scène reste reconnaissable dans les ombres ; l'interface garde ses couleurs et sa position.
 
-Un visualiseur à **12 bandes** apparaît dans le menu, les salons et discrètement au-dessus du HUD en partie. Il analyse uniquement la musique réellement diffusée, après le volume, les filtres et les fondus ; les bruitages ne font pas bouger les barres. Sans MP3 local ou quand la musique est silencieuse, elles reviennent au repos. Le volume reste à zéro par défaut.
-
-**F4 / mouvements réduits** coupe le parallaxe et les secousses, et réduit la hauteur et la vitesse des barres. **Intensité des impacts** règle aussi l'amplitude des secousses. Les flèches gauche / droite permettent désormais d'ajuster ce réglage comme les autres valeurs numériques.
-
-Ces ajouts sont locaux ; le **protocole 11** reste compatible avec les versions 1.2.0 et 1.2.1. Compilation et revue de code effectuées ; rendu, audio réel, coopération et performances Raspberry Pi restent à essayer.
-
-## Effets de combat — snapshot 1.2.1
-
-### Des coups marquants
-
-Les coups spéciaux peuvent déclencher une **impact frame** : une variation brève du contraste de la scène, avec une silhouette accentuée de la cible. L'interface conserve ses couleurs et sa lisibilité.
-
-| Événement visible | Présentation |
+| Événement | Séquence |
 | --- | --- |
-| Élimination par tir à la tête | Accent cyan, contraste pendant environ 45 ms |
-| Attaque légère interrompue | Accent orange et éclats, environ 45 ms |
-| Deux éliminations alignées avec Perforation | Accent violet et liaison géométrique entre les cibles, environ 45 ms |
-| Champion vaincu | Contraste noir et blanc, environ 60 ms, fragments dorés et onde au sol |
+| Élimination par tir à la tête | Négatif noir/blanc → positif noir/blanc → retour progressif |
+| Attaque légère interrompue, même si elle tue | Négatif noir/blanc → noir/rouge → retour progressif |
+| Deux éliminations alignées avec Perforation | Négatif noir/blanc → noir/rouge, liaison entre les cibles → retour progressif |
+| Champion vaincu dans le champ de vision | Séquence prolongée noir/blanc puis noir/rouge, fragments dorés et onde au sol |
 
-Un délai partagé de **0,4 s**, porté à **0,8 s pour le champion**, espace les effets. Une confirmation plus importante peut prendre la priorité. Les durées sont quantifiées par les images réellement affichées : sur un écran à 30 FPS, une image dure environ 33 ms.
+Les durées nominales sont de **160 ms**, ou **220 ms pour le champion**. Chaque phase reste affichée au moins une image : à 30 FPS, compter environ 200 / 233 ms. Les deux premières phases gardent leur intensité, la dernière s'estompe. Le réglage par défaut de 50 % produit un effet nettement plus marqué ; le slider reste réglable de 0 à 100 %. Le délai partagé passe à **0,6 s**, ou **1 s pour le champion**, avec priorité aux événements majeurs.
 
-Un **arrêt visuel allant jusqu'à 40 ms** peut retenir la pose de l'arme et l'évolution des nouvelles particules locales. La simulation continue : déplacements, tirs, recharges, réanimations et chronomètres réseau ne sont pas figés. La recharge et le changement d'arme gardent la priorité sur cet arrêt. Le choix de modules apparaît environ 0,22 s après la fin de vague pour laisser voir le dernier impact ; le compte à rebours de dix secondes continue normalement.
+Les têtes fatales ne dépendent plus d'un nouveau rayon calculé après le tir : déplacer la souris entre le coup et l'image suivante ne supprime plus la confirmation. Les interruptions fatales sont aussi reconnues parmi les nouveaux corps. Les confirmations restent déduites des compteurs et états déjà transmis ; des actions regroupées dans le même instantané peuvent encore simplifier leur attribution visuelle.
+
+Un **arrêt visuel allant jusqu'à 40 ms** retient seulement la pose de l'arme et les nouvelles particules locales. Déplacements, tirs, recharges, réanimations et chronomètres continuent. Recharge et changement d'arme gardent la priorité. Le choix des modules attend environ **0,3 s** après la fin de vague pour laisser voir la séquence ; son échéance autoritaire de dix secondes continue normalement.
+
+### Parallaxe sur la composition du menu
+
+Tout le menu suit la souris, avec un déplacement proportionnel à la profondeur : décor 3D lointain, fond du panneau, grille, carte d'informations, commandes et titre / réacteur au premier plan. Les panneaux de pause, fin de partie, réglages, salons et notification de mise à jour participent aussi au mouvement. Les zones de clic, sliders et champs suivent exactement la couche de leurs commandes, en tenant compte du format de la fenêtre. La souris quittant la fenêtre ramène doucement le menu au centre.
+
+Les explosions proches, frappes au sol des champions et activations du réacteur conservent leurs brèves secousses locales, atténuées par distance ; l'interface de combat reste stable.
+
+### Visualiseur musical
+
+Les **12 bandes** suivent uniquement la musique réellement diffusée, après volume, filtres et fondus, avant les bruitages. Les filtres sont plus sélectifs et les niveaux utilisent une échelle logarithmique avec plancher : les basses ne font plus monter artificiellement toutes les barres. Segments lumineux, crêtes blanches et descente plus rapide rendent les variations plus lisibles. Au silence, seules les bases des barres restent visibles. Le volume reste à zéro par défaut et aucun morceau tiers n'est distribué.
+
+**F4 / mouvements réduits** coupe le parallaxe, les secousses et la phase inversée, et réduit la hauteur / vitesse des barres. Le contraste positif des impacts reste actif ; le régler à zéro coupe les impact frames. **Intensité des impacts** pilote aussi l'amplitude des secousses.
+
+Compilation et vérifications hors écran réalisées : captures des phases et du menu, clics / sliders / champs avec parallaxe, réponse audio sur signaux et extraits MP3 locaux, encodage / décodage réseau. Aucun essai sur Raspberry Pi ni connexion réelle entre deux machines pour ce snapshot ; performances et confort en partie restent à évaluer. Voir [VALIDATION.md](VALIDATION.md).
+
+## Armures et effets introduits avec le snapshot 1.2.1
 
 ### Armures, surfaces et mouvement
 
@@ -68,11 +74,11 @@ Ces effets apparaissent à la première personne et sur les armes des alliés :
 
 ### Réglage et coopération
 
-**Échap → Réglages → Intensité des impacts** : slider, saisie numérique et flèches, de **0 à 100 %**, réglé sur **50 % par défaut**. La valeur est sauvegardée ; les anciens fichiers de réglages restent lisibles. À zéro, les nouveaux flashes, arrêts visuels, particules et effets d'arme sont coupés ; l'état des armures reste visible. **F4 / mouvements réduits** supprime l'arrêt visuel, les traînées d'esquive et l'animation des effets sur les armes.
+**Échap → Réglages → Intensité des impacts** : slider, saisie numérique et flèches, de **0 à 100 %**, réglé sur **50 % par défaut**. La valeur est sauvegardée ; les anciens fichiers de réglages restent lisibles. À zéro, les nouveaux flashes, arrêts visuels, particules et effets d'arme sont coupés ; l'état des armures reste visible. **F4 / mouvements réduits** supprime l'arrêt visuel, la phase inversée, les traînées d'esquive et l'animation des effets sur les armes.
 
 Les effets sont calculés **localement** depuis les états et compteurs de combat déjà reçus. Ils ne changent ni le gameplay ni le générateur aléatoire de la simulation. Les marques de tir sont une représentation cosmétique de la visée observée ; en coopération, la réception des instantanés et les variations de fréquence d'image peuvent simplifier ou décaler certaines confirmations.
 
-**Protocole 11 conservé : 1.2.0 et 1.2.1 restent compatibles en coopération.** Chaque ordinateur choisit son intensité. Les nouveaux effets n'ajoutent ni texture, ni bibliothèque, ni passe de rendu. Le profil Pi borne les nouvelles particules à **40**, et les marques à **8** ; les autres profils utilisent au plus **112 particules et 20 marques**. Le buffer d'arme réserve 4 000 sommets pour les nouveaux détails. Compilation et revue réalisées ; rendu en partie, connexion réelle et performances Pi restent à essayer, voir [VALIDATION.md](VALIDATION.md).
+**Protocole 11 conservé : les versions 1.2.0 à 1.2.3 restent compatibles en coopération.** Chaque ordinateur choisit son intensité. Les nouveaux effets n'ajoutent ni texture, ni bibliothèque, ni passe de rendu. Le profil Pi borne les nouvelles particules à **40**, et les marques à **8** ; les autres profils utilisent au plus **112 particules et 20 marques**. Le buffer d'arme réserve 4 000 sommets pour les nouveaux détails. Compilation et captures hors écran réalisées ; connexion réelle et performances Pi restent à essayer, voir [VALIDATION.md](VALIDATION.md).
 
 ## Nouveautés — version 1.2.0
 

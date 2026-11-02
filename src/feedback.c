@@ -51,10 +51,10 @@ static void impact(Feedback *f,const Game *g,const App *app,int kind,int id,int 
         if(priority(kind)<=priority(f->impact_kind))return;
     }else if(f->impact_cooldown>0&&priority(kind)<=priority(f->impact_kind))return;
     f->impact_kind=kind;f->impact_ids[0]=id;f->impact_ids[1]=second;
-    f->impact_color=kind==IMPACT_CHAMPION?(Color){.98f,.98f,.94f}:
-        (kind==IMPACT_INTERRUPT?(Color){1,.57f,.24f}:(kind==IMPACT_PIERCE?(Color){.78f,.54f,1}:(Color){.38f,.94f,1}));
-    f->impact_duration=kind==IMPACT_CHAMPION?.060f:.045f;
-    f->impact_time=f->impact_duration;f->impact_cooldown=kind==IMPACT_CHAMPION?.8f:.4f;
+    f->impact_color=(Color){1,1,1};f->impact_phase=app->motion?0:1;
+    f->impact_duration=kind==IMPACT_CHAMPION?.220f:.160f;
+    f->impact_time=f->impact_duration-(app->motion?0:(kind==IMPACT_CHAMPION?.055f:.045f));
+    f->impact_cooldown=kind==IMPACT_CHAMPION?1:.6f;
     f->impact_drawn=f->hold_drawn=false;f->held_weapon=g->player.weapon;
     f->hold_time=app->motion?.040f*app->impact_intensity:0;
     shake(f,g,app,kind==IMPACT_CHAMPION?.009f:(kind==IMPACT_PIERCE?.004f:.0025f),kind==IMPACT_CHAMPION?.24f:.12f);
@@ -151,7 +151,19 @@ static void cache(Feedback *f,const Game *g) {
 static void advance(Feedback *f,const Game *g,const App *app,float dt) {
     f->shake_time=app->motion?fmaxf(0,f->shake_time-dt):0;
     f->impact_cooldown=fmaxf(0,f->impact_cooldown-dt);
-    if(f->impact_drawn)f->impact_time=fmaxf(0,f->impact_time-dt);
+    if(f->impact_drawn&&f->impact_time>0) {
+        f->impact_time=fmaxf(0,f->impact_time-dt);
+        bool champion=f->impact_kind==IMPACT_CHAMPION;
+        float negative=champion?.055f:.045f,positive=champion?.065f:.055f;
+        float elapsed=f->impact_duration-f->impact_time;
+        /* Ne jamais sauter une phase, même si une image est lente. */
+        if(f->impact_phase==0&&(!app->motion||elapsed>=negative)) {
+            f->impact_phase=1;f->impact_time=f->impact_duration-negative;f->impact_drawn=false;
+        }else if(f->impact_phase==1&&elapsed>=negative+positive) {
+            f->impact_phase=2;f->impact_time=f->impact_duration-negative-positive;f->impact_drawn=false;
+        }
+    }
+    f->impact_color=f->impact_phase>0&&f->impact_kind!=IMPACT_HEAD?(Color){1,.035f,.018f}:(Color){1,1,1};
     bool held=f->hold_time>0;
     f->hold_time=fmaxf(0,f->hold_time-dt);
     if(!app->motion)f->hold_time=0;
@@ -248,17 +260,18 @@ void feedback_update(Feedback *f,const Game *g,const App *app) {
         Vec3 point=vadd(e->body.position,(Vec3){0,.9f*enemy_size(e),0});
         if(vlength(vsub(point,g->player.body.position))>48)continue;
         debris(f,app,point,(Vec3){0,1,0},feedback_enemy_color(e),e->elite?18:8,SHARD);
+        const Enemy *old=find_enemy(f->enemies,f->enemy_count,e->id);
+        if(old&&old->attack_timer>.12f&&!old->attack_fired&&e->attack_fired
+            &&e->type!=ENEMY_BOMBER&&!e->elite&&focused(g,point,.82f))
+            impact(f,g,app,IMPACT_INTERRUPT,e->id,-1);
         if(e->elite) {
             Vec3 floor=vadd(e->body.position,(Vec3){0,.04f,0});ring(f,floor,(Color){1,.72f,.26f},6,1);
             if(focused(g,point,.3f))impact(f,g,app,IMPACT_CHAMPION,e->id,-1);
         }
         if(killed&&focused(g,point,.94f)&&deaths_seen<2)deaths[deaths_seen++]=e;
-        if(killed&&headshot) {
-            Vec3 q=e->body.position;float scale=enemy_size(e),r=.6f*scale;
-            float hit=ray_box(player_eye(&g->player,false),look_direction(g->player.yaw,g->player.pitch),
-                (Box){{q.x-r,q.y+1.18f*scale,q.z-r},{q.x+r,q.y+ENEMY_HEIGHT*scale,q.z+r}},SHOT_RANGE);
-            if(hit<SHOT_RANGE)impact(f,g,app,IMPACT_HEAD,e->id,-1);
-        }
+        /* Les compteurs autoritaires restent valides après un mouvement de
+           souris. Ne pas reconstituer le tir avec la visée de l'image suivante. */
+        if(killed&&headshot)impact(f,g,app,IMPACT_HEAD,e->id,-1);
     }
     if(deaths_seen==2&&g->player.upgrades[UPGRADE_PIERCE]&&local->weapon<STANDARD_WEAPONS&&g->shot_age<.18f) {
         Vec3 a=vadd(deaths[0]->body.position,(Vec3){0,1,0}),b=vadd(deaths[1]->body.position,(Vec3){0,1,0});
@@ -296,8 +309,10 @@ Vec3 feedback_camera_shake(const Feedback *f,const App *app) {
 }
 float feedback_impact(const Feedback *f,const App *app) {
     if(!f||f->impact_time<=0||app->state!=STATE_PLAYING)return 0;
-    float t=clampf(f->impact_time/fmaxf(.001f,f->impact_duration),0,1);
-    return app->impact_intensity*(f->impact_kind==IMPACT_CHAMPION?.85f:.65f)*t;
+    float tail=f->impact_kind==IMPACT_CHAMPION?.100f:.060f;
+    float fade=f->impact_phase==2?clampf(f->impact_time/tail,0,1):1;
+    float remaining=1-clampf(app->impact_intensity,0,1);
+    return (1-remaining*remaining*remaining)*fade;
 }
 bool feedback_hold_weapon(const Feedback *f,const Game *g,const App *app) {
     return f&&app->motion&&app->impact_intensity>0&&f->hold_time>0&&app->state==STATE_PLAYING

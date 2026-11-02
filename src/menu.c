@@ -6,6 +6,33 @@
 int menu_count(const App *a){return a->menu_page?11:4;}
 static float ease(float t){t=clampf(t,0,1);return t*t*(3-2*t);}
 static Color mix(Color a,Color b,float t){return (Color){a.r+(b.r-a.r)*t,a.g+(b.g-a.g)*t,a.b+(b.b-a.b)*t};}
+bool menu_visible(const App *a) {
+    return a->state==STATE_MENU||a->state==STATE_PAUSED||a->state==STATE_DEAD
+        ||a->state==STATE_NETWORK||a->state==STATE_LOBBY;
+}
+Vec3 menu_offset(const App *a,float depth) {
+    if(!a->motion||!menu_visible(a))return (Vec3){0,0,0};
+    return (Vec3){-a->menu_parallax_x*depth*12,-a->menu_parallax_y*depth*7,0};
+}
+/* La profondeur est un marqueur temporaire du maillage UI. Elle est consommée
+   avant l'envoi au GPU ; aucune perspective ne déforme les textes. */
+void menu_layer(Mesh *m,int first,float depth) {
+    for(int i=first;i<m->count;i++)m->data[i].position.z=depth;
+}
+void menu_parallax_apply(Mesh *m,const App *a) {
+    if(!menu_visible(a))return;
+    for(int i=0;i<m->count;i++) {
+        Vertex *v=&m->data[i];Vec3 offset=menu_offset(a,v->position.z>0?v->position.z:MENU_CONTROL_DEPTH);
+        v->position.x+=offset.x;v->position.y+=offset.y;v->position.z=0;
+    }
+}
+bool menu_coordinates(const App *a,const Renderer *r,int x,int y,float *px,float *py) {
+    int w,h;SDL_GetWindowSize(r->window,&w,&h);if(w<=0||h<=0)return false;
+    float dw=(float)w,dh=dw*9/16;if(dh>h){dh=(float)h;dw=dh*16/9;}
+    Vec3 offset=menu_offset(a,MENU_CONTROL_DEPTH);
+    *px=((float)x-((float)w-dw)/2)*640/dw-offset.x;
+    *py=((float)y-((float)h-dh)/2)*360/dh-offset.y;return true;
+}
 int menu_row_id(const App *a,int row) {
     static const int main_ids[4]={0,1,11,10};
     if(row<0||row>=menu_count(a))return -1;
@@ -27,7 +54,7 @@ void menu_pointer_update(App *a,const Renderer *r) {
 }
 void menu_animate(App *a,float dt) {
     bool visible=a->state==STATE_MENU||a->state==STATE_PAUSED||a->state==STATE_DEAD;
-    bool pointer=visible||a->state==STATE_NETWORK||a->state==STATE_LOBBY;
+    bool pointer=menu_visible(a);
     float blend=1-expf(-8*dt);
     if(a->motion) {
         a->menu_parallax_x+=((pointer?a->menu_pointer_x:0)-a->menu_parallax_x)*blend;
@@ -44,9 +71,7 @@ void menu_animate(App *a,float dt) {
     else a->menu_highlight=(float)row;
 }
 int menu_hit(const App *a,Renderer *r,int x,int y) {
-    int width,height;SDL_GetWindowSize(r->window,&width,&height);if(width<=0||height<=0)return -1;
-    float dw=(float)width,dh=dw*9/16;if(dh>height){dh=(float)height;dw=dh*16/9;}
-    float px=((float)x-((float)width-dw)/2)*640/dw,py=((float)y-((float)height-dh)/2)*360/dh;
+    float px,py;if(!menu_coordinates(a,r,x,y,&px,&py))return -1;
     if(px<64||px>(a->menu_page?576:342)||py<128)return -1;
     float step=a->menu_page?SETTINGS_ROW_HEIGHT:42;int row=(int)((py-128)/step);
     if(!a->menu_page&&py-128-(float)row*step>38)return -1;
@@ -56,26 +81,30 @@ static void center(Mesh *m,float y,int scale,Color c,const char *text) {
     mesh_text(m,(640-(float)strlen(text)*6*(float)scale)/2,y,scale,c,text);
 }
 static const Color ink={.91f,.96f,1},blue={.32f,.8f,1},muted={.51f,.64f,.72f};
-static void translate(Mesh *m,int first,float x,float y) {
-    for(int i=first;i<m->count;i++){m->data[i].position.x+=x;m->data[i].position.y+=y;}
-}
 void ui_music_visualizer(Mesh *m,const App *a,float x,float baseline,float width,float height) {
     float step=width/MUSIC_VISUAL_BANDS;
     for(int i=0;i<MUSIC_VISUAL_BANDS;i++) {
         float level=clampf(a->music_bands[i],0,1);
-        float h=1+level*height*(a->motion?1:.45f);
-        mesh_rect(m,x+(float)i*step,baseline-h,step-2,h,mix((Color){.10f,.22f,.28f},blue,level));
+        float h=floorf(level*height*(a->motion?1:.45f)),bx=x+(float)i*step;
+        mesh_rect(m,bx,baseline-1,step-2,1,(Color){.08f,.19f,.24f});
+        for(float y=0;y<h;y+=3) {
+            Color c=y>height*.75f?(Color){1,.72f,.25f}:(Color){.25f,.85f,1};
+            mesh_rect(m,bx,baseline-y-fminf(2,h-y),step-2,fminf(2,h-y),c);
+        }
+        float peak=floorf(a->music_peaks[i]*height*(a->motion?1:.45f));
+        if(peak>=1)mesh_rect(m,bx,baseline-peak,step-2,1,(Color){.9f,.97f,1});
     }
 }
 void menu_build(Mesh *m,const Game *g,const App *a) {
     char text[160];int first=m->count;float time=a->motion?a->ui_time:0;
-    float px=a->motion?a->menu_parallax_x:0,py=a->motion?a->menu_parallax_y:0;
     mesh_rect(m,48,16,544,328,(Color){.025f,.045f,.064f});
     mesh_rect(m,48,16,544,2,blue);mesh_rect(m,48,342,544,2,(Color){.1f,.23f,.30f});
-    for(int i=0;i<6;i++)mesh_rect(m,368+(float)i*36-px*7,26-py*4,1,63,(Color){.055f,.1f,.14f});
-    if(a->motion)mesh_rect(m,368-px*7,27+fmodf(time*12,59)-py*4,206,1,(Color){.085f,.17f,.22f});
+    menu_layer(m,first,.25f);int grid=m->count;
+    for(int i=0;i<6;i++)mesh_rect(m,368+(float)i*36,26,1,63,(Color){.055f,.1f,.14f});
+    if(a->motion)mesh_rect(m,368,27+fmodf(time*12,59),206,1,(Color){.085f,.17f,.22f});
+    menu_layer(m,grid,.45f);
     mesh_text(m,64,27,1,muted,"FASTFPS " GAME_VERSION " / SURVIE COOPERATIVE");
-    mesh_text(m,64+px*4,44+py*2.5f,7,ink,"FASTFPS");
+    int title=m->count;mesh_text(m,64,44,7,ink,"FASTFPS");menu_layer(m,title,1.1f);
     mesh_text(m,427,45,1,blue,a->menu_page?"REGLAGES":"SECTEUR ZERO");
     snprintf(text,sizeof(text),"RECORD %d",a->best_score);mesh_text(m,427,61,1,muted,text);
     mesh_text(m,427,80,1,muted,"MUSIQUE");
@@ -92,8 +121,8 @@ void menu_build(Mesh *m,const Game *g,const App *a) {
     float pulse=.7f+.2f*sinf(time*2);
     mesh_triangle(m,(Vec3){396,46,0},(Vec3){406,62,0},(Vec3){396,78,0},mix(muted,blue,pulse),(Vec3){0,0,1});
     mesh_triangle(m,(Vec3){396,46,0},(Vec3){396,78,0},(Vec3){386,62,0},mix(ink,blue,pulse),(Vec3){0,0,1});
-    translate(m,orb,px*6,py*4);
-    if(a->state==STATE_DEAD)center(m,95,2,(Color){1,.53f,.24f},"GAME OVER");
+    menu_layer(m,orb,1.35f);
+    if(a->state==STATE_DEAD)center(m,95,2,(Color){1,.53f,.24f},"PARTIE TERMINEE");
     else center(m,96,1,blue,a->menu_page?"AJUSTE TON JEU / REGLAGES SAUVEGARDES":(a->state==STATE_PAUSED?"PARTIE EN PAUSE":"BOUGE. COOPERE. SURVIS."));
     if(a->state==STATE_DEAD) {
         snprintf(text,sizeof(text),"%s / SCORE %d / %d ROUNDS",g->cooperative?"EQUIPE A TERRE":"TROIS VIES EPUISEES",g->score,g->completed_waves);
@@ -127,7 +156,7 @@ void menu_build(Mesh *m,const Game *g,const App *a) {
         mesh_text(m,376,241,1,blue,"E MAINTENU : REANIMER");
         mesh_text(m,376,259,1,muted,"LIFTS : HAUTEURS ET SOINS");
         mesh_text(m,376,275,1,blue,world_route_name(g->map_id));
-        translate(m,card,px*3,py*2);
+        menu_layer(m,card,.6f);
         center(m,312,1,muted,"FLECHES OU SOURIS / ENTREE POUR JOUER");
     }else {
         mesh_rect(m,64,128+a->menu_highlight*SETTINGS_ROW_HEIGHT,512,15,(Color){.1f,.2f,.26f});

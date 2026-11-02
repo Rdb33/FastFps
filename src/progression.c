@@ -60,7 +60,7 @@ void upgrade_sync(App *app,const Game *g,bool demo) {
     if(app->state==STATE_PLAYING&&pending) {
         /* Laisser apparaître la confirmation visuelle du dernier coup avant
            les cartes ; le délai de choix autoritaire continue normalement. */
-        if(app->impact_intensity>0&&g->wave_clear_time>2.58f)return;
+        if(app->impact_intensity>0&&g->wave_clear_time>2.50f)return;
         app->state=STATE_UPGRADE;app->selected=0;app->upgrade_choice=0;
         app->upgrade_ready_at=SDL_GetTicks()+1000;
         app->upgrade_released=!(SDL_GetMouseState(NULL,NULL)&SDL_BUTTON(SDL_BUTTON_LEFT));

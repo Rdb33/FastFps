@@ -1,3 +1,13 @@
+# Snapshot 1.2.3
+
+- Impact frames composées en trois phases : négatif noir/blanc avec contours, positif noir/blanc pour les têtes ou noir/rouge pour les autres coups marquants, puis retour aux couleurs normales. Durées nominales de 160 / 220 ms, chaque phase affichée au moins une image ; intensité accrue et détails lisibles dans les ombres. Délai partagé 0,6 / 1 s ; interface conservée.
+- Confirmations des têtes fatales fondées sur les compteurs de combat plutôt que sur la visée de l'image suivante. Interruptions fatales reconnues parmi les nouveaux corps. Délai cosmétique avant les modules porté de 0,22 à 0,3 s ; échéance autoritaire inchangée.
+- Parallaxe de toute la composition du menu : fond, grille, carte d'informations, commandes, titre et réacteur déplacés selon leur profondeur ; décor 3D en arrière-plan, accueil / pause / fin de partie / réglages / salons / fenêtre de mise à jour. Zones de clic, saisies et sliders suivent les commandes ; conversion commune pour les fenêtres avec bandes noires.
+- Visualiseur : filtres deux fois plus sélectifs, échelle logarithmique avec plancher et réponse plus rapide, segments lumineux et témoins de crête. Suppression des colonnes de fond qui semblaient pleines au silence. Volume et fondus conservés, aucune musique ajoutée au dépôt.
+- F4 coupe la phase inversée et le parallaxe, conserve un contraste positif et réduit les barres ; intensité zéro coupe les impact frames. Protocole 11 et simulation conservés, compatibilité avec les versions 1.2.0 à 1.2.2. Aucune dépendance, texture ou passe de rendu supplémentaire.
+- Compilation C11 sans avertissement, captures OpenGL hors écran, contrôles temporaires des déclenchements et phases, interactions avec parallaxe, analyse de signaux et extraits musicaux locaux, encodage / décodage réseau. Aucun essai Pi ni connexion réelle entre machines ; coût GPU et confort à confirmer en partie.
+- À la publication, suite des mécaniques réussie ; deux échecs préexistants des suites réseau / gameplay, reproduits dans la 1.2.2, restent ouverts. Détails dans VALIDATION.md.
+
 # Snapshot 1.2.2
 
 - Parallaxe à la souris : titre, réacteur et panneau décoratif à plusieurs profondeurs, déplacement léger du décor 3D dans l'accueil et les salons, interpolation et retour au centre à la perte du survol. Zones de clic et commandes fixes.

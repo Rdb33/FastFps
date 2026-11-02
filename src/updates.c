@@ -139,12 +139,8 @@ static bool enabled(const UpdateChecker *u) {
     return u->released&&SDL_TICKS_PASSED(SDL_GetTicks(),u->ready_at);
 }
 
-static int button_at(Renderer *r,int x,int y) {
-    int width,height;SDL_GetWindowSize(r->window,&width,&height);
-    if(width<=0||height<=0)return -1;
-    float dw=(float)width,dh=dw*9/16;
-    if(dh>height){dh=(float)height;dw=dh*16/9;}
-    float px=((float)x-((float)width-dw)/2)*640/dw,py=((float)y-((float)height-dh)/2)*360/dh;
+static int button_at(const App *app,Renderer *r,int x,int y) {
+    float px,py;if(!menu_coordinates(app,r,x,y,&px,&py))return -1;
     if(py<231||py>263)return -1;
     if(px>=104&&px<=312)return 0;
     return px>=328&&px<=536?1:-1;
@@ -188,9 +184,9 @@ bool updates_event(App *app,Renderer *r,const SDL_Event *event) {
             else if(key==SDL_SCANCODE_RETURN||key==SDL_SCANCODE_KP_ENTER||key==SDL_SCANCODE_SPACE)activate(u);
         }
     }else if(enabled(u)&&event->type==SDL_MOUSEMOTION) {
-        int hit=button_at(r,event->motion.x,event->motion.y);if(hit>=0)u->selected=hit;
+        int hit=button_at(app,r,event->motion.x,event->motion.y);if(hit>=0)u->selected=hit;
     }else if(enabled(u)&&event->type==SDL_MOUSEBUTTONDOWN&&event->button.button==SDL_BUTTON_LEFT) {
-        int hit=button_at(r,event->button.x,event->button.y);
+        int hit=button_at(app,r,event->button.x,event->button.y);
         if(hit>=0){u->selected=hit;activate(u);}
     }
     return event->type==SDL_KEYDOWN||event->type==SDL_KEYUP||event->type==SDL_TEXTINPUT
@@ -202,7 +198,7 @@ void updates_build(Mesh *m,const App *app) {
     if(!visible(app)||!app->updates->open)return;
     const UpdateChecker *u=app->updates;char text[96];
     Color blue={.32f,.8f,1},ink={.91f,.96f,1},muted={.51f,.64f,.72f};
-    mesh_rect(m,0,0,640,360,(Color){.012f,.022f,.032f});
+    mesh_rect(m,-24,-16,688,392,(Color){.012f,.022f,.032f});
     mesh_rect(m,80,72,480,216,(Color){.035f,.07f,.10f});mesh_rect(m,80,72,480,3,blue);
     mesh_text(m,104,94,2,blue,u->details?"METTRE FASTFPS A JOUR":"MISE A JOUR DISPONIBLE");
     snprintf(text,sizeof(text),"VERSION INSTALLEE : %s / DISPONIBLE : %s",GAME_VERSION,u->latest);

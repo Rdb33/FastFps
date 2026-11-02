@@ -1,14 +1,20 @@
-# Salons coopératifs — version 1.2.2
+# Salons coopératifs — version 1.2.3
 
 Un joueur héberge un salon sur son ordinateur ; jusqu’à trois amis le rejoignent. L’hôte lance la partie quand les joueurs sont prêts. Le jeu utilise une **adresse IPv4 et un port TCP**, sans service central ni frais d’hébergement.
 
-**Les versions 1.2.0, 1.2.1 et 1.2.2 partagent le protocole 11** ; les versions 1.1.x et antérieures sont incompatibles. L'hôte gère les renforts, la coordination des attaques lourdes, les défis facultatifs, le réacteur, les bonus des quais et les dégâts. Les états de bonus et de charge, les réserves et les directions des impacts sont transmis aux invités. Le déplacement des joueurs, y compris les bonus de vitesse et l'élan des plateformes, reste prédit localement. Les nouvelles règles ne changent pas la manière de rejoindre un salon.
+**Les versions 1.2.0 à 1.2.3 partagent le protocole 11** ; les versions 1.1.x et antérieures sont incompatibles. L'hôte gère les renforts, la coordination des attaques lourdes, les défis facultatifs, le réacteur, les bonus des quais et les dégâts. Les états de bonus et de charge, les réserves et les directions des impacts sont transmis aux invités. Le déplacement des joueurs, y compris les bonus de vitesse et l'élan des plateformes, reste prédit localement. Les nouvelles règles ne changent pas la manière de rejoindre un salon.
 
 Le réacteur se charge en équipe avec 12 éliminations ; **E sur le socle central**, lorsque la charge est pleine, donne aux joueurs debout +15 PV, +15 % de vitesse et +25 % de vitesse de recharge pendant 15 s. Recharge de 45 s. La réanimation d'un allié à proximité prend la priorité sur l'activation. Les défis réussis récompensent toute l'équipe debout ; les bonus des quais sont individuels et consommés par le premier joueur à portée.
 
 Les renforts ajoutent des ennemis en réserve selon l'effectif et, dès la vague 9, selon l'avancement de la partie, jusqu'à 54 sur une vague, mais jamais plus de **18 actifs**. Ils arrivent au plus par trois toutes les deux secondes lorsqu'une position sûre et des places sont disponibles. La vague ne se termine qu'une fois la réserve vide et les derniers ennemis éliminés. Les PV augmentent de 10 % par joueur supplémentaire, avec une progression par vague de 5,5 % de leur base jusqu’à ×4,25. Les dégâts progressent jusqu’à +40 % (+25 % en Découverte) à la vague 31. Les durées des bonus temporaires sont suspendues pendant les intermissions. Les directions des deux derniers ennemis apparaissent quand la réserve est vide.
 
 La notification de mise à jour reste locale, attend un menu et ne suspend pas la partie de l'équipe. Les couleurs, numéros, armes, poses et étiquettes des alliés restent dérivés des états répliqués.
+
+## Présentation du snapshot 1.2.3
+
+Le parallaxe déplace aussi les commandes des salons et leurs zones de clic. Les impacts en trois phases, leur intensité et le visualiseur restent propres à chaque ordinateur. Les têtes fatales et interruptions mortelles sont confirmées à partir des états / compteurs existants, sans paquet supplémentaire et sans modifier la visée de gameplay. Si plusieurs actions arrivent dans le même instantané, leur attribution visuelle peut rester simplifiée.
+
+L'encodage / décodage d'un état réseau contenant un tir à la tête a été contrôlé avec le déclenchement de l'effet. Une connexion réelle avec latence entre plusieurs ordinateurs reste à essayer. Le protocole 11 et la manière de rejoindre un salon sont conservés.
 
 ## Présentation du snapshot 1.2.2
 

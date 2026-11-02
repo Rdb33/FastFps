@@ -38,7 +38,7 @@ static float towards(float n,float target,float step) {
 static void visualizer_init(void) {
     static const float centers[MUSIC_VISUAL_BANDS]={60,95,150,240,380,600,950,1500,2400,3800,6000,9000};
     for(int i=0;i<MUSIC_VISUAL_BANDS;i++) {
-        float w=6.283185307f*centers[i]/MUSIC_RATE,alpha=sinf(w)*.5f;
+        float w=6.283185307f*centers[i]/MUSIC_RATE,alpha=sinf(w)*.25f;
         MusicBand *b=&music.bands[i];
         b->b0=alpha/(1+alpha);b->b2=-b->b0;
         b->a1=-2*cosf(w)/(1+alpha);b->a2=(1-alpha)/(1+alpha);
@@ -73,7 +73,10 @@ static void visualizer_analyse(const float *stereo,int frames) {
     for(int i=0;i<MUSIC_VISUAL_BANDS;i++) {
         MusicBand *b=&music.bands[i];
         float rms=sqrtf(energy[i]/(float)frames);
-        b->level=sqrtf(bounded(rms*12,0,1));
+        /* Échelle logarithmique avec plancher : la racine précédente gonflait
+           les sons faibles et saturait les basses. Aucun gain automatique. */
+        float db=20*log10f(fmaxf(rms,.000001f));
+        float level=bounded((db+54)/36,0,1);b->level=level*level;
     }
 }
 static bool open_track(MusicTrack *t,const char *name) {

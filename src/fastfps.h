@@ -144,7 +144,7 @@ typedef struct {
     GLint light_position2, light_color2, glow, eye, detail, surface;
     GLint composite_position, composite_uv, composite_texture;
     GLint composite_texel, composite_effects;
-    GLint composite_brightness, composite_impact, pulse;
+    GLint composite_brightness, composite_impact, composite_impact_phase, pulse;
     struct Feedback *feedback;
     float brightness;
     uint32_t world_revision;
@@ -178,6 +178,7 @@ typedef struct {
     float ui_time, music_notice_time, menu_age, menu_highlight;
     float menu_pointer_x, menu_pointer_y, menu_parallax_x, menu_parallax_y;
     float music_bands[MUSIC_VISUAL_BANDS];
+    float music_peaks[MUSIC_VISUAL_BANDS];
     int menu_visual_page;
     State menu_visual_state;
 } App;
@@ -343,6 +344,11 @@ int menu_row_id(const App *app, int row);
 void menu_move(App *app, int direction);
 void menu_animate(App *app, float dt);
 void menu_pointer_update(App *app, const Renderer *renderer);
+bool menu_visible(const App *app);
+Vec3 menu_offset(const App *app, float depth);
+void menu_layer(Mesh *mesh, int first, float depth);
+void menu_parallax_apply(Mesh *mesh, const App *app);
+bool menu_coordinates(const App *app, const Renderer *renderer, int x, int y, float *px, float *py);
 void ui_music_visualizer(Mesh *mesh, const App *app, float x, float baseline, float width, float height);
 int menu_hit(const App *app, Renderer *renderer, int x, int y);
 void menu_build(Mesh *mesh, const Game *game, const App *app);

@@ -2,7 +2,21 @@
 
 Historique des contrôles sur la machine de développement ; les résultats sont datés par version.
 
+## Snapshot 1.2.3 — 2 novembre 2026
+
+- Compilation C11 `-O2 -Wall -Wextra -Wpedantic`, sans avertissement, et revue du diff.
+- Programme de contrôle temporaire lié aux objets réels du jeu : fonctions de tir / simulation puis Renderer OpenGL ES hors écran Mesa llvmpipe, profil Pi 640 × 360. Captures du négatif, positif noir/blanc, positif noir/rouge et retour progressif ; aucune erreur OpenGL observée. Ce rendu logiciel sur PC ne constitue pas une mesure Pi.
+- Déclenchements contrôlés : tête fatale, tête non fatale, corps simple, interruption survivante et fatale, champion visible et hors regard, double élimination Perforation, tête avec visée déplacée, dernier ennemi et cartes, délai partagé, intensités 0 / 50 / 100 %, mode rétro et F4. Les deux défauts précédemment reproduits — interruption fatale et visée déplacée — déclenchent désormais leur effet dans ces scénarios.
+- Phases temporelles contrôlées : négatif → positif → restauration, puis extinction. Les premières phases conservent leur force ; une image lente ne saute pas directement à l'extinction. F4 commence au positif ; aucune phase inversée en mode réduit.
+- Captures des menus avec pointeur au centre et aux coins, réglages et salons. Contrôles des clics aux positions déplacées, extrémités de slider, champ pseudo, bouton de notification de mise à jour et fenêtre carrée avec bandes noires. F4 remet le décalage à zéro ; marqueurs de profondeur UI consommés avant l'envoi au GPU.
+- Analyse hors ligne du même code de filtres avec sinus à 95 Hz (silence, amplitudes 0,001 / 0,01 / 0,03 / 0,12) : bande centrale à 0 / 0 / 0,095 / 0,329 / 0,825 ; silence après son : douze bandes à zéro. Analyse de deux extraits MP3 personnels de douze secondes, gain approchant le volume 50 % avant filtre / duck : variations réelles, aucun écrêtage à 1 sur ces extraits. Aucun enregistrement audio ou extrait ajouté au dépôt ; pas d'écoute ni de mesure du périphérique audio.
+- État réseau encodé / décodé avec tête fatale et impact confirmé. Protocole 11, fonctions de sérialisation et états de gameplay inchangés ; présentation locale uniquement.
+- Contrôles et captures conservés dans build/verification-v1.2.3, hors Git. Aucune nouvelle dépendance ni passe de rendu ; lecture du voisinage du pixel limitée aux phases d'impact. **Raspberry Pi, connexion réelle entre ordinateurs, latence, écoute et confort sur une partie complète restent à essayer.**
+- Contrôle de publication : binaire `FASTFPS 1.2.3`, démonstration de 60 images et capture hors écran réussies ; suite `test-mechanics` réussie. **La suite complète n'est pas au vert** : `test-network` échoue sur la transition vers la vague 6 (`tests/network.c:123`) et `test-gameplay` sur le placement des barils (`tests/gameplay.c:70`). Ces deux échecs sont reproduits à l'identique dans un export propre du tag `v1.2.2` ; ils restent à corriger séparément.
+
 ## Snapshot 1.2.2 — 2 novembre 2026
+
+Contrôles ci-dessous consignés à la préparation. Une vérification complémentaire hors écran a ensuite confirmé les effets nominaux et reproduit deux défauts : interruption fatale et tête suivie d’un déplacement de visée. Leurs corrections et nouvelles captures sont décrites dans la section 1.2.3.
 
 - Compilation C11 avec `-O2 -Wall -Wextra -Wpedantic`, sans avertissement, et revue du diff.
 - Parallaxe calculé dans App / Renderer ; taille de fenêtre et bandes noires prises en compte, cibles bornées à ±1, lissage indépendant de la fréquence. Coordonnées des boutons / champs / sliders conservées. Lecture de la souris séparée des événements pour fonctionner pendant la saisie et le glissement des sliders.

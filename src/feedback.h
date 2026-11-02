@@ -44,7 +44,7 @@ typedef struct Feedback {
     uint32_t event_serial;
     int completed_waves, blast_count;
     Blast blasts[MAX_BLASTS];
-    int impact_kind, impact_ids[2], held_weapon;
+    int impact_kind, impact_phase, impact_ids[2], held_weapon;
     Color impact_color;
 } Feedback;
 

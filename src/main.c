@@ -318,9 +318,10 @@ int main(int argc,char **argv) {
         audio_music(app.music_volume,gameplay_music,music_focus);
         float levels[MUSIC_VISUAL_BANDS];audio_music_levels(levels);
         for(int i=0;i<MUSIC_VISUAL_BANDS;i++) {
-            float rate=levels[i]>app.music_bands[i]?18:5;
+            float rate=levels[i]>app.music_bands[i]?35:12;
             if(!app.motion)rate*=.35f;
             app.music_bands[i]+=(levels[i]-app.music_bands[i])*(1-expf(-(float)elapsed*rate));
+            app.music_peaks[i]=fmaxf(app.music_bands[i],app.music_peaks[i]-(float)elapsed*(app.motion?.75f:.3f));
         }
         menu_pointer_update(&app,&renderer);
         menu_animate(&app,(float)elapsed);

@@ -30,11 +30,6 @@ void settings_write(const App *app) {
     fprintf(file,"%d %.2f %d %d %d %d %d %.2f %.2f %.2f\n",app->quality,app->sensitivity,app->sound,app->best_score,app->motion,app->difficulty,app->modern,app->brightness,app->music_volume,app->impact_intensity);fclose(file);
 }
 /* Coordonnées communes à l'affichage et aux zones interactives du menu. */
-static bool coordinates(Renderer *r,int x,int y,float *px,float *py) {
-    int w,h;SDL_GetWindowSize(r->window,&w,&h);if(w<=0||h<=0)return false;
-    float dw=(float)w,dh=dw*9/16;if(dh>h){dh=(float)h;dw=dh*16/9;}
-    *px=((float)x-((float)w-dw)/2)*640/dw;*py=((float)y-((float)h-dh)/2)*360/dh;return true;
-}
 static bool numeric_row(int row){return row==3||row==9||row==13||row==14;}
 static float value(const App *a,int row){return row==3?a->sensitivity:(row==9?a->brightness:(row==13?a->music_volume:a->impact_intensity))*100;}
 static float minimum(int row){return row==3?.3f:(row==9?50:0);}
@@ -88,14 +83,14 @@ bool settings_event(App *a,Renderer *r,const SDL_Event *e) {
     if(e->type==SDL_MOUSEBUTTONUP&&e->button.button==SDL_BUTTON_LEFT&&a->slider_drag>=0){a->slider_drag=-1;return true;}
     if(e->type==SDL_MOUSEMOTION) {
         if(a->slider_drag>=0) {
-            float x,y;if(coordinates(r,e->motion.x,e->motion.y,&x,&y))
+            float x,y;if(menu_coordinates(a,r,e->motion.x,e->motion.y,&x,&y))
                 assign(a,a->slider_drag,minimum(a->slider_drag)+clampf((x-320)/150,0,1)*(maximum(a->slider_drag)-minimum(a->slider_drag)));
             return true;
         }
         if(a->numeric_edit>=0)return true;
     }
     if(e->type==SDL_MOUSEBUTTONDOWN&&e->button.button==SDL_BUTTON_LEFT) {
-        float x,y;if(!coordinates(r,e->button.x,e->button.y,&x,&y))return false;
+        float x,y;if(!menu_coordinates(a,r,e->button.x,e->button.y,&x,&y))return false;
         finish(a,true);
         int row=menu_row_id(a,(int)floorf((y-128)/SETTINGS_ROW_HEIGHT));
         if(x<64||x>576||y<128||row<0||!numeric_row(row))return false;

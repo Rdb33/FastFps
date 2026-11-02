@@ -70,13 +70,10 @@ static void action(App *app,Game *g) {
     bool success=app->selected==0?net_host(n):net_join(n);
     if(success){stop_edit(app);n->discovery_requested=false;app->state=STATE_LOBBY;app->selected=0;}
 }
-static int hit(Renderer *r,int x,int y,State state) {
-    int width,height;SDL_GetWindowSize(r->window,&width,&height);
-    if(width<=0||height<=0)return -1;
-    float dw=(float)width,dh=dw*9/16;if(dh>height){dh=(float)height;dw=dh*16/9;}
-    float px=((float)x-((float)width-dw)/2)*640/dw,py=((float)y-((float)height-dh)/2)*360/dh;
+static int hit(const App *app,Renderer *r,int x,int y) {
+    float px,py;if(!menu_coordinates(app,r,x,y,&px,&py))return -1;
     if(px<76||px>564)return -1;
-    if(state==STATE_NETWORK) {
+    if(app->state==STATE_NETWORK) {
         if(py>=94&&py<214)return (int)((py-94)/20);
         if(py>=237&&py<291)return 6+(int)((py-237)/18);
     }else if(py>=237&&py<297)return (int)((py-237)/20);
@@ -125,11 +122,11 @@ bool lobby_event(App *app,Game *g,Renderer *r,const SDL_Event *event) {
         return true;
     }
     if(event->type==SDL_MOUSEMOTION) {
-        if(app->editing<0){int row=hit(r,event->motion.x,event->motion.y,app->state);if(row>=0)app->selected=row;}
+        if(app->editing<0){int row=hit(app,r,event->motion.x,event->motion.y);if(row>=0)app->selected=row;}
         return true;
     }
     if(event->type==SDL_MOUSEBUTTONDOWN&&event->button.button==SDL_BUTTON_LEFT) {
-        int row=hit(r,event->button.x,event->button.y,app->state);
+        int row=hit(app,r,event->button.x,event->button.y);
         stop_edit(app);if(row>=0){app->selected=row;action(app,g);}return true;
     }
     return false;
@@ -164,10 +161,13 @@ static void row(Mesh *m,const App *app,int index,float y,const char *text,bool e
 }
 void lobby_build(Mesh *m,const Game *g,const App *app) {
     Network *n=app->network;char text[128];
+    int panel=m->count;
     mesh_rect(m,48,12,544,336,(Color){.055f,.06f,.047f});mesh_rect(m,48,12,544,3,blue);
+    menu_layer(m,panel,.25f);
     mesh_text(m,76,27,1,muted,"FASTFPS " GAME_VERSION " / COOPERATION A 4 JOUEURS");
     ui_music_visualizer(m,app,490,34,86,9);
-    centered(m,46,4,ink,app->state==STATE_NETWORK?"JOUER ENSEMBLE":"SALON COOP");
+    int title=m->count;centered(m,46,4,ink,app->state==STATE_NETWORK?"JOUER ENSEMBLE":"SALON COOP");
+    menu_layer(m,title,1.1f);
     if(app->network_help) {
         centered(m,88,2,blue,"CONNEXION EN QUELQUES ETAPES");
         mesh_text(m,80,120,1,ink,"MEME RESEAU / MEME WI-FI");
