@@ -2,7 +2,8 @@
 #define FASTFPS_CONFIG_H
 
 /* Réglages de la première base : gameplay proche d'un Doom moderne. */
-#define GAME_VERSION "1.2.1"
+#define GAME_VERSION "1.2.2"
+#define MUSIC_VISUAL_BANDS 12
 #define MAP_COUNT 3
 #define STANDARD_WEAPONS 4
 #define WEAPON_ROCKET 4

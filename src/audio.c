@@ -49,6 +49,7 @@ void audio_init(void) {
     else SDL_Log("Audio indisponible : %s",SDL_GetError());
 }
 void audio_music(float volume,bool gameplay,float focus){music_set(volume,gameplay,focus);}
+void audio_music_levels(float levels[MUSIC_VISUAL_BANDS]){music_levels(levels);}
 void audio_enabled(bool value) {
     enabled=value;
     if(device){SDL_LockAudioDevice(device);memset(voices,0,sizeof(voices));SDL_UnlockAudioDevice(device);}

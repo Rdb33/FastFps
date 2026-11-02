@@ -194,6 +194,8 @@ void ui_build(Mesh *m,const Game *g,const App *app) {
             mesh_text(m,410+dx,255,1,muted,"TOUCHE 5 / DEGATS DE ZONE");
         }
         encounters_ui(m,g,app);
+        if(app->state==STATE_PLAYING&&!app->show_build&&!g->dead)
+            ui_music_visualizer(m,app,548,302,78,9);
         if(app->state==STATE_PLAYING&&app->music_notice_time>0&&app->music_volume<=0&&!g->dead&&!app->show_build) {
             float slide=app->motion?clampf(fminf((8-app->music_notice_time)/.25f,app->music_notice_time/.25f),0,1):1;
             slide=slide*slide*(3-2*slide);

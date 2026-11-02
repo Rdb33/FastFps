@@ -166,6 +166,7 @@ void lobby_build(Mesh *m,const Game *g,const App *app) {
     Network *n=app->network;char text[128];
     mesh_rect(m,48,12,544,336,(Color){.055f,.06f,.047f});mesh_rect(m,48,12,544,3,blue);
     mesh_text(m,76,27,1,muted,"FASTFPS " GAME_VERSION " / COOPERATION A 4 JOUEURS");
+    ui_music_visualizer(m,app,490,34,86,9);
     centered(m,46,4,ink,app->state==STATE_NETWORK?"JOUER ENSEMBLE":"SALON COOP");
     if(app->network_help) {
         centered(m,88,2,blue,"CONNEXION EN QUELQUES ETAPES");

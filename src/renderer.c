@@ -196,9 +196,16 @@ void renderer_draw(Renderer *r,const Game *g,const App *app) {
     const Player *p=&g->player;float speed=hypotf(p->body.velocity.x,p->body.velocity.z);
     float fov=(87+(app->motion?speed*.2f:0))*PI_F/180;
     Mat4 projection=perspective(fov,(float)r->width/(float)r->height,.05f,100);
-    Mat4 view=view_matrix(player_eye(p,app->motion),p->yaw,p->pitch);
+    Vec3 eye=player_eye(p,app->motion),shake=feedback_camera_shake(r->feedback,app);
+    float yaw=p->yaw+shake.y,pitch=p->pitch+shake.x;
+    if(app->motion&&(app->state==STATE_MENU||app->state==STATE_NETWORK||app->state==STATE_LOBBY)) {
+        float x=app->menu_parallax_x,y=app->menu_parallax_y;
+        eye=vadd(eye,(Vec3){cosf(p->yaw)*x*.28f,-y*.1f,sinf(p->yaw)*x*.28f});
+        yaw+=x*.023f;pitch-=y*.016f;
+    }
+    Mat4 view=view_matrix(eye,yaw,pitch);
     if(app->motion) {
-        float angle=p->strafe_blend*.009f+(p->body.grounded?sinf(p->bob)*p->movement_blend*.0025f:0);
+        float angle=p->strafe_blend*.009f+(p->body.grounded?sinf(p->bob)*p->movement_blend*.0025f:0)+shake.z;
         float c=cosf(angle),s=sinf(angle);
         Mat4 roll={{c,s,0,0,-s,c,0,0,0,0,1,0,0,0,0,1}};view=mat_multiply(roll,view);
     }
@@ -207,7 +214,7 @@ void renderer_draw(Renderer *r,const Game *g,const App *app) {
     glEnable(GL_DEPTH_TEST);glEnable(GL_CULL_FACE);glDisable(GL_BLEND);
     glClearColor(.045f,.04f,.032f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);glUseProgram(r->program);
     Color theme=sector_theme(g->wave);glUniform3f(r->sector_color,theme.r,theme.g,theme.b);
-    Vec3 eye=player_eye(p,app->motion);glUniform3f(r->eye,eye.x,eye.y,eye.z);
+    glUniform3f(r->eye,eye.x,eye.y,eye.z);
     glUniform1f(r->detail,r->modern&&r->detail_level>0?1:0);glUniform1f(r->surface,1);
     float pulse=r->feedback->reactor_pulse;
     glUniform2f(r->pulse,(1.2f-pulse)*32/1.2f,pulse>0?pulse/1.2f*app->impact_intensity:0);
@@ -308,7 +315,8 @@ void renderer_draw(Renderer *r,const Game *g,const App *app) {
     glUniform2f(r->pulse,0,0);
     glUniform3f(r->light_color,0,0,0);glUniform3f(r->sector_color,.75f,.85f,1);
     glUniform3f(r->light_color2,0,0,0);glUniform3f(r->eye,0,0,0);
-    glClear(GL_DEPTH_BUFFER_BIT);upload(r->gun_buffer,m);draw(r,r->gun_buffer,m->count,projection,0,0);
+    Mat4 gun_matrix=mat_multiply(projection,view_matrix((Vec3){0,0,0},shake.y*.35f,shake.x*.35f));
+    glClear(GL_DEPTH_BUFFER_BIT);upload(r->gun_buffer,m);draw(r,r->gun_buffer,m->count,gun_matrix,0,0);
     ui_build(&r->ui,g,app);ui_teammates(&r->ui,g,app,matrix);updates_build(&r->ui,app);upload(r->ui_buffer,&r->ui);
     /* L'interface est dessinée après l'agrandissement, à la résolution de la fenêtre. */
     glBindFramebuffer(GL_FRAMEBUFFER,0);

@@ -2,6 +2,15 @@
 
 Historique des contrôles sur la machine de développement ; les résultats sont datés par version.
 
+## Snapshot 1.2.2 — 2 novembre 2026
+
+- Compilation C11 avec `-O2 -Wall -Wextra -Wpedantic`, sans avertissement, et revue du diff.
+- Parallaxe calculé dans App / Renderer ; taille de fenêtre et bandes noires prises en compte, cibles bornées à ±1, lissage indépendant de la fréquence. Coordonnées des boutons / champs / sliders conservées. Lecture de la souris séparée des événements pour fonctionner pendant la saisie et le glissement des sliders.
+- Secousses amorties et bornées à 0,012 rad avant le réglage d'intensité, appliquées aux matrices de rendu, avec influence réduite sur l'arme. Aucune écriture dans les angles du joueur, les collisions ou le RNG de gameplay ; HUD stable, étiquettes d'alliés projetées avec la vue de la scène. Caches remis à zéro avec la map / partie ; désactivation hors jeu, à intensité nulle et avec F4.
+- Analyse à douze bandes fixes sur 22 050 Hz stéréo, après les effets musicaux et avant les bruitages. Coefficients calculés à l'initialisation, aucun fichier, allocation ou verrou dans l'analyse du callback. Au silence, états des filtres remis à zéro et calcul des bandes évité. Les niveaux seuls sont copiés sous verrou depuis le thread principal, puis lissés ; le lecteur continue à accepter l'absence de MP3.
+- 72 sommets de rectangles par visualiseur dans le maillage d'interface existant, sans nouvelle passe ni dépendance. État de présentation ajouté dans App / Feedback uniquement, protocole 11 et états sérialisés inchangés.
+- **Aucun test ni lancement du jeu exécuté pour ce snapshot.** À essayer : parallaxe avec souris, clavier, redimensionnement et perte de focus ; clics et sliders stables ; secousses en solo / coopération et F4 ; visualiseur avec volume nul, fichiers absents, fondus menu / partie, pause et reprise. Performances et confort sur Raspberry Pi restent à mesurer.
+
 ## Snapshot 1.2.1 — 2 novembre 2026
 
 - Compilation C11 avec `-O2 -Wall -Wextra -Wpedantic`, sans avertissement, et revue des changements.

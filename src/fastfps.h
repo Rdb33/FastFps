@@ -176,6 +176,8 @@ typedef struct {
     int upgrade_choice;
     int menu_page;
     float ui_time, music_notice_time, menu_age, menu_highlight;
+    float menu_pointer_x, menu_pointer_y, menu_parallax_x, menu_parallax_y;
+    float music_bands[MUSIC_VISUAL_BANDS];
     int menu_visual_page;
     State menu_visual_state;
 } App;
@@ -302,6 +304,7 @@ void upgrade_ui(Mesh *mesh, const Game *game, const App *app);
 void audio_init(void);
 void audio_enabled(bool enabled);
 void audio_music(float volume, bool gameplay, float focus);
+void audio_music_levels(float levels[MUSIC_VISUAL_BANDS]);
 void audio_suppressed(bool suppressed);
 void audio_play(Sound sound);
 void audio_listener(Vec3 position, float yaw);
@@ -339,6 +342,8 @@ int menu_count(const App *app);
 int menu_row_id(const App *app, int row);
 void menu_move(App *app, int direction);
 void menu_animate(App *app, float dt);
+void menu_pointer_update(App *app, const Renderer *renderer);
+void ui_music_visualizer(Mesh *mesh, const App *app, float x, float baseline, float width, float height);
 int menu_hit(const App *app, Renderer *renderer, int x, int y);
 void menu_build(Mesh *mesh, const Game *game, const App *app);
 

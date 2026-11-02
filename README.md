@@ -1,6 +1,6 @@
 # FASTFPS — Secteur zéro
 
-**FPS 3D natif, style Doom, pensé pour le Raspberry Pi 4.** Base à améliorer progressivement : déplacement nerveux, quatre armes principales et survie dans trois arènes industrielles. Snapshot **1.2.1** : impact frames, armures abîmées, effets des modules sur les armes et débris géométriques.
+**FPS 3D natif, style Doom, pensé pour le Raspberry Pi 4.** Base à améliorer progressivement : déplacement nerveux, quatre armes principales et survie dans trois arènes industrielles. Snapshot **1.2.2** : parallaxe du menu à la souris, tremblements événementiels et visualiseur musical, après les effets de combat du snapshot 1.2.1.
 
 Application en **C11**, **SDL2** (fenêtre, clavier, souris et son) et **OpenGL ES 2** (rendu 3D). Graphismes, police et bruitages sont générés localement. Les musiques MP3 locales et facultatives sont lues avec **mpg123**.
 
@@ -20,7 +20,19 @@ Les contributions et retours de jeu sont bienvenus. Consulte le [guide de contri
 
 Pour un signalement sensible, suis la [politique de sécurité](SECURITY.md). Les [notices tierces](THIRD_PARTY_NOTICES.md) précisent notamment la provenance et les droits des musiques de Buckshot Roulette. Les [réglages GitHub de communauté](.github/COMMUNITY_SETUP.md) décrivent la description du dépôt et l'activation des signalements privés.
 
-## Nouveautés — snapshot 1.2.1
+## Nouveautés — snapshot 1.2.2
+
+Le titre, le réacteur et les décors du menu réagissent à la position de la souris avec des profondeurs et un lissage différents. Le décor 3D bouge aussi légèrement dans l'accueil et les salons. Les boutons, champs, sliders et zones de clic restent fixes ; le mouvement revient doucement au centre quand la souris quitte la fenêtre.
+
+Les explosions proches, frappes au sol des champions et activations du réacteur font brièvement trembler la vue. Une secousse plus légère accompagne les coups marquants, dégâts reçus, fins de vague, arrivées de champions, armes débloquées et événements de roquettes. L'amplitude diminue avec la distance pour les événements dans l'arène. Les secousses ne s'additionnent pas sans limite et ne changent ni la visée réelle ni les déplacements ; l'interface reste stable.
+
+Un visualiseur à **12 bandes** apparaît dans le menu, les salons et discrètement au-dessus du HUD en partie. Il analyse uniquement la musique réellement diffusée, après le volume, les filtres et les fondus ; les bruitages ne font pas bouger les barres. Sans MP3 local ou quand la musique est silencieuse, elles reviennent au repos. Le volume reste à zéro par défaut.
+
+**F4 / mouvements réduits** coupe le parallaxe et les secousses, et réduit la hauteur et la vitesse des barres. **Intensité des impacts** règle aussi l'amplitude des secousses. Les flèches gauche / droite permettent désormais d'ajuster ce réglage comme les autres valeurs numériques.
+
+Ces ajouts sont locaux ; le **protocole 11** reste compatible avec les versions 1.2.0 et 1.2.1. Compilation et revue de code effectuées ; rendu, audio réel, coopération et performances Raspberry Pi restent à essayer.
+
+## Effets de combat — snapshot 1.2.1
 
 ### Des coups marquants
 

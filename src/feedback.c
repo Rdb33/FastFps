@@ -34,6 +34,17 @@ static bool focused(const Game *g,Vec3 point,float cone) {
 static int priority(int kind) {
     return kind==IMPACT_CHAMPION?4:(kind==IMPACT_PIERCE?3:(kind==IMPACT_HEAD?2:1));
 }
+static void shake(Feedback *f,const Game *g,const App *app,float strength,float duration) {
+    if(!app->motion||app->impact_intensity<=0||app->state!=STATE_PLAYING||g->dead)return;
+    float envelope=f->shake_time/fmaxf(.001f,f->shake_duration);
+    strength=fminf(.012f,strength);
+    if(strength<=f->shake_strength*envelope*envelope)return;
+    f->shake_strength=strength;f->shake_time=f->shake_duration=duration;
+}
+static void nearby_shake(Feedback *f,const Game *g,const App *app,Vec3 point,float range,float strength,float duration) {
+    float attenuation=clampf(1-vlength(vsub(point,g->player.body.position))/range,0,1);
+    if(attenuation>0)shake(f,g,app,strength*attenuation,duration);
+}
 static void impact(Feedback *f,const Game *g,const App *app,int kind,int id,int second) {
     if(app->impact_intensity<=0||app->state!=STATE_PLAYING||g->dead)return;
     if(f->impact_time>0) {
@@ -46,6 +57,7 @@ static void impact(Feedback *f,const Game *g,const App *app,int kind,int id,int 
     f->impact_time=f->impact_duration;f->impact_cooldown=kind==IMPACT_CHAMPION?.8f:.4f;
     f->impact_drawn=f->hold_drawn=false;f->held_weapon=g->player.weapon;
     f->hold_time=app->motion?.040f*app->impact_intensity:0;
+    shake(f,g,app,kind==IMPACT_CHAMPION?.009f:(kind==IMPACT_PIERCE?.004f:.0025f),kind==IMPACT_CHAMPION?.24f:.12f);
 }
 static int budget(const App *app) {return app->quality==0?40:FEEDBACK_PARTICLES;}
 static void particle(Feedback *f,const App *app,Vec3 p,Vec3 v,Color c,float life,float size,int kind) {
@@ -126,12 +138,18 @@ static void cache(Feedback *f,const Game *g) {
         FeedbackActor *a=&f->actors[id];
         a->position=p->body.position;a->fall_speed=p->body.velocity.y;a->weapon=p->weapon;
         a->grounded=p->body.grounded;a->shots=g->actors[id].shots;
+        a->health=p->health;a->shield=p->shield;
+        a->damage_time=id==g->local_actor?g->damage_time:g->actors[id].damage_time;
         a->kills=g->actors[id].run_kills;a->heads=g->actors[id].run_headshots;a->active=g->actors[id].active;
     }
     f->reactor_cooldown=g->reactor_cooldown;f->wave=g->wave;f->tick=g->tick;
     f->revision=g->world->revision;f->local_actor=g->local_actor;
+    f->event_serial=g->event_serial;f->unlock_notice=g->unlock_time;f->completed_waves=g->completed_waves;
+    f->blast_count=g->blast_count;memcpy(f->blasts,g->blasts,(size_t)g->blast_count*sizeof(Blast));
+    for(int i=0;i<g->barrel_count;i++)f->barrel_times[i]=g->barrels[i].explosion_time;
 }
 static void advance(Feedback *f,const Game *g,const App *app,float dt) {
+    f->shake_time=app->motion?fmaxf(0,f->shake_time-dt):0;
     f->impact_cooldown=fmaxf(0,f->impact_cooldown-dt);
     if(f->impact_drawn)f->impact_time=fmaxf(0,f->impact_time-dt);
     bool held=f->hold_time>0;
@@ -164,12 +182,19 @@ void feedback_update(Feedback *f,const Game *g,const App *app) {
     float dt=f->clock?clampf((float)((double)(now-f->clock)/(double)SDL_GetPerformanceFrequency()),0,.1f):0;
     bool reset=!f->initialized||f->revision!=g->world->revision||g->tick<f->tick||g->wave<f->wave||g->local_actor!=f->local_actor;
     if(reset) {
-        memset(f,0,sizeof(*f));f->rng=0x6f65a11u;f->initialized=true;cache(f,g);f->clock=now;return;
+        bool next_wave=f->initialized&&g->tick>=f->tick&&g->wave>f->wave&&g->local_actor==f->local_actor;
+        memset(f,0,sizeof(*f));f->rng=0x6f65a11u;f->initialized=true;cache(f,g);f->clock=now;
+        if(next_wave) {
+            if(g->unlock_time>5)shake(f,g,app,.003f,.18f);
+            if(g->rocket_event)shake(f,g,app,.006f,.28f);
+            if(g->wave%5==0)shake(f,g,app,.007f,.28f);
+        }
+        return;
     }
     f->clock=now;
     if(app->impact_intensity<=0) {
         f->particle_count=f->mark_count=f->ring_count=0;
-        f->impact_time=f->hold_time=f->impact_cooldown=f->reactor_pulse=0;
+        f->impact_time=f->hold_time=f->impact_cooldown=f->reactor_pulse=f->shake_time=0;
         cache(f,g);return;
     }
     if(f->particle_count>budget(app))f->particle_count=budget(app);
@@ -177,13 +202,30 @@ void feedback_update(Feedback *f,const Game *g,const App *app) {
     if(app->state==STATE_PAUSED&&!g->cooperative)dt=0;
     advance(f,g,app,dt);
     bool active=app->state==STATE_PLAYING&&!g->round_over&&app->impact_intensity>0;
-    if(!active){f->impact_time=f->hold_time=0;cache(f,g);return;}
+    if(!active){f->impact_time=f->hold_time=f->shake_time=0;cache(f,g);return;}
     const FeedbackActor *local=&f->actors[g->local_actor];
+    if(g->damage_time>0&&(g->player.health<local->health-.1f||
+        (g->player.shield<local->shield-.1f&&g->damage_time>local->damage_time+.02f)))
+        shake(f,g,app,.005f,.16f);
+    if(g->event_serial!=f->event_serial&&g->rocket_event)shake(f,g,app,.006f,.28f);
+    if(g->unlock_time>f->unlock_notice+.3f&&g->unlock_time>5)shake(f,g,app,.003f,.18f);
+    if(g->wave>f->wave&&g->wave%5==0)shake(f,g,app,.007f,.28f);
+    if(g->completed_waves>f->completed_waves)shake(f,g,app,.003f,.16f);
+    for(int i=0;i<g->blast_count;i++) {
+        const Blast *b=&g->blasts[i];bool seen=false;
+        for(int j=0;j<f->blast_count;j++)if(vlength(vsub(b->position,f->blasts[j].position))<.1f
+            &&f->blasts[j].time>=b->time-.05f){seen=true;break;}
+        if(!seen&&b->time>.5f)nearby_shake(f,g,app,b->position,18,.010f,.24f);
+    }
+    for(int i=0;i<g->barrel_count;i++)if(g->barrels[i].explosion_time>f->barrel_times[i]+.15f)
+        nearby_shake(f,g,app,g->barrels[i].position,16,.009f,.22f);
     bool killed=g->actors[g->local_actor].run_kills>local->kills;
     bool headshot=g->actors[g->local_actor].run_headshots>local->heads&&g->headshot_time>0;
     const Enemy *deaths[2]={NULL,NULL};int deaths_seen=0;
     for(int i=0;i<g->enemy_count;i++) {
         const Enemy *e=&g->enemies[i],*old=find_enemy(f->enemies,f->enemy_count,e->id);
+        if(old&&e->elite&&e->slam_flash>old->slam_flash+.1f)
+            nearby_shake(f,g,app,e->body.position,24,.012f,.28f);
         if(!old||e->health>=old->health||e->health<=0)continue;
         Vec3 point=vadd(e->body.position,(Vec3){0,1.05f*enemy_size(e),0});
         if(vlength(vsub(point,g->player.body.position))>38)continue;
@@ -238,11 +280,19 @@ void feedback_update(Feedback *f,const Game *g,const App *app) {
         }
     }
     if(g->reactor_cooldown>f->reactor_cooldown+.5f&&g->reactor_cooldown>43) {
+        nearby_shake(f,g,app,(Vec3){0,0,0},32,.006f,.22f);
         f->reactor_pulse=1.2f;ring(f,(Vec3){0,.045f,0},(Color){.35f,1,.65f},32,1.2f);
         ring(f,(Vec3){0,1.87f,0},(Color){.6f,1,.85f},3.1f,.55f);
         debris(f,app,(Vec3){0,4.1f,0},(Vec3){0,1,0},(Color){.4f,1,.7f},16,SPARK);
     }
     cache(f,g);
+}
+Vec3 feedback_camera_shake(const Feedback *f,const App *app) {
+    if(!f||!app->motion||app->impact_intensity<=0||app->state!=STATE_PLAYING||f->shake_time<=0)
+        return (Vec3){0,0,0};
+    float t=f->shake_duration-f->shake_time,envelope=f->shake_time/fmaxf(.001f,f->shake_duration);
+    float strength=f->shake_strength*envelope*envelope*app->impact_intensity;
+    return (Vec3){sinf(t*107)*strength,sinf(t*83)*strength*.7f,sinf(t*71)*strength*.45f};
 }
 float feedback_impact(const Feedback *f,const App *app) {
     if(!f||f->impact_time<=0||app->state!=STATE_PLAYING)return 0;

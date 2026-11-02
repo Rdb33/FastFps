@@ -16,6 +16,10 @@ typedef struct {
     off_t position, length;
     bool failed;
 } MusicTrack;
+typedef struct {
+    float b0, b2, a1, a2;
+    float z1[2], z2[2], level;
+} MusicBand;
 static struct {
     SDL_AudioDeviceID device;
     SDL_Thread *thread;
@@ -24,11 +28,53 @@ static struct {
     float volume, target_volume, volume_step, focus, target_focus, duck;
     float filter[2], delay[MUSIC_DELAY][2];
     unsigned delay_at;
+    MusicBand bands[MUSIC_VISUAL_BANDS];
 } music;
 
 static float bounded(float n,float lo,float hi){return fmaxf(lo,fminf(hi,n));}
 static float towards(float n,float target,float step) {
     return n<target?fminf(n+step,target):fmaxf(n-step,target);
+}
+static void visualizer_init(void) {
+    static const float centers[MUSIC_VISUAL_BANDS]={60,95,150,240,380,600,950,1500,2400,3800,6000,9000};
+    for(int i=0;i<MUSIC_VISUAL_BANDS;i++) {
+        float w=6.283185307f*centers[i]/MUSIC_RATE,alpha=sinf(w)*.5f;
+        MusicBand *b=&music.bands[i];
+        b->b0=alpha/(1+alpha);b->b2=-b->b0;
+        b->a1=-2*cosf(w)/(1+alpha);b->a2=(1-alpha)/(1+alpha);
+    }
+}
+/* Analyse de la musique après volume, filtre, fondus et écho, avant les
+   bruitages. Banque fixe de filtres, sans allocation ni verrou du callback. */
+static void visualizer_analyse(const float *stereo,int frames) {
+    float energy[MUSIC_VISUAL_BANDS]={0},peak=0;
+    if(frames<=0)return;
+    for(int f=0;f<frames*2;f++)peak=fmaxf(peak,fabsf(stereo[f]));
+    if(peak<.000001f) {
+        /* Le silence ne doit ni animer les barres ni laisser les filtres
+           travailler sur des nombres dénormalisés, surtout sur le Pi. */
+        for(int i=0;i<MUSIC_VISUAL_BANDS;i++) {
+            MusicBand *b=&music.bands[i];
+            b->z1[0]=b->z1[1]=b->z2[0]=b->z2[1]=b->level=0;
+        }
+        return;
+    }
+    for(int f=0;f<frames;f++) {
+        float sample[2]={stereo[f*2],stereo[f*2+1]};
+        for(int i=0;i<MUSIC_VISUAL_BANDS;i++) {
+            MusicBand *b=&music.bands[i];
+            for(int c=0;c<2;c++) {
+                float y=b->b0*sample[c]+b->z1[c];
+                b->z1[c]=-b->a1*y+b->z2[c];b->z2[c]=b->b2*sample[c]-b->a2*y;
+                energy[i]+=y*y*.5f;
+            }
+        }
+    }
+    for(int i=0;i<MUSIC_VISUAL_BANDS;i++) {
+        MusicBand *b=&music.bands[i];
+        float rms=sqrtf(energy[i]/(float)frames);
+        b->level=sqrtf(bounded(rms*12,0,1));
+    }
 }
 static bool open_track(MusicTrack *t,const char *name) {
     int error; t->decoder=mpg123_new(NULL,&error);
@@ -105,6 +151,7 @@ static int producer(void *unused) {
 void music_init(SDL_AudioDeviceID device) {
     memset(&music,0,sizeof(music));music.device=device;music.focus=music.target_focus=1;
     music.volume_step=1.0f/(MUSIC_RATE*.4f);
+    visualizer_init();
     if(!device||mpg123_init()!=MPG123_OK)return;
     music.initialized=true;
     const char *names[]={"menu.mp3","gameplay.mp3"};
@@ -154,6 +201,14 @@ void music_render(float *stereo,int frames,float duck) {
         }
         music.delay_at=(music.delay_at+1)%MUSIC_DELAY;
     }
+    visualizer_analyse(stereo,frames);
+}
+void music_levels(float levels[MUSIC_VISUAL_BANDS]) {
+    memset(levels,0,sizeof(float)*MUSIC_VISUAL_BANDS);
+    if(!music.initialized||!music.device)return;
+    SDL_LockAudioDevice(music.device);
+    for(int i=0;i<MUSIC_VISUAL_BANDS;i++)levels[i]=music.bands[i].level;
+    SDL_UnlockAudioDevice(music.device);
 }
 void music_fadeout(void) {
     if(!music.initialized)return;

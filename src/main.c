@@ -267,7 +267,7 @@ int main(int argc,char **argv) {
                     if(key==SDL_SCANCODE_UP)menu_move(&app,-1);
                     else if(key==SDL_SCANCODE_DOWN)menu_move(&app,1);
                     else if(key==SDL_SCANCODE_RETURN||key==SDL_SCANCODE_KP_ENTER||key==SDL_SCANCODE_SPACE)menu_action(&app,&game,&renderer,1);
-                    else if((key==SDL_SCANCODE_LEFT||key==SDL_SCANCODE_RIGHT)&&((app.selected>=2&&app.selected<=9)||app.selected==13))
+                    else if((key==SDL_SCANCODE_LEFT||key==SDL_SCANCODE_RIGHT)&&((app.selected>=2&&app.selected<=9)||app.selected==13||app.selected==14))
                         menu_action(&app,&game,&renderer,key==SDL_SCANCODE_LEFT?-1:1);
                 }else if(key==SDL_SCANCODE_TAB)app.show_build=!app.show_build;
                 else if(key==SDL_SCANCODE_1||key==SDL_SCANCODE_KP_1)game_request_weapon(&game,0);
@@ -316,6 +316,13 @@ int main(int argc,char **argv) {
         }
         float music_focus=app.state==STATE_PAUSED?.15f:(gameplay_music&&game.dead?.1f:(app.state==STATE_UPGRADE?.6f:1));
         audio_music(app.music_volume,gameplay_music,music_focus);
+        float levels[MUSIC_VISUAL_BANDS];audio_music_levels(levels);
+        for(int i=0;i<MUSIC_VISUAL_BANDS;i++) {
+            float rate=levels[i]>app.music_bands[i]?18:5;
+            if(!app.motion)rate*=.35f;
+            app.music_bands[i]+=(levels[i]-app.music_bands[i])*(1-expf(-(float)elapsed*rate));
+        }
+        menu_pointer_update(&app,&renderer);
         menu_animate(&app,(float)elapsed);
         double interval=1.0/((app.state==STATE_PLAYING||app.state==STATE_UPGRADE)?PRESETS[app.quality].fps:30);
         if(now-last_render>=interval-.0005) {

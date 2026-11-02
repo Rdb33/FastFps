@@ -16,8 +16,23 @@ void menu_move(App *a,int direction) {
     for(int i=0;i<count;i++)if(menu_row_id(a,i)==a->selected)row=i;
     a->selected=menu_row_id(a,(row+direction+count)%count);
 }
+void menu_pointer_update(App *a,const Renderer *r) {
+    a->menu_pointer_x=a->menu_pointer_y=0;
+    if(SDL_GetMouseFocus()!=r->window)return;
+    int x,y,w,h;SDL_GetMouseState(&x,&y);SDL_GetWindowSize(r->window,&w,&h);
+    if(w<=0||h<=0)return;
+    float dw=(float)w,dh=dw*9/16;if(dh>h){dh=(float)h;dw=dh*16/9;}
+    a->menu_pointer_x=clampf(((float)x-(float)w*.5f)/(dw*.5f),-1,1);
+    a->menu_pointer_y=clampf(((float)y-(float)h*.5f)/(dh*.5f),-1,1);
+}
 void menu_animate(App *a,float dt) {
     bool visible=a->state==STATE_MENU||a->state==STATE_PAUSED||a->state==STATE_DEAD;
+    bool pointer=visible||a->state==STATE_NETWORK||a->state==STATE_LOBBY;
+    float blend=1-expf(-8*dt);
+    if(a->motion) {
+        a->menu_parallax_x+=((pointer?a->menu_pointer_x:0)-a->menu_parallax_x)*blend;
+        a->menu_parallax_y+=((pointer?a->menu_pointer_y:0)-a->menu_parallax_y)*blend;
+    }else a->menu_parallax_x=a->menu_parallax_y=0;
     int row=0;for(int i=0;i<menu_count(a);i++)if(menu_row_id(a,i)==a->selected)row=i;
     if(a->menu_visual_state!=a->state||a->menu_visual_page!=a->menu_page) {
         a->menu_age=0;a->menu_highlight=(float)row;
@@ -41,16 +56,31 @@ static void center(Mesh *m,float y,int scale,Color c,const char *text) {
     mesh_text(m,(640-(float)strlen(text)*6*(float)scale)/2,y,scale,c,text);
 }
 static const Color ink={.91f,.96f,1},blue={.32f,.8f,1},muted={.51f,.64f,.72f};
+static void translate(Mesh *m,int first,float x,float y) {
+    for(int i=first;i<m->count;i++){m->data[i].position.x+=x;m->data[i].position.y+=y;}
+}
+void ui_music_visualizer(Mesh *m,const App *a,float x,float baseline,float width,float height) {
+    float step=width/MUSIC_VISUAL_BANDS;
+    for(int i=0;i<MUSIC_VISUAL_BANDS;i++) {
+        float level=clampf(a->music_bands[i],0,1);
+        float h=1+level*height*(a->motion?1:.45f);
+        mesh_rect(m,x+(float)i*step,baseline-h,step-2,h,mix((Color){.10f,.22f,.28f},blue,level));
+    }
+}
 void menu_build(Mesh *m,const Game *g,const App *a) {
     char text[160];int first=m->count;float time=a->motion?a->ui_time:0;
+    float px=a->motion?a->menu_parallax_x:0,py=a->motion?a->menu_parallax_y:0;
     mesh_rect(m,48,16,544,328,(Color){.025f,.045f,.064f});
     mesh_rect(m,48,16,544,2,blue);mesh_rect(m,48,342,544,2,(Color){.1f,.23f,.30f});
-    for(int i=0;i<6;i++)mesh_rect(m,368+(float)i*36,26,1,63,(Color){.055f,.1f,.14f});
-    if(a->motion)mesh_rect(m,368,27+fmodf(time*12,59),206,1,(Color){.085f,.17f,.22f});
+    for(int i=0;i<6;i++)mesh_rect(m,368+(float)i*36-px*7,26-py*4,1,63,(Color){.055f,.1f,.14f});
+    if(a->motion)mesh_rect(m,368-px*7,27+fmodf(time*12,59)-py*4,206,1,(Color){.085f,.17f,.22f});
     mesh_text(m,64,27,1,muted,"FASTFPS " GAME_VERSION " / SURVIE COOPERATIVE");
-    mesh_text(m,64,44,7,ink,"FASTFPS");
+    mesh_text(m,64+px*4,44+py*2.5f,7,ink,"FASTFPS");
     mesh_text(m,427,45,1,blue,a->menu_page?"REGLAGES":"SECTEUR ZERO");
     snprintf(text,sizeof(text),"RECORD %d",a->best_score);mesh_text(m,427,61,1,muted,text);
+    mesh_text(m,427,80,1,muted,"MUSIQUE");
+    ui_music_visualizer(m,a,475,87,96,12);
+    int orb=m->count;
     for(int i=0;i<12;i++) {
         float angle=(float)i*2*PI_F/12+time*.30f,next=angle+.32f;
         Color c=mix((Color){.10f,.23f,.30f},blue,.30f+.20f*sinf(time*2+(float)i));
@@ -62,6 +92,7 @@ void menu_build(Mesh *m,const Game *g,const App *a) {
     float pulse=.7f+.2f*sinf(time*2);
     mesh_triangle(m,(Vec3){396,46,0},(Vec3){406,62,0},(Vec3){396,78,0},mix(muted,blue,pulse),(Vec3){0,0,1});
     mesh_triangle(m,(Vec3){396,46,0},(Vec3){396,78,0},(Vec3){386,62,0},mix(ink,blue,pulse),(Vec3){0,0,1});
+    translate(m,orb,px*6,py*4);
     if(a->state==STATE_DEAD)center(m,95,2,(Color){1,.53f,.24f},"GAME OVER");
     else center(m,96,1,blue,a->menu_page?"AJUSTE TON JEU / REGLAGES SAUVEGARDES":(a->state==STATE_PAUSED?"PARTIE EN PAUSE":"BOUGE. COOPERE. SURVIS."));
     if(a->state==STATE_DEAD) {
@@ -85,6 +116,7 @@ void menu_build(Mesh *m,const Game *g,const App *a) {
             mesh_text(m,text_x,y+7,2,mix(muted,ink,weight*entry),title);
             mesh_text(m,text_x,y+25,1,mix(muted,blue,weight*entry),description);
         }
+        int card=m->count;
         mesh_rect(m,362,128,214,163,(Color){.04f,.08f,.11f});
         mesh_text(m,376,141,1,blue,"PREPARE TA PROCHAINE VAGUE");
         snprintf(text,sizeof(text),"MAP : %s",world_map_name(g->map_id));mesh_text(m,376,162,1,ink,text);
@@ -95,6 +127,7 @@ void menu_build(Mesh *m,const Game *g,const App *a) {
         mesh_text(m,376,241,1,blue,"E MAINTENU : REANIMER");
         mesh_text(m,376,259,1,muted,"LIFTS : HAUTEURS ET SOINS");
         mesh_text(m,376,275,1,blue,world_route_name(g->map_id));
+        translate(m,card,px*3,py*2);
         center(m,312,1,muted,"FLECHES OU SOURIS / ENTREE POUR JOUER");
     }else {
         mesh_rect(m,64,128+a->menu_highlight*SETTINGS_ROW_HEIGHT,512,15,(Color){.1f,.2f,.26f});

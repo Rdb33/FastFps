@@ -1,3 +1,12 @@
+# Snapshot 1.2.2
+
+- Parallaxe à la souris : titre, réacteur et panneau décoratif à plusieurs profondeurs, déplacement léger du décor 3D dans l'accueil et les salons, interpolation et retour au centre à la perte du survol. Zones de clic et commandes fixes.
+- Secousses locales amorties de 0,12 à 0,28 s pour les coups marquants, dégâts, explosions proches, frappes au sol des champions, réacteur, vagues, déblocages et événements de roquettes. Amplitude plafonnée, atténuation par distance et priorité à la secousse la plus forte ; visée de gameplay et interface conservées.
+- Visualiseur musical à douze bandes dans le menu, les salons et le HUD : analyse stéréo après fondus / volume / filtre / écho, avant les bruitages, sans animation simulée au silence. Filtrage évité au silence ; copie bornée des niveaux sous verrou SDL hors du callback.
+- F4 désactive parallaxe et secousses, ralentit et réduit les barres. Intensité des impacts pilote aussi les secousses ; réglage par flèches gauche / droite corrigé.
+- Protocole 11 conservé, compatibilité de gameplay avec 1.2.0 / 1.2.1 ; aucun changement des paquets, des statistiques ou du RNG de gameplay. Pas de nouvelle dépendance, texture ou passe de rendu.
+- Compilation C11 sans avertissement et revue de code. Aucun test ni essai de rendu, audio réel, coopération ou Pi exécuté ; coût du visualiseur et confort des mouvements à mesurer en partie.
+
 # Snapshot 1.2.1
 
 - Impact frames locales : cyan pour une tête fatale, orange pour une interruption, violet pour des éliminations alignées avec Perforation, contraste noir et blanc pour le champion. Durées de 45 / 60 ms, délai partagé et priorité aux événements majeurs ; interface composée après les effets.

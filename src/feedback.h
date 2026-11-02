@@ -21,7 +21,7 @@ typedef struct {
 typedef struct { Vec3 position; Color color; float life, duration, radius; } FeedbackRing;
 typedef struct {
     Vec3 position;
-    float fall_speed, dust_cooldown;
+    float fall_speed, dust_cooldown, health, shield, damage_time;
     uint32_t shots;
     int kills, heads, weapon;
     bool grounded, active;
@@ -39,6 +39,11 @@ typedef struct Feedback {
     FeedbackRing rings[FEEDBACK_RINGS]; int ring_count;
     float impact_time, impact_duration, impact_cooldown, hold_time;
     float reactor_cooldown, reactor_pulse;
+    float shake_time, shake_duration, shake_strength;
+    float unlock_notice, barrel_times[MAX_BARRELS];
+    uint32_t event_serial;
+    int completed_waves, blast_count;
+    Blast blasts[MAX_BLASTS];
     int impact_kind, impact_ids[2], held_weapon;
     Color impact_color;
 } Feedback;
@@ -48,6 +53,7 @@ void feedback_draw(Feedback *feedback, Mesh *mesh, const Game *game, const App *
 void feedback_tint(const Feedback *feedback, Mesh *mesh, int first, int enemy, float intensity);
 bool feedback_hold_weapon(const Feedback *feedback, const Game *game, const App *app);
 float feedback_impact(const Feedback *feedback, const App *app);
+Vec3 feedback_camera_shake(const Feedback *feedback, const App *app);
 Color feedback_enemy_color(const Enemy *enemy);
 
 #endif
