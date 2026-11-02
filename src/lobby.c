@@ -49,7 +49,7 @@ static void action(App *app,Game *g) {
     if(app->state==STATE_LOBBY) {
         if(app->selected==2){leave(app,g);return;}
         if(app->selected==1){copy(n);return;}
-        if(n->mode==NET_HOST)net_start(n,g,(double)SDL_GetPerformanceCounter()/(double)SDL_GetPerformanceFrequency());
+        if(n->mode==NET_HOST)menu_confirm_open(app,CONFIRM_COOP);
         else net_ready(n);
         return;
     }

@@ -27,6 +27,15 @@ static const Enemy *aim_target(const Game *g) {
 }
 void ui_build(Mesh *m,const Game *g,const App *app) {
     m->count=0;char text[160];
+    if(app->state==STATE_PLAYING&&g->intro_time>0) {
+        static const char *titles[MAP_COUNT]={"LE GARDIEN DU COEUR","LE MAITRE DES FOURNAISES","LE VEILLEUR DES RUINES"};
+        Color gold={1,.74f,.3f};
+        mesh_rect(m,0,0,640,43,(Color){.008f,.012f,.018f});mesh_rect(m,0,285,640,75,(Color){.008f,.012f,.018f});
+        centered(m,17,1,gold,"UNE PRESENCE HOSTILE APPROCHE");
+        centered(m,301,2,ink,titles[g->map_id]);
+        snprintf(text,sizeof(text),"CHAMPION / %s / VAGUE %d",world_map_name(g->map_id),g->wave);centered(m,325,1,gold,text);
+        centered(m,344,1,muted,g->cooperative?"ESPACE : PASSER POUR TOUTE L'EQUIPE":"ESPACE : PASSER");return;
+    }
     if(app->state==STATE_NETWORK||app->state==STATE_LOBBY){lobby_build(m,g,app);return;}
     if(app->state==STATE_PLAYING||app->state==STATE_UPGRADE) {
         mesh_rect(m,0,0,640,30,(Color){.05f,.055f,.045f});
@@ -135,7 +144,8 @@ void ui_build(Mesh *m,const Game *g,const App *app) {
             Color color=target->type==ENEMY_CASTER?(Color){.67f,.43f,1}:
                 (target->type==ENEMY_BRUTE?(Color){.78f,.83f,.32f}:(target->type==ENEMY_BOMBER?(Color){1,.75f,.24f}:orange));
             if(target->elite)color=(Color){1,.76f,.25f};
-            centered(m,86,1,color,target->elite?"CHAMPION":(target->type==ENEMY_CASTER?"INVOCATEUR":(target->type==ENEMY_BRUTE?"BRUTE":(target->type==ENEMY_BOMBER?"BOMBARDIER":"TRAQUEUR"))));
+            if(target->type==ENEMY_WEAVER)color=(Color){.75f,.95f,1};
+            centered(m,86,1,color,target->elite?"CHAMPION":(target->type==ENEMY_WEAVER?"LANCE-TOILE":(target->type==ENEMY_CASTER?"INVOCATEUR":(target->type==ENEMY_BRUTE?"BRUTE":(target->type==ENEMY_BOMBER?"BOMBARDIER":"TRAQUEUR")))));
             mesh_rect(m,270,98,100,3,(Color){.16f,.15f,.12f});
             mesh_rect(m,270,98,100*clampf(target->health/fmaxf(1,target->max_health),0,1),3,color);
         }
@@ -194,6 +204,13 @@ void ui_build(Mesh *m,const Game *g,const App *app) {
             mesh_text(m,410+dx,255,1,muted,"TOUCHE 5 / DEGATS DE ZONE");
         }
         encounters_ui(m,g,app);
+        if(g->player.web_timer>0&&!g->dead) {
+            Color web={.75f,.95f,1};mesh_rect(m,12,158,192,36,(Color){.035f,.07f,.10f});
+            mesh_rect(m,12,158,3,36,web);
+            snprintf(text,sizeof(text),"ENTOILE : %.2f S",g->player.web_timer);mesh_text(m,24,166,1,web,text);
+            mesh_text(m,24,178,1,ink,"VISEE ET TIRS DISPONIBLES");
+            mesh_rect(m,24,190,168*g->player.web_timer/WEB_ROOT_TIME,2,web);
+        }
         if(app->state==STATE_PLAYING&&!app->show_build&&!g->dead)
             ui_music_visualizer(m,app,548,302,78,9);
         if(app->state==STATE_PLAYING&&app->music_notice_time>0&&app->music_volume<=0&&!g->dead&&!app->show_build) {
@@ -214,7 +231,7 @@ void ui_build(Mesh *m,const Game *g,const App *app) {
 /* Names and health stay crisp in the HUD pass, with the same projection as
  * the world. Occluded teammates keep only their existing team-list entry. */
 void ui_teammates(Mesh *m,const Game *g,const App *app,Mat4 matrix) {
-    if(!g->cooperative||app->state!=STATE_PLAYING||app->show_build)return;
+    if(!g->cooperative||app->state!=STATE_PLAYING||app->show_build||g->intro_time>0)return;
     Vec3 eye=player_eye(&g->player,app->motion);
     float previous_x[MAX_PLAYERS],previous_y[MAX_PLAYERS],previous_w[MAX_PLAYERS],previous_h[MAX_PLAYERS];int used=0;
     for(int id=0;id<MAX_PLAYERS;id++)if(id!=g->local_actor&&g->actors[id].active) {

@@ -1,11 +1,11 @@
 #include "fastfps.h"
 #include <math.h>
 
-int graphics_detail(int quality){return quality==0?0:(quality==2?2:1);}
+int graphics_detail(int quality){return quality==0?0:(quality==2||quality==4?2:1);}
 
 Color sector_theme(int wave) {
-    static const Color themes[]={{.28f,.76f,1},{.72f,.40f,1},{1,.59f,.24f},{.25f,1,.70f}};
-    return themes[((wave>0?wave-1:0)/5)%4];
+    static const Color themes[MAP_COUNT]={{.28f,.76f,1},{1,.46f,.15f},{.30f,.94f,.70f}};
+    return themes[((wave>0?wave-1:0)/5)%MAP_COUNT];
 }
 
 static float floor_height(const World *world,Vec3 p) {
@@ -33,6 +33,7 @@ void animate_arena(Mesh *m,const Game *g,const App *app) {
     float pulse=.88f+.12f*sinf(time*2.2f);
     Color glow={theme.r*pulse,theme.g*pulse,theme.b*pulse};
     m->glow=1;
+    if(g->map_id==0) {
     mesh_diamond(m,core,.54f+.025f*sinf(time*3),glow);
     mesh_diamond(m,core,.27f,(Color){.84f,.96f,1});
     for(int i=0;i<3;i++) {
@@ -44,6 +45,21 @@ void animate_arena(Mesh *m,const Game *g,const App *app) {
     for(int i=0;i<4;i++) {
         float angle=time*.9f+(float)i*PI_F/2;
         mesh_diamond(m,(Vec3){sinf(angle)*1.45f,3.4f+sinf(time*2+(float)i)*.22f,cosf(angle)*1.45f},.09f,glow);
+    }
+    }else if(g->map_id==1) {
+        m->glow=0;mesh_cylinder(m,(Vec3){0,2.1f,0},(Vec3){0,3.4f,0},.68f,(Color){.20f,.14f,.09f},10);
+        m->glow=1;
+        for(int k=0;k<4;k++)mesh_ring(m,(Vec3){0,3.2f+.38f*k,0},.58f+.08f*sinf(time*2+k),.09f,glow,16);
+        mesh_diamond(m,core,.40f,glow);
+        for(int k=0;k<4;k++) {
+            float angle=time*.65f+k*PI_F*.5f;
+            mesh_diamond(m,(Vec3){cosf(angle)*.8f,4.1f+.35f*sinf(time*3+k),sinf(angle)*.8f},.06f,glow);
+        }
+    }else {
+        m->glow=0;mesh_diamond(m,core,.85f,(Color){.28f,.27f,.21f});
+        mesh_beveled_box(m,(Vec3){0,2.1f,0},(Vec3){.8f,1.4f,.8f},.10f,(Color){.27f,.25f,.18f});
+        m->glow=1;mesh_diamond(m,vadd(core,(Vec3){0,.05f,0}),.38f,glow);
+        for(int k=0;k<3;k++)mesh_ring(m,(Vec3){0,3.5f+.55f*k,0},.6f+.12f*sinf(time+k),.035f,glow,6);
     }
     for(int k=0;k<g->world->platform_count;k++) {
         const Platform *platform=&g->world->platforms[k];Box box=g->world->solids[platform->solid];

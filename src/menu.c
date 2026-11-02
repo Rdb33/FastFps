@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
-int menu_count(const App *a){return a->menu_page?11:4;}
+int menu_count(const App *a){return a->menu_page?12:4;}
 static float ease(float t){t=clampf(t,0,1);return t*t*(3-2*t);}
 static Color mix(Color a,Color b,float t){return (Color){a.r+(b.r-a.r)*t,a.g+(b.g-a.g)*t,a.b+(b.b-a.b)*t};}
 bool menu_visible(const App *a) {
@@ -11,7 +11,7 @@ bool menu_visible(const App *a) {
         ||a->state==STATE_NETWORK||a->state==STATE_LOBBY;
 }
 Vec3 menu_offset(const App *a,float depth) {
-    if(!a->motion||!menu_visible(a))return (Vec3){0,0,0};
+    if(!a->menu_motion||!menu_visible(a))return (Vec3){0,0,0};
     return (Vec3){-a->menu_parallax_x*depth*12,-a->menu_parallax_y*depth*7,0};
 }
 /* La profondeur est un marqueur temporaire du maillage UI. Elle est consommée
@@ -36,7 +36,7 @@ bool menu_coordinates(const App *a,const Renderer *r,int x,int y,float *px,float
 int menu_row_id(const App *a,int row) {
     static const int main_ids[4]={0,1,11,10};
     if(row<0||row>=menu_count(a))return -1;
-    return a->menu_page?(row<8?row+2:(row==8?13:(row==9?14:12))):main_ids[row];
+    return a->menu_page?(row<8?row+2:(row==8?13:(row==9?14:(row==10?15:12)))):main_ids[row];
 }
 void menu_move(App *a,int direction) {
     int count=menu_count(a),row=0;
@@ -53,10 +53,11 @@ void menu_pointer_update(App *a,const Renderer *r) {
     a->menu_pointer_y=clampf(((float)y-(float)h*.5f)/(dh*.5f),-1,1);
 }
 void menu_animate(App *a,float dt) {
+    if(a->game_confirmation&&a->state!=a->confirmation_state)a->game_confirmation=CONFIRM_NONE;
     bool visible=a->state==STATE_MENU||a->state==STATE_PAUSED||a->state==STATE_DEAD;
     bool pointer=menu_visible(a);
     float blend=1-expf(-8*dt);
-    if(a->motion) {
+    if(a->menu_motion) {
         a->menu_parallax_x+=((pointer?a->menu_pointer_x:0)-a->menu_parallax_x)*blend;
         a->menu_parallax_y+=((pointer?a->menu_pointer_y:0)-a->menu_parallax_y)*blend;
     }else a->menu_parallax_x=a->menu_parallax_y=0;
@@ -81,6 +82,70 @@ static void center(Mesh *m,float y,int scale,Color c,const char *text) {
     mesh_text(m,(640-(float)strlen(text)*6*(float)scale)/2,y,scale,c,text);
 }
 static const Color ink={.91f,.96f,1},blue={.32f,.8f,1},muted={.51f,.64f,.72f};
+void menu_confirm_open(App *a,GameConfirmation kind) {
+    a->game_confirmation=kind;a->confirmation_state=a->state;
+    a->confirmation_yes=false;a->confirmation_released=false;
+    a->confirmation_ready_at=SDL_GetTicks()+180;
+}
+static int confirmation_hit(const App *a,Renderer *r,int x,int y) {
+    float px,py;if(!menu_coordinates(a,r,x,y,&px,&py)||py<222||py>252)return -1;
+    if(px>=112&&px<=310)return 0;
+    return px>=330&&px<=528?1:-1;
+}
+bool menu_confirm_event(App *a,Renderer *r,const SDL_Event *e,GameConfirmation *accepted) {
+    *accepted=CONFIRM_NONE;
+    if(a->state!=a->confirmation_state)a->game_confirmation=CONFIRM_NONE;
+    if(!a->game_confirmation)return false;
+    if(e->type==SDL_QUIT){a->running=false;return true;}
+    if(e->type==SDL_WINDOWEVENT&&e->window.event==SDL_WINDOWEVENT_FOCUS_LOST) {
+        a->game_confirmation=CONFIRM_NONE;return true;
+    }
+    if((e->type==SDL_MOUSEBUTTONUP&&e->button.button==SDL_BUTTON_LEFT)
+        ||(e->type==SDL_KEYUP&&(e->key.keysym.scancode==SDL_SCANCODE_RETURN
+        ||e->key.keysym.scancode==SDL_SCANCODE_KP_ENTER||e->key.keysym.scancode==SDL_SCANCODE_SPACE)))
+        a->confirmation_released=true;
+    bool activate=false;
+    if(e->type==SDL_MOUSEMOTION) {
+        int hit=confirmation_hit(a,r,e->motion.x,e->motion.y);
+        if(hit>=0)a->confirmation_yes=hit==1;
+    }else if(e->type==SDL_MOUSEBUTTONDOWN&&e->button.button==SDL_BUTTON_LEFT) {
+        int hit=confirmation_hit(a,r,e->button.x,e->button.y);
+        if(hit>=0){a->confirmation_yes=hit==1;activate=true;}
+    }else if(e->type==SDL_KEYDOWN&&!e->key.repeat) {
+        SDL_Scancode key=e->key.keysym.scancode;
+        if(key==SDL_SCANCODE_ESCAPE){a->game_confirmation=CONFIRM_NONE;return true;}
+        if(key==SDL_SCANCODE_LEFT||key==SDL_SCANCODE_UP)a->confirmation_yes=false;
+        else if(key==SDL_SCANCODE_RIGHT||key==SDL_SCANCODE_DOWN)a->confirmation_yes=true;
+        else if(key==SDL_SCANCODE_TAB)a->confirmation_yes=!a->confirmation_yes;
+        else if(key==SDL_SCANCODE_RETURN||key==SDL_SCANCODE_KP_ENTER||key==SDL_SCANCODE_SPACE)activate=true;
+    }
+    if(activate&&a->confirmation_released&&SDL_TICKS_PASSED(SDL_GetTicks(),a->confirmation_ready_at)) {
+        if(a->confirmation_yes)*accepted=a->game_confirmation;
+        a->game_confirmation=CONFIRM_NONE;
+    }
+    return true;
+}
+void menu_confirm_build(Mesh *m,const App *a) {
+    if(!a->game_confirmation||a->state!=a->confirmation_state)return;
+    mesh_rect(m,88,105,464,163,(Color){.018f,.035f,.05f});
+    mesh_rect(m,88,105,464,2,blue);
+    center(m,122,2,ink,"LANCER UNE NOUVELLE PARTIE ?");
+    if(a->game_confirmation==CONFIRM_COOP) {
+        center(m,158,1,blue,"LA PARTIE DEMARRERA POUR TOUT LE SALON.");
+        center(m,177,1,muted,"LES JOUEURS DOIVENT ETRE PRETS.");
+    }else {
+        center(m,158,1,blue,"TU REPARTIRAS DE LA VAGUE 1.");
+        center(m,177,1,muted,a->state==STATE_PAUSED?
+            "LA PROGRESSION DE CETTE PARTIE SERA PERDUE.":"TROIS VIES / NOUVEAUX MODULES / NOUVEL ARSENAL");
+    }
+    center(m,200,1,muted,"FLECHES OU SOURIS / ENTREE / ECHAP : ANNULER");
+    for(int i=0;i<2;i++) {
+        bool selected=a->confirmation_yes==(i==1);float x=i?330:112;
+        mesh_rect(m,x,222,198,30,selected?(Color){.12f,.26f,.34f}:(Color){.055f,.10f,.14f});
+        mesh_rect(m,x,250,198,2,selected?blue:muted);
+        mesh_text(m,x+24,232,1,selected?ink:muted,i?"LANCER LA PARTIE":"ANNULER");
+    }
+}
 void ui_music_visualizer(Mesh *m,const App *a,float x,float baseline,float width,float height) {
     float step=width/MUSIC_VISUAL_BANDS;
     for(int i=0;i<MUSIC_VISUAL_BANDS;i++) {
@@ -168,12 +233,13 @@ void menu_build(Mesh *m,const Game *g,const App *a) {
                 case 3:snprintf(text,sizeof(text),"SENSIBILITE (0.30-3.00)");break;
                 case 4:snprintf(text,sizeof(text),"EFFETS SONORES : %s / F3",a->sound?"ACTIFS":"COUPES");break;
                 case 5:snprintf(text,sizeof(text),"PLEIN ECRAN : %s",a->fullscreen?"ACTIF":"NON");break;
-                case 6:snprintf(text,sizeof(text),"CAMERA : %s",a->motion?"ANIMEE":"MOUVEMENTS REDUITS");break;
+                case 6:snprintf(text,sizeof(text),"CAMERA DE COMBAT : %s / F4",a->motion?"ANIMEE":"STABLE");break;
                 case 7:{const char *names[]={"DETENTE","NORMAL","BRUTAL"};snprintf(text,sizeof(text),"DIFFICULTE%s : %s",g->cooperative?" DE L'HOTE":"",names[g->cooperative?g->difficulty:a->difficulty]);break;}
                 case 8:snprintf(text,sizeof(text),"VISUEL : %s / F5",a->modern?"MODERNE":"RETRO");break;
                 case 9:snprintf(text,sizeof(text),"LUMINOSITE (50-200%%)");break;
                 case 13:snprintf(text,sizeof(text),"MUSIQUE (0-100%%)");break;
                 case 14:snprintf(text,sizeof(text),"INTENSITE DES IMPACTS");break;
+                case 15:snprintf(text,sizeof(text),"PARALLAXE DU MENU : %s",a->menu_motion?"ACTIF":"COUPE");break;
                 default:snprintf(text,sizeof(text),"RETOUR");break;
             }
             mesh_text(m,74,y,1,selected?blue:muted,selected?">":" ");

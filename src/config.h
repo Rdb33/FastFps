@@ -2,7 +2,7 @@
 #define FASTFPS_CONFIG_H
 
 /* Réglages de la première base : gameplay proche d'un Doom moderne. */
-#define GAME_VERSION "1.2.3"
+#define GAME_VERSION "1.3.0"
 #define MENU_CONTROL_DEPTH .85f
 #define MUSIC_VISUAL_BANDS 12
 #define MAP_COUNT 3
@@ -13,13 +13,17 @@
 #define MAX_DECKS 2
 #define MAX_BLASTS 8
 #define MAX_BOMBS 12
-#define BOMB_FALL_TIME 3.0f
+#define BOMB_FALL_TIME 2.0f
+#define WEB_ROOT_TIME .75f
+#define WEB_IMMUNITY_TIME 2.5f
+#define ENEMY_CLIMB_TIME .5f
+#define CHAMPION_INTRO_TIME 2.2f
 #define BOMB_RELOAD_TIME 5.0f
 #define BOMB_RADIUS 3.5f
 #define BOMBER_RANGE 48.0f
 #define REVIVE_TIME 2.5f
 #define REVIVE_RANGE 2.8f
-#define PRESET_COUNT 4
+#define PRESET_COUNT 5
 #define MAX_PLAYERS 4
 #define PLAYER_NAME_LENGTH 16
 #define FIXED_STEP (1.0f / 60.0f)
@@ -42,11 +46,13 @@
 #define REACTOR_DURATION 15.0f
 #define MAX_WAVE_ENEMIES 54
 #define DAMAGE_DIRECTIONS 4
-#define SETTINGS_ROW_HEIGHT 16.0f
+#define SETTINGS_ROW_HEIGHT 15.0f
 #define UPGRADE_LOCK_TIME 1.0f
 #define NAV_W 28
 #define NAV_H 24
 #define PLAYER_RADIUS 0.38f
+#define ARENA_HALF_X 27.5f
+#define ARENA_HALF_Z 23.5f
 #define PLAYER_HEIGHT 1.70f
 #define PLAYER_EYE 1.48f
 #define PLAYER_SPEED 9.0f

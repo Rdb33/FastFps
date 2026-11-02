@@ -25,7 +25,7 @@ Vec3 ai_move(Game *g,Enemy *e,const Player *p,bool visible,float dt) {
         if(distance<15)target=vadd(e->body.position,vadd(vscale(forward,-4),vscale(side,sign*2)));
         else if(distance<30)target=vadd(e->body.position,vscale(side,sign*2));
     }
-    else if(e->type==ENEMY_CASTER) {
+    else if(e->type==ENEMY_CASTER||e->type==ENEMY_WEAVER) {
         if(distance<7)target=vadd(e->body.position,vadd(vscale(forward,-3),vscale(side,sign*2)));
         else if(distance<14)target=vadd(e->body.position,vscale(side,sign*3));
     }else if(e->type==ENEMY_RUNNER&&distance>3&&distance<18) {

@@ -11,12 +11,13 @@ static void settings_path(char *out,size_t size) {
 void settings_read(App *app) {
     char path[2048];settings_path(path,sizeof(path));if(!path[0])return;
     FILE *file=fopen(path,"r");if(!file)return;
-    int quality=0,sound=1,best=0,motion=1,difficulty=1,modern=1;float sensitivity=1,brightness=1,music_volume=0,impact_intensity=.5f;
-    if(fscanf(file,"%d %f %d %d %d %d %d %f %f %f",&quality,&sensitivity,&sound,&best,&motion,&difficulty,&modern,&brightness,&music_volume,&impact_intensity)>=4) {
+    int quality=0,sound=1,best=0,motion=1,difficulty=1,modern=1,menu_motion=1;float sensitivity=1,brightness=1,music_volume=0,impact_intensity=.5f;
+    if(fscanf(file,"%d %f %d %d %d %d %d %f %f %f %d",&quality,&sensitivity,&sound,&best,&motion,&difficulty,&modern,&brightness,&music_volume,&impact_intensity,&menu_motion)>=4) {
         app->quality=quality>=0&&quality<PRESET_COUNT?quality:0;
         app->sensitivity=isfinite(sensitivity)?clampf(sensitivity,.3f,3):1;
         app->sound=sound!=0;app->best_score=best>=0?best:0;
         app->motion=motion!=0;
+        app->menu_motion=menu_motion!=0;
         app->difficulty=difficulty>=0&&difficulty<=2?difficulty:1;
         app->modern=modern!=0;app->brightness=isfinite(brightness)?clampf(brightness,.5f,2):1;
         app->music_volume=isfinite(music_volume)?clampf(music_volume,0,1):0;
@@ -27,7 +28,7 @@ void settings_read(App *app) {
 void settings_write(const App *app) {
     char path[2048];settings_path(path,sizeof(path));if(!path[0])return;
     FILE *file=fopen(path,"w");if(!file)return;
-    fprintf(file,"%d %.2f %d %d %d %d %d %.2f %.2f %.2f\n",app->quality,app->sensitivity,app->sound,app->best_score,app->motion,app->difficulty,app->modern,app->brightness,app->music_volume,app->impact_intensity);fclose(file);
+    fprintf(file,"%d %.2f %d %d %d %d %d %.2f %.2f %.2f %d\n",app->quality,app->sensitivity,app->sound,app->best_score,app->motion,app->difficulty,app->modern,app->brightness,app->music_volume,app->impact_intensity,app->menu_motion);fclose(file);
 }
 /* Coordonnées communes à l'affichage et aux zones interactives du menu. */
 static bool numeric_row(int row){return row==3||row==9||row==13||row==14;}

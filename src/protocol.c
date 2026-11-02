@@ -18,8 +18,20 @@ static Vec3 rv(Reader *r){Vec3 v;v.x=rf(r);v.y=rf(r);v.z=rf(r);return v;}
 static Color rc(Reader *r){Color c;c.r=rf(r);c.g=rf(r);c.b=rf(r);return c;}
 static void ws(Writer *w,const char *s,size_t limit){size_t n=strnlen(s,limit);w8(w,(uint8_t)n);for(size_t i=0;i<n;i++)w8(w,(uint8_t)s[i]);}
 static void rs(Reader *r,char *s,size_t capacity){unsigned n=r8(r);if(n>=capacity){r->ok=false;s[0]=0;return;}for(unsigned i=0;i<n;i++){uint8_t c=r8(r);if(c<32||c>126)r->ok=false;s[i]=(char)c;}s[n]=0;}
-static void wb(Writer *w,const Body *b){wv(w,b->position);wv(w,b->velocity);w8(w,b->grounded);}
-static void rb(Reader *r,Body *b){b->position=rv(r);b->velocity=rv(r);uint8_t ground=r8(r);b->grounded=ground!=0;if(ground>1)r->ok=false;}
+/* Coordonnées au pas de 1/128 : erreur <= 4 mm, coût borné, pas de compression.
+   La hauteur du corps reste en float pour préserver les contacts au sol. */
+static void wcoord(Writer *w,float v) {
+    if(!isfinite(v)||v<-256||v>255.99f){w->ok=false;return;}
+    int n=(int)lroundf(v*128);uint16_t u=(uint16_t)n;
+    w8(w,(uint8_t)(u>>8));w8(w,(uint8_t)u);
+}
+static float rcoord(Reader *r) {
+    unsigned hi=r8(r),lo=r8(r),u=(hi<<8)|lo;int n=u>=32768?(int)u-65536:(int)u;return (float)n/128;
+}
+static void wq(Writer *w,Vec3 p){wcoord(w,p.x);wcoord(w,p.y);wcoord(w,p.z);}
+static Vec3 rq(Reader *r){Vec3 p;p.x=rcoord(r);p.y=rcoord(r);p.z=rcoord(r);return p;}
+static void wb(Writer *w,const Body *b){wcoord(w,b->position.x);wf(w,b->position.y);wcoord(w,b->position.z);wq(w,b->velocity);w8(w,b->grounded);}
+static void rb(Reader *r,Body *b){b->position.x=rcoord(r);b->position.y=rf(r);b->position.z=rcoord(r);b->velocity=rq(r);uint8_t ground=r8(r);b->grounded=ground!=0;if(ground>1)r->ok=false;}
 
 static void player_write(Writer *w,const Player *p) {
     wb(w,&p->body);
@@ -28,6 +40,7 @@ static void player_write(Writer *w,const Player *p) {
     F(landing);F(sway_x);F(sway_y);F(step_timer);F(dash_timer);F(dash_cooldown);
     F(weapon_switch);F(melee_timer);F(reload_timer);F(reload_duration);F(upgrade_lock);F(boost_timer);
     F(shield);F(shield_time);F(speed_time);F(power_time);F(reactor_time);F(dash_power_time);F(switch_power_time);
+    F(web_timer);F(web_immunity);
     #undef F
     w8(w,(uint8_t)p->weapon);w8(w,(uint8_t)p->weapon_target);w8(w,p->previous_weapon);
     for(int i=0;i<WEAPON_COUNT;i++)w8(w,p->ammo[i]);
@@ -42,11 +55,14 @@ static void player_read(Reader *r,Player *p) {
     F(landing);F(sway_x);F(sway_y);F(step_timer);F(dash_timer);F(dash_cooldown);
     F(weapon_switch);F(melee_timer);F(reload_timer);F(reload_duration);F(upgrade_lock);F(boost_timer);
     F(shield);F(shield_time);F(speed_time);F(power_time);F(reactor_time);F(dash_power_time);F(switch_power_time);
+    F(web_timer);F(web_immunity);
     #undef F
     if(p->shield<0||p->shield>30||p->shield_time<0||p->shield_time>12.01f
         ||p->speed_time<0||p->speed_time>8.01f||p->power_time<0||p->power_time>12.01f
         ||p->reactor_time<0||p->reactor_time>REACTOR_DURATION+.01f||p->dash_power_time<0||p->dash_power_time>1.26f
-        ||p->switch_power_time<0||p->switch_power_time>2.51f)r->ok=false;
+        ||p->switch_power_time<0||p->switch_power_time>2.51f
+        ||p->web_timer<0||p->web_timer>WEB_ROOT_TIME+.001f
+        ||p->web_immunity<0||p->web_immunity>WEB_ROOT_TIME+WEB_IMMUNITY_TIME+.001f)r->ok=false;
     p->weapon=r8(r);p->weapon_target=r8(r);p->previous_weapon=r8(r);
     if(p->previous_weapon>=STANDARD_WEAPONS||p->boost_timer<0||p->boost_timer>.7f)r->ok=false;
     for(int i=0;i<WEAPON_COUNT;i++){p->ammo[i]=r8(r);if(p->ammo[i]>WEAPONS[i].magazine)r->ok=false;}
@@ -60,6 +76,7 @@ static void player_read(Reader *r,Player *p) {
     if(p->weapon>=WEAPON_COUNT||p->weapon_target>=WEAPON_COUNT||p->health<0||p->health>player_max_health(p)||fabsf(p->pitch)>1.46f)r->ok=false;
 }
 static void actor_write(Writer *w,const Actor *a) {
+    if(!a->active){w8(w,0);return;}
     w8(w,(uint8_t)((a->active?1:0)|(a->dead?2:0)|(a->dash_pressed?4:0)|(a->melee_pressed?8:0)|(a->revive_held?16:0)));
     ws(w,a->name,PLAYER_NAME_LENGTH);player_write(w,&a->player);
     #define F(field) wf(w,a->field)
@@ -74,6 +91,7 @@ static void actor_write(Writer *w,const Actor *a) {
 }
 static void actor_read(Reader *r,Actor *a) {
     uint8_t flags=r8(r);if(flags>31)r->ok=false;
+    if(!(flags&1)){if(flags)r->ok=false;memset(a,0,sizeof(*a));a->revive_target=-1;return;}
     a->active=(flags&1)!=0;a->dead=(flags&2)!=0;a->dash_pressed=(flags&4)!=0;a->melee_pressed=(flags&8)!=0;a->revive_held=(flags&16)!=0;
     rs(r,a->name,sizeof(a->name));player_read(r,&a->player);
     #define F(field) a->field=rf(r)
@@ -102,6 +120,8 @@ static void enemy_write(Writer *w,const Enemy *e) {
     #undef F
     wv(w,e->attack_direction);wv(w,e->knockback);w8(w,e->attack_fired);w8(w,(uint8_t)e->target_actor);
     w8(w,e->elite);w8(w,(uint8_t)e->slam_state);wf(w,e->slam_timer);wf(w,e->slam_flash);wv(w,e->slam_target);
+    wf(w,e->climb_timer);
+    if(e->climb_timer>0){w8(w,(uint8_t)e->climb_solid);wq(w,e->climb_start);wq(w,e->climb_target);}
 }
 static void enemy_read(Reader *r,Enemy *e) {
     uint32_t id=r32(r);if(id>2147483647u)r->ok=false;e->id=(int)id;e->type=r8(r);rb(r,&e->body);
@@ -113,8 +133,11 @@ static void enemy_read(Reader *r,Enemy *e) {
     e->target_actor=r8(r);
     uint8_t elite=r8(r);e->elite=elite!=0;if(elite>1)r->ok=false;
     e->slam_state=r8(r);e->slam_timer=rf(r);e->slam_flash=rf(r);e->slam_target=rv(r);
+    e->climb_timer=rf(r);e->climb_solid=0;e->climb_start=e->climb_target=(Vec3){0,0,0};
+    if(e->climb_timer>0){e->climb_solid=r8(r);e->climb_start=rq(r);e->climb_target=rq(r);}
+    if(e->climb_timer<0||e->climb_timer>ENEMY_CLIMB_TIME+.001f||e->climb_solid>=MAX_SOLIDS)r->ok=false;
     if(e->slam_state>3||e->slam_timer<0||e->slam_timer>3.01f||e->slam_flash<0||e->slam_flash>.81f||(!e->elite&&e->slam_state))r->ok=false;
-    if(e->type>ENEMY_BOMBER||fired>1||e->target_actor>=MAX_PLAYERS||e->attack_timer<0
+    if(e->type>ENEMY_WEAVER||fired>1||e->target_actor>=MAX_PLAYERS||e->attack_timer<0
         ||(e->attack_timer>0&&e->attack_duration<=0)||e->max_health<0||e->max_health>10000)r->ok=false;
 }
 
@@ -146,6 +169,7 @@ size_t protocol_snapshot_write(uint8_t *data,size_t capacity,const Game *g) {
     w32(&w,(uint32_t)g->completed_waves);wf(&w,g->wave_clear_time);
     w8(&w,g->rocket_event);w32(&w,g->event_serial);wf(&w,g->event_notice_time);
     w8(&w,(uint8_t)g->unlock_weapon);wf(&w,g->unlock_time);
+    wf(&w,g->intro_time);w32(&w,(uint32_t)g->intro_enemy);w32(&w,g->intro_serial);w32(&w,(uint32_t)g->intro_last_wave);
     w8(&w,(uint8_t)g->wave_total);w8(&w,(uint8_t)g->wave_spawned);w8(&w,(uint8_t)g->reinforcements);
     wf(&w,g->reinforce_timer);
     w8(&w,(uint8_t)g->reactor_charge);wf(&w,g->reactor_cooldown);
@@ -163,16 +187,17 @@ size_t protocol_snapshot_write(uint8_t *data,size_t capacity,const Game *g) {
     w8(&w,(uint8_t)g->enemy_count);for(int i=0;i<g->enemy_count;i++)enemy_write(&w,&g->enemies[i]);
     w8(&w,(uint8_t)g->corpse_count);for(int i=0;i<g->corpse_count;i++)enemy_write(&w,&g->corpses[i]);
     w8(&w,(uint8_t)g->projectile_count);
-    for(int i=0;i<g->projectile_count;i++){const Projectile *p=&g->projectiles[i];wv(&w,p->position);wv(&w,p->velocity);wf(&w,p->life);wc(&w,p->color);w8(&w,(uint8_t)p->kind);w8(&w,(uint8_t)p->owner);wf(&w,p->damage);}
+    for(int i=0;i<g->projectile_count;i++){const Projectile *p=&g->projectiles[i];wq(&w,p->position);wq(&w,p->velocity);wf(&w,p->life);wc(&w,p->color);w8(&w,(uint8_t)p->kind);w8(&w,(uint8_t)p->owner);wf(&w,p->damage);}
     w8(&w,(uint8_t)g->pickup_count);
     for(int i=0;i<g->pickup_count;i++){wv(&w,g->pickups[i].position);wf(&w,g->pickups[i].cooldown);}
     w8(&w,(uint8_t)g->barrel_count);
     for(int i=0;i<g->barrel_count;i++) {
         const Barrel *b=&g->barrels[i];wv(&w,b->position);wf(&w,b->health);wf(&w,b->explosion_time);w8(&w,(uint8_t)b->owner);
     }
-    w8(&w,(uint8_t)g->particle_count);
-    for(int i=0;i<g->particle_count;i++) {
-        const Particle *p=&g->particles[i];wv(&w,p->position);wv(&w,p->velocity);wc(&w,p->color);
+    int particles=g->particle_count<NET_VISUAL_PARTICLES?g->particle_count:NET_VISUAL_PARTICLES;
+    w8(&w,(uint8_t)particles);
+    for(int i=g->particle_count-particles;i<g->particle_count;i++) {
+        const Particle *p=&g->particles[i];wq(&w,p->position);wq(&w,p->velocity);wc(&w,p->color);
         wf(&w,p->life);wf(&w,p->max_life);wf(&w,p->size);
     }
     return w.ok?w.pos:0;
@@ -192,6 +217,9 @@ bool protocol_snapshot_read(Game *g,const uint8_t *data,size_t size) {
     out.completed_waves=(int)completed;out.wave_clear_time=rf(&r);
     uint8_t event=r8(&r);out.rocket_event=event!=0;out.event_serial=r32(&r);out.event_notice_time=rf(&r);
     unsigned unlock=r8(&r);out.unlock_weapon=unlock==255?-1:(int)unlock;out.unlock_time=rf(&r);
+    out.intro_time=rf(&r);uint32_t intro_enemy=r32(&r);out.intro_serial=r32(&r);uint32_t intro_wave=r32(&r);
+    if(out.intro_time<0||out.intro_time>CHAMPION_INTRO_TIME+.001f||intro_enemy>2147483647u||intro_wave>wave)return false;
+    out.intro_enemy=(int)intro_enemy;out.intro_last_wave=(int)intro_wave;
     if(event>1||(unlock!=255&&(unlock<1||unlock>=STANDARD_WEAPONS))||out.unlock_time<0||out.unlock_time>6.01f
         ||out.event_notice_time<0||out.event_notice_time>6.01f||out.time<0)return false;
     out.wave_total=r8(&r);out.wave_spawned=r8(&r);out.reinforcements=r8(&r);
@@ -227,9 +255,9 @@ bool protocol_snapshot_read(Game *g,const uint8_t *data,size_t size) {
     out.corpse_count=r8(&r);if(out.corpse_count>MAX_CORPSES)return false;
     for(int i=0;i<out.corpse_count;i++)enemy_read(&r,&out.corpses[i]);
     out.projectile_count=r8(&r);if(out.projectile_count>MAX_PROJECTILES)return false;
-    for(int i=0;i<out.projectile_count;i++){Projectile *p=&out.projectiles[i];p->position=rv(&r);p->velocity=rv(&r);p->life=rf(&r);p->color=rc(&r);p->kind=r8(&r);
+    for(int i=0;i<out.projectile_count;i++){Projectile *p=&out.projectiles[i];p->position=rq(&r);p->velocity=rq(&r);p->life=rf(&r);p->color=rc(&r);p->kind=r8(&r);
         unsigned owner=r8(&r);p->owner=owner==255?-1:(int)owner;p->damage=rf(&r);
-        if(p->kind>1||(owner>=MAX_PLAYERS&&owner!=255)||(p->kind==1&&owner>=MAX_PLAYERS)
+        if(p->kind>2||(owner>=MAX_PLAYERS&&owner!=255)||(p->kind==1&&owner>=MAX_PLAYERS)||(p->kind==2&&owner!=255)
             ||p->damage<0||p->damage>1000||p->life<0||p->life>5.01f)r.ok=false;
     }
     out.pickup_count=r8(&r);if(out.pickup_count>MAX_PICKUPS)return false;
@@ -240,15 +268,19 @@ bool protocol_snapshot_read(Game *g,const uint8_t *data,size_t size) {
         unsigned owner=r8(&r);b->owner=owner==255?-1:(int)owner;
         if((owner>=MAX_PLAYERS&&owner!=255)||b->health<0||b->health>45||b->explosion_time<0||b->explosion_time>.66f)r.ok=false;
     }
-    unsigned particles=r8(&r);if(particles>MAX_PARTICLES)return false;
+    unsigned particles=r8(&r);if(particles>NET_VISUAL_PARTICLES)return false;
     out.particle_count=0;
     for(unsigned i=0;i<particles;i++) {
-        Particle p;p.position=rv(&r);p.velocity=rv(&r);p.color=rc(&r);
+        Particle p;p.position=rq(&r);p.velocity=rq(&r);p.color=rc(&r);
         p.life=rf(&r);p.max_life=rf(&r);p.size=rf(&r);
         if(p.life<0||p.max_life<=0||p.life>p.max_life+.001f||p.size<=0||p.size>2)r.ok=false;
         if(out.particle_count<out.particle_limit&&out.particle_count<MAX_PARTICLES)out.particles[out.particle_count++]=p;
     }
     if(!r.ok||r.pos!=size||out.local_actor<0||out.local_actor>=MAX_PLAYERS)return false;
+    if(out.intro_time>0) {
+        bool found=false;for(int i=0;i<out.enemy_count;i++)if(out.enemies[i].id==out.intro_enemy&&out.enemies[i].elite&&out.enemies[i].health>0)found=true;
+        if(!found||!out.intro_serial||out.intro_last_wave!=out.wave||out.wave%5!=0)return false;
+    }
     if(out.map_id!=((out.wave>0?out.wave-1:0)/5)%MAP_COUNT)return false;
     for(int i=0;i<MAX_PLAYERS;i++)if(out.actors[i].active) {
         if(!game_weapon_available(&out,out.actors[i].player.weapon)||!game_weapon_available(&out,out.actors[i].player.weapon_target))return false;

@@ -25,6 +25,12 @@ void move_horizontal(const World *world,Body *b,float dx,float dz,float radius,f
     }
     if(hit_x)b->velocity.x=0;
     if(hit_z)b->velocity.z=0;
+    /* La bordure reste fermée au-dessus des falaises, même en rocket jump. */
+    float x=clampf(b->position.x,-ARENA_HALF_X+radius,ARENA_HALF_X-radius);
+    float z=clampf(b->position.z,-ARENA_HALF_Z+radius,ARENA_HALF_Z-radius);
+    if(x!=b->position.x)b->velocity.x=0;
+    if(z!=b->position.z)b->velocity.z=0;
+    b->position.x=x;b->position.z=z;
 }
 void move_vertical(const World *world,Body *b,float dt,float radius,float height) {
     float previous=b->position.y;b->velocity.y-=PLAYER_GRAVITY*dt;
@@ -46,6 +52,12 @@ static float approach(float value,float target,float step) {
 }
 void update_player(World *world,Player *p,Input input,float dt) {
     Body *b=&p->body;
+    bool webbed=p->web_timer>0;
+    p->web_timer=fmaxf(0,p->web_timer-dt);p->web_immunity=fmaxf(0,p->web_immunity-dt);
+    if(webbed) {
+        input.forward=input.right=0;input.jump=input.dash=input.sprint=false;
+        b->velocity.x=b->velocity.z=0;p->dash_timer=p->boost_timer=0;
+    }
     p->boost_timer=fmaxf(0,p->boost_timer-dt);
     p->dash_cooldown=fmaxf(0,p->dash_cooldown-dt);
     p->dash_timer=fmaxf(0,p->dash_timer-dt);

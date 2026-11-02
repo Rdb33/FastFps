@@ -37,7 +37,7 @@ static void protocol_test(World *world) {
     Game copy;game_reset(&copy,world,28);copy.local_actor=2;
     assert(protocol_snapshot_read(&copy,buffer,size));
     assert(copy.score==5678&&copy.wave==12&&copy.current_actor==2&&copy.local_actor==2);
-    assert(copy.player.body.position.x==game.actors[2].player.body.position.x);
+    assert(fabsf(copy.player.body.position.x-game.actors[2].player.body.position.x)<.004f);
     assert(copy.world==world&&copy.actors[3].active);
     for(size_t i=0;i<size;i+=17){int score=copy.score;assert(!protocol_snapshot_read(&copy,buffer,i));assert(copy.score==score);}
     uint8_t fuzz[100];
@@ -90,6 +90,8 @@ static void virtual_sessions(World *world) {
     for(int i=0;i<3;i++){net_ready(clients[i]);transfer(clients[i],0,host,i+1,&server,0);}
     for(int i=0;i<3;i++)transfer(host,i+1,clients[i],0,&games[i],0);
     assert(net_start(host,&server,0));
+    uint8_t late_ready=1;size_t late_size=frame(bytes,PACKET_READY,&late_ready,1);
+    assert(net_feed(host,1,&server,bytes,late_size,0)&&host->phase==ROOM_PLAYING);
     for(int i=0;i<3;i++) {
         transfer(host,i+1,clients[i],0,&games[i],0);
         assert(clients[i]->phase==ROOM_PLAYING&&games[i].cooperative&&games[i].local_actor==i+1);
@@ -110,6 +112,7 @@ static void virtual_sessions(World *world) {
     }
     /* Transition d'arène et rechargement propagés à trois invités. */
     server.wave=5;server.completed_waves=4;server.enemy_count=0;server.projectile_count=0;server.wave_timer=.001f;
+    server.reinforcements=0;server.wave_spawned=server.wave_total;server.intro_time=0;
     game_actor_save(&server);
     for(int i=0;i<MAX_PLAYERS;i++){server.actors[i].player.upgrade_pending=false;server.actors[i].player.ammo[0]=17;}
     server.current_actor=-1;game_actor_select(&server,0);
@@ -175,8 +178,13 @@ static void virtual_sessions(World *world) {
     }
     game_end_rocket_event(&server);net_tick(host,&server,(Command){0},FIXED_STEP,12);
     for(int i=0;i<3;i++){transfer(host,i+1,clients[i],0,&games[i],12);assert(!games[i].rocket_event&&games[i].player.weapon!=4);}
+    /* Une file encombrée peut sauter des états ordinaires, jamais la fin. */
+    uint8_t ping[4]={0,0,0,0};size_t ping_size=frame(bytes,PACKET_PING,ping,sizeof(ping));
+    while(host->peers[1].pending<NET_PACKET_MAX+16) {
+        memcpy(host->peers[1].send+host->peers[1].pending,bytes,ping_size);host->peers[1].pending+=ping_size;
+    }
     server.round_over=true;net_tick(host,&server,(Command){0},FIXED_STEP,15);
-    for(int i=0;i<3;i++){transfer(host,i+1,clients[i],0,&games[i],15);assert(clients[i]->phase==ROOM_FINISHED);}
+    for(int i=0;i<3;i++){transfer(host,i+1,clients[i],0,&games[i],15);assert(clients[i]->phase==ROOM_FINISHED&&games[i].round_over);}
     assert(net_start(host,&server,16));
     for(int i=0;i<3;i++){transfer(host,i+1,clients[i],0,&games[i],16);assert(clients[i]->round==2&&clients[i]->sequence==0);}
     Command stale={.sequence=900,.round=1};uint8_t body[64];size_t len=protocol_command_write(body,sizeof(body),&stale);

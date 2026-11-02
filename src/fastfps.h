@@ -49,6 +49,7 @@ typedef struct {
     float boost_timer;
     float shield, shield_time, speed_time, power_time, reactor_time;
     float dash_power_time, switch_power_time;
+    float web_timer, web_immunity;
     uint8_t previous_weapon;
     uint8_t upgrades[UPGRADE_COUNT], offers[UPGRADE_CHOICES];
     bool upgrade_pending;
@@ -73,7 +74,7 @@ typedef struct {
     bool active, dead, dash_pressed, melee_pressed;
     char name[PLAYER_NAME_LENGTH+1];
 } Actor;
-typedef enum { ENEMY_RUNNER, ENEMY_CASTER, ENEMY_BRUTE, ENEMY_BOMBER } EnemyType;
+typedef enum { ENEMY_RUNNER, ENEMY_CASTER, ENEMY_BRUTE, ENEMY_BOMBER, ENEMY_WEAVER } EnemyType;
 typedef struct {
     Body body;
     int id, type;
@@ -87,6 +88,9 @@ typedef struct {
     int slam_state;
     float slam_timer, slam_flash, stuck_time;
     Vec3 slam_target;
+    float climb_timer;
+    Vec3 climb_start, climb_target;
+    int climb_solid;
 } Enemy;
 typedef struct { Vec3 position, velocity; float life; Color color; int kind, owner; float damage; } Projectile;
 typedef struct { Vec3 position, velocity; Color color; float life, max_life, size; } Particle;
@@ -114,6 +118,10 @@ typedef struct {
     int event_last_wave, unlock_weapon;
     uint32_t event_rng, event_serial;
     float unlock_time, event_notice_time;
+    float intro_time;
+    int intro_enemy, intro_last_wave;
+    uint32_t intro_serial;
+    uint8_t intro_skip_ready; /* Front de touche, uniquement sur l'autorité. */
     int wave, score, kills, next_id, difficulty;
     int completed_waves, map_id, lives;
     float time, wave_timer, nav_timer, shot_cooldown, recoil, hit_time, damage_time;
@@ -140,11 +148,11 @@ typedef struct {
     SDL_Window *window; SDL_GLContext context;
     GLuint program, composite_program;
     GLint position, color, normal, matrix, fog, unlit;
-    GLint light_position, light_color, sector_color;
+    GLint light_position, light_color, sector_color, fog_color;
     GLint light_position2, light_color2, glow, eye, detail, surface;
     GLint composite_position, composite_uv, composite_texture;
     GLint composite_texel, composite_effects;
-    GLint composite_brightness, composite_impact, composite_impact_phase, pulse;
+    GLint composite_brightness, composite_impact, composite_impact_phase, composite_impact_focus, pulse;
     struct Feedback *feedback;
     float brightness;
     uint32_t world_revision;
@@ -158,11 +166,12 @@ typedef struct {
     uint32_t pose_tick;
 } Renderer;
 typedef enum { STATE_MENU, STATE_PLAYING, STATE_PAUSED, STATE_DEAD, STATE_NETWORK, STATE_LOBBY, STATE_UPGRADE } State;
+typedef enum { CONFIRM_NONE, CONFIRM_SOLO, CONFIRM_COOP } GameConfirmation;
 struct Network;
 struct UpdateChecker;
 typedef struct {
     State state;
-    bool running, fullscreen, sound, capture_error, motion, modern;
+    bool running, fullscreen, sound, capture_error, motion, modern, menu_motion;
     int selected, quality, best_score, fps, difficulty;
     float sensitivity, brightness, music_volume, impact_intensity;
     int numeric_edit, slider_drag;
@@ -181,6 +190,10 @@ typedef struct {
     float music_peaks[MUSIC_VISUAL_BANDS];
     int menu_visual_page;
     State menu_visual_state;
+    GameConfirmation game_confirmation;
+    State confirmation_state;
+    bool confirmation_yes, confirmation_released;
+    Uint32 confirmation_ready_at;
 } App;
 typedef enum { SOUND_SHOT, SOUND_SHOTGUN, SOUND_HIT, SOUND_KILL,
     SOUND_HURT, SOUND_JUMP, SOUND_PICKUP, SOUND_WAVE,
@@ -198,6 +211,8 @@ Vec3 vscale(Vec3 v, float scale);
 float vlength(Vec3 v);
 Vec3 vnormalize(Vec3 v);
 Vec3 look_direction(float yaw, float pitch);
+bool enemy_try_climb(Game *game, Enemy *enemy, Vec3 direction);
+bool enemy_update_climb(Game *game, Enemy *enemy, float dt);
 float ray_box(Vec3 origin, Vec3 direction, Box box, float range);
 Mat4 perspective(float fov, float aspect, float near_plane, float far_plane);
 Mat4 view_matrix(Vec3 eye, float yaw, float pitch);
@@ -352,5 +367,8 @@ bool menu_coordinates(const App *app, const Renderer *renderer, int x, int y, fl
 void ui_music_visualizer(Mesh *mesh, const App *app, float x, float baseline, float width, float height);
 int menu_hit(const App *app, Renderer *renderer, int x, int y);
 void menu_build(Mesh *mesh, const Game *game, const App *app);
+void menu_confirm_open(App *app, GameConfirmation kind);
+bool menu_confirm_event(App *app, Renderer *renderer, const SDL_Event *event, GameConfirmation *accepted);
+void menu_confirm_build(Mesh *mesh, const App *app);
 
 #endif

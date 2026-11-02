@@ -1,6 +1,6 @@
 # FASTFPS — Secteur zéro
 
-**FPS 3D natif, style Doom, pensé pour le Raspberry Pi 4.** Base à améliorer progressivement : déplacement nerveux, quatre armes principales et survie dans trois arènes industrielles. Snapshot **1.2.3** : impacts en plusieurs images inversées noir/blanc ou noir/rouge, parallaxe du menu par profondeur et visualiseur musical plus contrasté.
+**FPS 3D natif, style Doom, pensé pour le Raspberry Pi 4.** Base à améliorer progressivement : déplacement nerveux, quatre armes principales et survie dans trois arènes industrielles. Version **1.3.0** : environnements distincts, lance-toile dès la vague 21, escalade des petites créatures, introductions rares de champions et réseau allégé.
 
 Application en **C11**, **SDL2** (fenêtre, clavier, souris et son) et **OpenGL ES 2** (rendu 3D). Graphismes, police et bruitages sont générés localement. Les musiques MP3 locales et facultatives sont lues avec **mpg123**.
 
@@ -20,11 +20,59 @@ Les contributions et retours de jeu sont bienvenus. Consulte le [guide de contri
 
 Pour un signalement sensible, suis la [politique de sécurité](SECURITY.md). Les [notices tierces](THIRD_PARTY_NOTICES.md) précisent notamment la provenance et les droits des musiques de Buckshot Roulette. Les [réglages GitHub de communauté](.github/COMMUNITY_SETUP.md) décrivent la description du dépôt et l'activation des signalements privés.
 
-## Nouveautés — snapshot 1.2.3
+## Nouveautés — version 1.3.0
+
+### Combats et coopération
+
+- Les bombes du bombardier tombent en **2 secondes**, avec une position visée fixe et une recharge de **5 secondes** après l'attaque.
+- Une réanimation continue lorsque le soigneur subit des dégâts, tant qu'il reste debout, à portée et maintient **E** avec une ligne de vue libre. Relâcher E ou quitter la portée interrompt toujours la progression.
+- Une **frappe fatale** repousse les ennemis dans un rayon de **4 mètres** autour de la victime. Les murs bloquent l'onde ; brutes et champions résistent davantage. Les alliés ne sont pas poussés et l'onde n'ajoute pas de dégâts.
+- Traqueurs, invocateurs et lance-toiles peuvent monter sur une dalle basse ou une terrasse accessible, avec une animation de **0,5 seconde**. Ils s'exposent pendant le mouvement ; les gros ennemis conservent leurs limites de déplacement. Une dalle mobile peut être abordée lorsqu'elle est suffisamment basse.
+
+Le **lance-toile apparaît dès la vague 21** : silhouette vert-gris, protections claires et appendices de tisseur. Il prépare son tir avant de lancer un projectile blanc évitable. Une toile qui touche immobilise les déplacements pendant **0,75 seconde** ; viser, tirer et recharger restent possibles. Une immunité temporaire empêche de prolonger immédiatement le blocage avec plusieurs toiles. L'hôte décide des touches ; les invités affichent et prédisent la durée reçue.
+
+### Trois environnements et trois manières de circuler
+
+| Map | Environnement et repères | Conséquence en jeu |
+| --- | --- | --- |
+| Réacteur | Hall fermé, éclairage cyan, grandes colonnes, noyau énergétique | Tourner autour du socle, couper les tirs derrière les colonnes, changer de côté par les balcons |
+| Fonderie | Machines hautes, fenêtres de four orange, conduites et toit partiel | Trois couloirs, traversées au centre et aux extrémités ; le convoyeur nord-sud permet de changer de position |
+| Bastion | Ruines à ciel ouvert, falaises ocre, obélisques verts et terrasses | Sauts et escalades entre niveaux, positions de tir élevées et accès alternatifs aux balcons |
+
+Les maps changent toujours toutes les **cinq vagues**. Soins, réacteur d'équipe, navettes et repères colorés gardent leur fonction commune ; architecture, matériaux, ciel et éclairage distinguent les zones.
+
+### Introductions rares de champions
+
+La première rencontre avec un champion reçoit une présentation d'environ **2,2 secondes** : cadrage sur l'ennemi, pose d'entrée, nom et bandes cinématiques. Ensuite, une introduction a **20 % de chances** de se produire lors d'une apparition éligible, avec au moins **15 vagues** depuis la précédente.
+
+Le combat est suspendu pendant la présentation. En coopération, l'hôte pilote le même événement pour l'équipe. **Espace** permet de passer après une courte protection contre les touches déjà maintenues ; un joueur peut passer pour tous. Les déplacements, attaques, munitions et défis ne progressent pas pendant cette pause. La musique baisse temporairement.
+
+### Parallaxe indépendant et affichage 1080p
+
+**Échap → Réglages → Parallaxe du menu** possède désormais son propre interrupteur, actif par défaut, y compris après lecture d'anciens réglages. Tu peux donc garder la caméra de combat stable avec **F4** tout en conservant le menu animé. Fond, décors, carte, boutons, titre et réacteur suivent leurs couches de profondeur ; les zones de clic suivent aussi leur commande.
+
+Le lancement d'une nouvelle partie demande une confirmation, en solo comme pour l'hôte d'un salon. **Annuler** est sélectionné par défaut ; utilise les flèches ou la souris puis Entrée, ou Échap pour revenir. Recommencer depuis la pause avertit que la progression de cette partie sera perdue. Reprendre la partie en cours reste immédiat.
+
+Le nouveau profil **1080P** est disponible avec **F2** ou dans les réglages : rendu interne **1920 × 1080**, objectif 60 FPS. Pour le sélectionner au lancement :
+
+```bash
+./lancer.sh --quality 1080p --fullscreen
+```
+
+Les profils Pi / Pi+ restent disponibles ; le profil par défaut d'une nouvelle installation demeure Pi 4.
+
+### Réseau
+
+La version utilise le **protocole 12** : toute l'équipe doit mettre à jour le jeu. Les états sont toujours envoyés à **20 Hz**, avec prédiction des déplacements. Les coordonnées horizontales et vitesses sont encodées plus simplement, les emplacements inactifs sont omis et au plus seize particules cosmétiques sont transmises. La hauteur des corps reste en précision complète pour préserver les contacts avec les plateformes. Aucune compression lourde ni dépendance supplémentaire.
+
+Sur les deux scénarios locaux comparés au format précédent, les états ont diminué d'environ **49 à 51 %**. Ce sont des mesures de paquets, pas une garantie de latence sur Internet. Voir [MULTIJOUEUR.md](MULTIJOUEUR.md) et [VALIDATION.md](VALIDATION.md).
+
+## Effets visuels
+
 
 ### Impacts en plusieurs images
 
-Un coup marquant déclenche désormais une **séquence en trois phases** : image inversée en noir et blanc avec contours, image contrastée en noir/blanc ou noir/rouge selon l'événement, puis retour progressif aux couleurs normales. La scène reste reconnaissable dans les ombres ; l'interface garde ses couleurs et sa position.
+Un coup marquant déclenche désormais une **séquence en trois phases** : image inversée en noir et blanc avec contours, image contrastée en noir/blanc ou noir/rouge avec traits convergeant sur l’impact, puis retour progressif aux couleurs normales. La scène reste reconnaissable dans les ombres ; l'interface garde ses couleurs et sa position.
 
 | Événement | Séquence |
 | --- | --- |
@@ -33,7 +81,7 @@ Un coup marquant déclenche désormais une **séquence en trois phases** : image
 | Deux éliminations alignées avec Perforation | Négatif noir/blanc → noir/rouge, liaison entre les cibles → retour progressif |
 | Champion vaincu dans le champ de vision | Séquence prolongée noir/blanc puis noir/rouge, fragments dorés et onde au sol |
 
-Les durées nominales sont de **160 ms**, ou **220 ms pour le champion**. Chaque phase reste affichée au moins une image : à 30 FPS, compter environ 200 / 233 ms. Les deux premières phases gardent leur intensité, la dernière s'estompe. Le réglage par défaut de 50 % produit un effet nettement plus marqué ; le slider reste réglable de 0 à 100 %. Le délai partagé passe à **0,6 s**, ou **1 s pour le champion**, avec priorité aux événements majeurs.
+Les durées nominales sont de **110 ms**, ou **170 ms pour le champion**. Chaque phase reste affichée au moins une image : à 30 FPS, compter environ 167 / 233 ms. Les deux premières phases gardent leur intensité, la dernière s'estompe. Le réglage par défaut de 50 % produit un effet nettement plus marqué ; le slider reste réglable de 0 à 100 %. Le délai partagé passe à **2 s**, ou **4 s pour le champion**, avec priorité aux événements majeurs.
 
 Les têtes fatales ne dépendent plus d'un nouveau rayon calculé après le tir : déplacer la souris entre le coup et l'image suivante ne supprime plus la confirmation. Les interruptions fatales sont aussi reconnues parmi les nouveaux corps. Les confirmations restent déduites des compteurs et états déjà transmis ; des actions regroupées dans le même instantané peuvent encore simplifier leur attribution visuelle.
 
@@ -49,7 +97,7 @@ Les explosions proches, frappes au sol des champions et activations du réacteur
 
 Les **12 bandes** suivent uniquement la musique réellement diffusée, après volume, filtres et fondus, avant les bruitages. Les filtres sont plus sélectifs et les niveaux utilisent une échelle logarithmique avec plancher : les basses ne font plus monter artificiellement toutes les barres. Segments lumineux, crêtes blanches et descente plus rapide rendent les variations plus lisibles. Au silence, seules les bases des barres restent visibles. Le volume reste à zéro par défaut et aucun morceau tiers n'est distribué.
 
-**F4 / mouvements réduits** coupe le parallaxe, les secousses et la phase inversée, et réduit la hauteur / vitesse des barres. Le contraste positif des impacts reste actif ; le régler à zéro coupe les impact frames. **Intensité des impacts** pilote aussi l'amplitude des secousses.
+**F4 / mouvements réduits** coupe les secousses et la phase inversée, et réduit la hauteur / vitesse des barres. Le parallaxe possède son propre interrupteur. Le contraste positif des impacts reste actif ; le régler à zéro coupe les impact frames. **Intensité des impacts** pilote aussi l'amplitude des secousses.
 
 Compilation et vérifications hors écran réalisées : captures des phases et du menu, clics / sliders / champs avec parallaxe, réponse audio sur signaux et extraits MP3 locaux, encodage / décodage réseau. Aucun essai sur Raspberry Pi ni connexion réelle entre deux machines pour ce snapshot ; performances et confort en partie restent à évaluer. Voir [VALIDATION.md](VALIDATION.md).
 
@@ -78,7 +126,7 @@ Ces effets apparaissent à la première personne et sur les armes des alliés :
 
 Les effets sont calculés **localement** depuis les états et compteurs de combat déjà reçus. Ils ne changent ni le gameplay ni le générateur aléatoire de la simulation. Les marques de tir sont une représentation cosmétique de la visée observée ; en coopération, la réception des instantanés et les variations de fréquence d'image peuvent simplifier ou décaler certaines confirmations.
 
-**Protocole 11 conservé : les versions 1.2.0 à 1.2.3 restent compatibles en coopération.** Chaque ordinateur choisit son intensité. Les nouveaux effets n'ajoutent ni texture, ni bibliothèque, ni passe de rendu. Le profil Pi borne les nouvelles particules à **40**, et les marques à **8** ; les autres profils utilisent au plus **112 particules et 20 marques**. Le buffer d'arme réserve 4 000 sommets pour les nouveaux détails. Compilation et captures hors écran réalisées ; connexion réelle et performances Pi restent à essayer, voir [VALIDATION.md](VALIDATION.md).
+**Protocole 12 : la version 1.3.0 est requise pour toute l’équipe.** Chaque ordinateur choisit son intensité. Les nouveaux effets n'ajoutent ni texture, ni bibliothèque, ni passe de rendu. Le profil Pi borne les nouvelles particules à **40**, et les marques à **8** ; les autres profils utilisent au plus **112 particules et 20 marques**. Le buffer d'arme réserve 4 000 sommets pour les nouveaux détails. Compilation et captures hors écran réalisées ; connexion réelle et performances Pi restent à essayer, voir [VALIDATION.md](VALIDATION.md).
 
 ## Nouveautés — version 1.2.0
 
@@ -92,7 +140,7 @@ Les effets sont calculés **localement** depuis les états et compteurs de comba
 
 ### Une difficulté qui accompagne la progression
 
-La résistance progresse de **5,5 % de la santé de base par vague après la première**, jusqu'à un multiplicateur de **4,25**, au lieu de 4,5 % et d'un plafond à 3. Les dégâts reçus montent graduellement jusqu'à **+40 % à la vague 31** en Normal / Brutal, et **+25 % en Découverte**, avant l'armure et le bouclier. Les projectiles des invocateurs passent progressivement de **14 à 16 m/s**. Les trois secondes de chute des bombes, leur recharge de cinq secondes et les préparations d'attaques sont conservées pour permettre l'esquive.
+La résistance progresse de **5,5 % de la santé de base par vague après la première**, jusqu'à un multiplicateur de **4,25**, au lieu de 4,5 % et d'un plafond à 3. Les dégâts reçus montent graduellement jusqu'à **+40 % à la vague 31** en Normal / Brutal, et **+25 % en Découverte**, avant l'armure et le bouclier. Les projectiles des invocateurs passent progressivement de **14 à 16 m/s**. Les deux secondes de chute des bombes, leur recharge de cinq secondes et les préparations d'attaques sont conservées pour permettre l'esquive.
 
 À difficulté normale, la vague 11 comporte **20 ennemis en solo / 38 à quatre**, la 21 **25 / 54**, et la 31 **30 / 54** ; jamais plus de 18 à la fois. Cette progression dépend de la vague et de l'effectif : elle ne retire pas le bénéfice du module choisi. L'équilibrage reste à ajuster d'après les retours de jeu.
 
@@ -121,7 +169,7 @@ Quatre modules rejoignent les six existants, chacun jusqu'au rang 5 :
 
 À partir de la vague 2, un défi d'équipe accompagne la vague : **aucune mise à terre**, **interrompre trois attaques**, ou **vaincre le champion en moins de 25 s** lors des vagues de champion. Toucher un ennemi pendant la préparation de son attaque légère annule cette attaque ; une bombe larguée ou un saut de champion ne peut pas être annulé ainsi. Une réussite rapporte **400 + 25 × vague points** et donne aux joueurs debout **15 points de bouclier pendant 12 s et 8 s de célérité**. Un échec n'arrête pas la partie et ne retire pas de points.
 
-**Multijoueur : protocole 11, v1.2.0 requise sur toutes les machines.** Renforts, objectifs, réacteur, objets et dégâts sont décidés par l'hôte ; les invités prédisent leur déplacement et affichent les états reçus. Les armes restent débloquées aux vagues **11 / 21 / 31**, et les maps changent toutes les cinq vagues. Aucun service réseau ni dépendance supplémentaire. Voir [VALIDATION.md](VALIDATION.md) pour les limites de validation.
+**Multijoueur : protocole 12, v1.3.0 requise sur toutes les machines.** Renforts, objectifs, réacteur, objets et dégâts sont décidés par l'hôte ; les invités prédisent leur déplacement et affichent les états reçus. Les armes restent débloquées aux vagues **11 / 21 / 31**, et les maps changent toutes les cinq vagues. Aucun service réseau ni dépendance supplémentaire. Voir [VALIDATION.md](VALIDATION.md) pour les limites de validation.
 
 ## Nouveautés — version 1.1.1
 
@@ -149,11 +197,11 @@ Pour jouer sans cette vérification : `./lancer.sh --no-update-check`. Les modes
 
 - **Armes permanentes** : fusil à pompe à la vague **11**, mitrailleuse à la **21**, lance rail à la **31**. Le Pulse reste disponible dès le début ; le lance roquettes reste lié à l'événement temporaire. La notification et le panneau de progression utilisent les mêmes seuils.
 - **Bombardier dès la vague 11** : trois par vague, contre deux brutes (dont le champion lorsqu'il est présent). Armure ambrée, visière lumineuse et générateurs sur les épaules ; **220 PV de base**, contre 260 pour la brute, avant les multiplicateurs de vague, difficulté et coopération.
-- **Bombes à longue portée** : une cible visible jusqu'à **48 m** ; la bombe apparaît au-dessus de sa position, puis explose **3 secondes** après le début de l'attaque. Le point visé reste fixe. Cercle orange de **3,5 m**, anneau de compte à rebours et alerte « Bombe / Esquive ! » permettent d'anticiper la chute. La hauteur tient compte du sol, des quais et des plafonds présents au lancement.
+- **Bombes à longue portée** : une cible visible jusqu'à **48 m** ; la bombe apparaît au-dessus de sa position, puis explose **2 secondes** après le début de l'attaque. Le point visé reste fixe. Cercle orange de **3,5 m**, anneau de compte à rebours et alerte « Bombe / Esquive ! » permettent d'anticiper la chute. La hauteur tient compte du sol, des quais et des plafonds présents au lancement.
 - Le bombardier recharge pendant **5 secondes après la chute**, soit au minimum **8 secondes entre deux attaques**. Il cherche à garder ses distances pendant la recharge. Les dégâts de zone touchent les joueurs debout à portée, diminuent avec la distance et sont bloqués par les murs. Une bombe déjà lancée reste dangereuse si son créateur est éliminé ; terminer la vague supprime les bombes restantes.
 - **Vampirisme** : **+1 PV par élimination et par rang**, soit +5 PV au rang maximum. Le soin de frappe fatale reste à +10 PV.
 - **Alliés** : pseudo, numéro « J1 » à « J4 », couleur d'armure, fond contrasté et petite pointe au-dessus de la tête. Portée d'affichage augmentée à 48 m pour les coéquipiers visibles ; santé et progression de réanimation conservées.
-- **Animations des ennemis** : coudes et genoux articulés, balancement du torse, foulée propre aux silhouettes et pieds animés selon la distance réellement parcourue. Préparation, frappe et récupération sont séparées ; le geste de frappe atteint son maximum au moment des dégâts. Le bombardier lève les bras et charge ses générateurs pendant les trois secondes de chute.
+- **Animations des ennemis** : coudes et genoux articulés, balancement du torse, foulée propre aux silhouettes et pieds animés selon la distance réellement parcourue. Préparation, frappe et récupération sont séparées ; le geste de frappe atteint son maximum au moment des dégâts. Le bombardier lève les bras et charge ses générateurs pendant les deux secondes de chute.
 
 Tous les nouveaux textes du jeu sont en **français**. **Multijoueur : protocole 10, version 1.1.0 requise sur tous les ordinateurs.** L'hôte choisit les cibles, compte les délais et applique les dégâts ; les invités reçoivent les bombes et affichent leurs alertes. Les buffers graphiques, les cinq appels de dessin et les dépendances existants sont conservés. Voir [VALIDATION.md](VALIDATION.md) pour les contrôles effectués et les essais restant à faire.
 
@@ -171,9 +219,9 @@ Les plateformes font une pause à chaque palier ; sa durée dépend du trajet. R
 
 ### Animations
 
-- Menu : entrée progressive, titres légèrement décalés à l’ouverture, sélection qui glisse entre les lignes, éclairage des cartes, motif de réacteur animé et balayage discret. Les zones cliquables restent fixes. Indicateur animé pendant la connexion à un salon.
+- Menu : entrée progressive, titres légèrement décalés à l’ouverture, sélection qui glisse entre les lignes, éclairage des cartes, motif de réacteur animé et balayage discret. Les zones cliquables suivent leur couche dans le parallaxe. Indicateur animé pendant la connexion à un salon.
 - Recharge : présentation de l’arme, retrait / insertion du chargeur ou de la cellule, main gauche qui accompagne le geste et action finale de réarmement. Le fusil montre trois insertions de deux cartouches ; le lance-roquettes montre une munition insérée dans le tube. Des clics mécaniques accompagnent les étapes, sans changer les durées ni la quantité de munitions restaurée.
-- Arme à la première personne : transitions de changement plus douces, mouvement adapté à la course et au saut, inclinaison de recharge autour de la poignée. Un léger roulis accompagne les déplacements ; **F4** coupe les nouveaux mouvements de caméra et réduit les animations décoratives du menu.
+- Arme à la première personne : transitions de changement plus douces, mouvement adapté à la course et au saut, inclinaison de recharge autour de la poignée. Un léger roulis accompagne les déplacements ; **F4** coupe les mouvements de caméra ; le parallaxe dispose maintenant de son propre interrupteur.
 - Personnages : genoux articulés, pose aérienne des champions, apparition adoucie et pieds maintenus au niveau du sol. Les coéquipiers tombent et se relèvent progressivement ; leurs gestes de recharge utilisent les mêmes phases que l’arme à la première personne. Ces poses sont visuelles et ne changent pas les collisions.
 - Notifications d’arme et d’événement : entrée / sortie glissées. Cartes de modules immobiles pour garder les clics précis, emblèmes animés et barre indiquant le délai avant le choix. Les soins disponibles ont un anneau pulsant.
 
@@ -208,8 +256,8 @@ Les plateformes font une pause à chaque palier ; sa durée dépend du trajet. R
 - **Champions : saut et écrasement au sol.** Le champion prépare son saut pendant 0,75 seconde. Le cercle orange de six mètres annonce sa cible ; celle-ci est fixée avant le décollage. Il saute réellement avec gravité et collisions, frappe à l’atterrissage, puis récupère. Les murs bloquent le choc ; sauter assez haut au bon moment ou quitter le cercle permet de l’éviter. Les dégâts sont appliqués une seule fois à l’impact.
 - **IA des ennemis** : cibles privilégiées selon leur visibilité, maintien de la cible pour éviter les changements incessants, itinéraires propres à chaque joueur en coopération, contournement des obstacles, séparation du groupe et tentatives de sortie lorsqu’un ennemi se bloque. Les traqueurs approchent par les côtés ; les invocateurs reculent si tu es trop près, se déplacent latéralement à distance et anticipent ton mouvement avant leur tir.
 - **Menu principal et Réglages séparés** : grandes actions Solo, Multijoueur, Réglages, Quitter ; raccourcis et contexte de partie affichés à droite. Les sliders et la saisie de luminosité / sensibilité sont conservés dans Réglages. Échap revient au menu précédent.
-- **Réanimation obligatoire en coopération** : aucun retour automatique. Approche-toi à moins de 2,8 mètres et maintiens **E pendant 2,5 secondes**, avec une ligne de vue libre. Relâcher E, s’éloigner, perdre la ligne de vue ou subir des dégâts interrompt la progression. Le joueur réanimé conserve ses modules et chargeurs, retrouve 50 % de sa santé maximale et bénéficie de deux secondes de protection. Une icône au-dessus du corps et une barre indiquent l’état. Si tous les joueurs actifs sont à terre, game over immédiat. Le solo conserve ses trois vies.
-- **Pop-up à chaque nouvelle arme** : carte visible pendant six secondes au déblocage des armes aux rounds 10, 20 et 30, avec le nom et la touche. Le combat continue pendant son affichage.
+- **Réanimation obligatoire en coopération** : aucun retour automatique. Approche-toi à moins de 2,8 mètres et maintiens **E pendant 2,5 secondes**, avec une ligne de vue libre. Relâcher E, s’éloigner ou perdre la ligne de vue interrompt la progression ; subir des dégâts ne la remet plus à zéro. Le joueur réanimé conserve ses modules et chargeurs, retrouve 50 % de sa santé maximale et bénéficie de deux secondes de protection. Une icône au-dessus du corps et une barre indiquent l’état. Si tous les joueurs actifs sont à terre, game over immédiat. Le solo conserve ses trois vies.
+- **Pop-up à chaque nouvelle arme** : carte visible pendant six secondes au déblocage des armes aux vagues 11, 21 et 31, avec le nom et la touche. Le combat continue pendant son affichage.
 - **Événement rare : Roquettes !** À partir du round 3, l’hôte effectue un tirage de 8 % par round éligible, avec au moins cinq rounds entre événements. Chaque joueur, même à terre, reçoit un lance-roquettes temporaire pour ce round, automatiquement équipé. **5** ou la molette permet de le sélectionner ensuite. Trois roquettes par chargeur, recharge de 2,1 secondes, réserves illimitées pendant l’événement. Les roquettes infligent des dégâts de zone sur 6,5 mètres, avec diminution selon la distance et blocage par les murs. Les explosions ne font pas de tirs à la tête. Elles ne blessent pas directement les alliés ; le tireur peut subir ses propres dégâts et faire un **rocket jump**. Les barils restent dangereux pour toute l’équipe. À la fin du round, le lanceur est retiré et l’arme précédant l’événement est restaurée si nécessaire.
 - **Mobilité sur les trois maps** : deux plaques élévatrices montent jusqu’à 3,48 mètres et une navette se déplace horizontalement. Monte dessus à leur passage ou saute dessus, puis utilise-les pour atteindre les hauteurs. Les joueurs, ennemis et corps peuvent être transportés. Une plaque descendante dégage un personnage vers un côté libre plutôt que de l’enfermer. Positions et collisions sont calculées depuis le temps de simulation de l’hôte et rejouées pour la prédiction locale.
 
@@ -486,7 +534,7 @@ Carte et paramètres sont actuellement dans les sources. Aucune option de compil
 
 Trois cartes et un mode survie solo ou coopératif, quatre armes permanentes par run, un lance-roquettes temporaire et un rechargement par chargeur. Collisions par boîtes, trajectoires parfois anguleuses. Pas encore de rampes, accroupissement, sauvegarde de partie ou manette.
 
-La coopération utilise un joueur hôte qui fait autorité sur le monde, un état d’entrée `Input`, des identifiants d’ennemis stables, une prédiction du déplacement et une interpolation à l’affichage. La connexion se fait par IPv4 et port TCP, sans service central dans le jeu. Tailscale utilise ses propres services de connexion et éventuellement de relais. La validation entre deux machines et sur Internet reste à faire : voir [VALIDATION.md](VALIDATION.md). Les **1.2.0 et 1.2.1 utilisent le protocole 11**, incompatible avec les versions 1.1.x et antérieures. Tous les joueurs doivent utiliser une version de gameplay compatible.
+La coopération utilise un joueur hôte qui fait autorité sur le monde, un état d’entrée `Input`, des identifiants d’ennemis stables, une prédiction du déplacement et une interpolation à l’affichage. La connexion se fait par IPv4 et port TCP, sans service central dans le jeu. Tailscale utilise ses propres services de connexion et éventuellement de relais. La validation entre deux machines et sur Internet reste à faire : voir [VALIDATION.md](VALIDATION.md). La **1.3.0 utilise le protocole 12**, incompatible avec les versions précédentes. Tous les joueurs doivent utiliser une version de gameplay compatible.
 
 Voir [ROADMAP.md](ROADMAP.md). Le prototype navigateur est conservé dans `prototype-web/` comme archive ; le lanceur principal utilise **l’application native**.
 

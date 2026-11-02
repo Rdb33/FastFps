@@ -22,7 +22,10 @@ void animate_creature(Mesh *mesh, const Enemy *e, float time) {
     float windup=attacking?smooth(progress/.52f)*(1-release):0;
     float strike=release*(1-smooth((progress-.62f)/.38f));
     float attack_side=e->id%2?1:-1;
+    float climb=dead?0:clampf(1-e->climb_timer/ENEMY_CLIMB_TIME,0,1);
+    bool climbing=!dead&&e->climb_timer>0;
     float shoulder=bounce+breath;
+    if(climbing)shoulder-=sinf(climb*PI_F)*.16f;
     if(!dead&&e->slam_state==1)shoulder-=.15f*(1-e->slam_timer/.75f);
     if(!dead&&e->slam_state==3)shoulder-=e->slam_timer/.85f*.17f;
     Color skin={.64f,.17f,.09f},armor={.27f,.17f,.12f},eye={1,.78f,.22f};
@@ -33,6 +36,8 @@ void animate_creature(Mesh *mesh, const Enemy *e, float time) {
         skin=(Color){.39f,.46f,.24f};armor=(Color){.61f,.52f,.24f};eye=(Color){1,.35f,.1f};width=.94f;
     } else if(e->type==ENEMY_BOMBER) {
         skin=(Color){.48f,.33f,.12f};armor=(Color){.24f,.20f,.15f};eye=(Color){1,.68f,.16f};width=.85f;
+    } else if(e->type==ENEMY_WEAVER) {
+        skin=(Color){.12f,.37f,.35f};armor=(Color){.64f,.73f,.71f};eye=(Color){.78f,.96f,1};width=.68f;
     }
     if(e->flash>0)skin=(Color){1,.88f,.67f};
     if(e->elite){armor=(Color){.88f,.59f,.18f};eye=(Color){1,.87f,.36f};skin=(Color){.37f,.26f,.16f};}
@@ -82,11 +87,19 @@ void animate_creature(Mesh *mesh, const Enemy *e, float time) {
         mesh_beveled_box(mesh,(Vec3){0,.77f+shoulder,.38f},(Vec3){.59f,.56f,.28f},.045f,armor);
         mesh->glow=dead?0:1;
         mesh_box(mesh,(Vec3){0,1.39f+shoulder,-.28f},(Vec3){.40f,.08f,.06f},eye);mesh->glow=0;
+    } else if(e->type==ENEMY_WEAVER) {
+        mesh_cylinder(mesh,(Vec3){0,.65f+shoulder,.44f},(Vec3){0,1.2f+shoulder,.44f},.30f,armor,8);
+        for(int side=-1;side<=1;side+=2)for(int k=0;k<2;k++) {
+            Vec3 a={side*.30f,1.1f+shoulder,.27f},b={side*(.64f+.13f*k),1.48f+shoulder-.32f*k,.37f};
+            mesh_cylinder(mesh,a,b,.05f,armor,5);
+            mesh_cylinder(mesh,b,(Vec3){b.x+side*.15f,b.y-.22f,b.z-.35f},.035f,eye,5);
+        }
     } else {
         mesh_diamond(mesh,(Vec3){-.30f,1.66f+shoulder,0},.16f,(Color){.78f,.68f,.44f});
         mesh_diamond(mesh,(Vec3){.30f,1.66f+shoulder,0},.16f,(Color){.78f,.68f,.44f});
     }
     float lean=dead?0:-blend*.075f-strike*.09f+windup*.05f;
+    if(climbing)lean=.20f*sinf(climb*PI_F);
     if(attacking&&e->type==ENEMY_BOMBER)lean=.045f*smooth(progress);
     float twist=attacking&&(e->type==ENEMY_RUNNER||e->type==ENEMY_BRUTE)?attack_side*(strike*.18f-windup*.14f):0;
     mesh_rotate(mesh,first,(Vec3){0,.55f+shoulder,0},lean,twist,dead?0:sinf(e->walk_phase)*blend*.025f);
@@ -99,15 +112,17 @@ void animate_creature(Mesh *mesh, const Enemy *e, float time) {
         mesh_beveled_box(mesh,(Vec3){hip.x,.09f+shoulder,0},(Vec3){.21f,.24f,.23f},.025f,skin);
         mesh_beveled_box(mesh,(Vec3){hip.x,.025f+shoulder,-.07f},(Vec3){.27f,.15f,.37f},.03f,armor);
         float knee=dead?.08f:fmaxf(0,-leg_angle)*1.15f;
+        if(climbing)knee=.45f+.55f*sinf(climb*PI_F);
         if(!dead&&e->slam_state==2)knee=.55f;
         mesh_rotate(mesh,shin,(Vec3){hip.x,.33f+shoulder,0},knee,0,0);
         mesh_rotate(mesh,leg,hip,leg_angle,0,0);
         float arm_angle=-leg_angle*.75f;
         if(!dead&&e->slam_state)arm_angle=e->slam_state==2?1.8f:(e->slam_state==1?-.5f:1.2f);
         float elbow=.12f+fmaxf(0,leg_angle)*.35f;
+        if(climbing){arm_angle=1.4f+.5f*sinf(climb*PI_F);elbow=.85f;}
         if(attacking) {
             if(e->type==ENEMY_BOMBER){arm_angle=1.0f+smooth(progress)*1.25f;elbow=.4f;}
-            else if(e->type==ENEMY_CASTER){arm_angle=.55f+windup*.25f+strike*1.0f;elbow=.65f*(1-strike);}
+            else if(e->type==ENEMY_CASTER||e->type==ENEMY_WEAVER){arm_angle=.55f+windup*.25f+strike*1.0f;elbow=.65f*(1-strike);}
             else if((float)side==attack_side){arm_angle=-windup*.95f+strike*1.65f;elbow=windup*.75f+strike*.10f;}
             else {arm_angle=windup*.25f+strike*.4f;elbow=.25f;}
         }
@@ -119,14 +134,15 @@ void animate_creature(Mesh *mesh, const Enemy *e, float time) {
         mesh_rotate(mesh,forearm,(Vec3){pivot.x,.66f+shoulder,0},elbow,0,0);
         mesh_rotate(mesh,arm,pivot,arm_angle,0,(float)side*(attacking&&e->type==ENEMY_BOMBER?.12f:.025f));
     }
-    if(!dead&&e->type==ENEMY_CASTER&&e->attack_timer>0&&!e->attack_fired) {
+    if(!dead&&(e->type==ENEMY_CASTER||e->type==ENEMY_WEAVER)&&e->attack_timer>0&&!e->attack_fired) {
         mesh->glow=1;
         float charge=clampf(progress/.62f,0,1);
-        mesh_diamond(mesh,(Vec3){0,1.2f,-.67f},.07f+.16f*charge,(Color){.3f,1,.83f});
+        Color cast=e->type==ENEMY_WEAVER?(Color){.75f,.95f,1}:(Color){.3f,1,.83f};
+        mesh_diamond(mesh,(Vec3){0,1.2f,-.67f},.07f+.16f*charge,cast);
         mesh_diamond(mesh,(Vec3){0,1.2f,-.67f},.055f,(Color){.95f,1,.70f});
         for(int i=0;i<3;i++) {
             float angle=time*9+(float)i*2*PI_F/3;
-            mesh_diamond(mesh,(Vec3){sinf(angle)*.24f,1.2f+cosf(angle)*.24f,-.67f},.035f,(Color){.42f,1,.82f});
+            mesh_diamond(mesh,(Vec3){sinf(angle)*.24f,1.2f+cosf(angle)*.24f,-.67f},.035f,cast);
         }
         mesh->glow=0;
     }

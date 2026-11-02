@@ -71,7 +71,6 @@ bool net_host(Network *n) {
 static bool queue(Network *n,int id,PacketType type,const uint8_t *body,size_t size) {
     Peer *p=&n->peers[id];
     if(p->fd==-1||size+1>NET_PACKET_MAX)return false;
-    if(type==PACKET_SNAPSHOT&&p->pending>NET_PACKET_MAX*2)return true;
     if(p->pending+size+5>NET_BUFFER_MAX)return false;
     put32(p->send+p->pending,(uint32_t)size+1);p->send[p->pending+4]=(uint8_t)type;
     if(size)memcpy(p->send+p->pending+5,body,size);
@@ -137,6 +136,8 @@ static void reconcile(Network *n,Game *g,const uint8_t *data,size_t size,double 
     if(local->kill_time>old->kill_time+.02f)audio_play(SOUND_KILL);
     else if(local->headshot_time>old->headshot_time+.02f)audio_play(SOUND_HEADSHOT);
     else if(local->hit_time>old->hit_time+.02f)audio_play(SOUND_HIT);
+    if(local->player.web_timer>old->player.web_timer+.1f)audio_play(SOUND_CAST);
+    if(snapshot.intro_serial!=n->previous.intro_serial)audio_play(SOUND_CHAMPION);
     for(int i=0;i<snapshot.barrel_count;i++)if(snapshot.barrels[i].health<=0
         &&i<n->previous.barrel_count&&n->previous.barrels[i].health>0)
         audio_play_at(SOUND_EXPLOSION,snapshot.barrels[i].position);
@@ -151,7 +152,7 @@ static void reconcile(Network *n,Game *g,const uint8_t *data,size_t size,double 
         for(int j=0;j<n->previous.bomb_count;j++)if(n->previous.bombs[j].source==b->source)seen=true;
         if(!seen)audio_play_at(SOUND_CAST,b->target);
     }
-    if(snapshot.wave>n->previous.wave)audio_play(snapshot.wave%5==0?SOUND_CHAMPION:SOUND_WAVE);
+    if(snapshot.wave>n->previous.wave&&snapshot.intro_serial==n->previous.intro_serial)audio_play(snapshot.wave%5==0?SOUND_CHAMPION:SOUND_WAVE);
     if(snapshot.completed_waves>n->previous.completed_waves)audio_play(SOUND_UPGRADE);
     if(snapshot.event_serial!=n->previous.event_serial)audio_play(SOUND_CHAMPION);
     if(snapshot.unlock_time>n->previous.unlock_time+.2f)audio_play(SOUND_UPGRADE);
@@ -203,7 +204,10 @@ static bool packet(Network *n,int id,Game *g,uint8_t type,const uint8_t *body,si
         }
         if(!p->accepted)return false;
         if(type==PACKET_READY) {
-            if(size!=1||body[0]>1||n->phase==ROOM_PLAYING)return false;
+            if(size!=1||body[0]>1)return false;
+            /* Un clic « prêt » peut arriver après START sur une vraie socket.
+               Ce paquet de salon tardif ne doit pas déconnecter un joueur. */
+            if(n->phase==ROOM_PLAYING)return true;
             n->members[id].ready=body[0]!=0;roster(n,g);return true;
         }
         if(type==PACKET_INPUT) {
@@ -285,7 +289,7 @@ static void snapshots(Network *n,Game *g,double now) {
     uint8_t data[NET_PACKET_MAX];game_actor_save(g);
     size_t size=protocol_snapshot_write(data,sizeof(data),g);
     if(!size){message(n,"ETAT TROP VOLUMINEUX");return;}
-    for(int i=1;i<MAX_PLAYERS;i++)if(n->peers[i].accepted&&!n->peers[i].closing)
+    for(int i=1;i<MAX_PLAYERS;i++)if(n->peers[i].accepted&&!n->peers[i].closing&&(g->round_over||n->peers[i].pending<NET_PACKET_MAX))
         if(!queue(n,i,PACKET_SNAPSHOT,data,size))n->peers[i].closing=true;
     n->last_snapshot=now;
 }
@@ -405,7 +409,7 @@ static Vec3 rider_position(const World *world,const Body *previous,const Body *l
 void net_render(const Network *n,const Game *g,Game *view,double now) {
     *view=*g;
     if(n->mode!=NET_CLIENT||!n->has_snapshot)return;
-    float age=clampf((float)(now-n->snapshot_time),0,.1f);
+    float age=g->intro_time>0?0:clampf((float)(now-n->snapshot_time),0,.1f);
     view->time=n->current.time+age;
     view->reactor_cooldown=fmaxf(0,view->reactor_cooldown-age);
     view->challenge_deadline=fmaxf(0,view->challenge_deadline-age);

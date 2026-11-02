@@ -18,6 +18,7 @@ Color feedback_enemy_color(const Enemy *e) {
     if(e->type==ENEMY_CASTER)return (Color){.55f,.36f,.84f};
     if(e->type==ENEMY_BRUTE)return (Color){.70f,.61f,.28f};
     if(e->type==ENEMY_BOMBER)return (Color){1,.64f,.18f};
+    if(e->type==ENEMY_WEAVER)return (Color){.65f,.95f,1};
     return (Color){.68f,.30f,.17f};
 }
 static const Enemy *find_enemy(const Enemy *enemies,int count,int id) {
@@ -49,12 +50,16 @@ static void impact(Feedback *f,const Game *g,const App *app,int kind,int id,int 
     if(app->impact_intensity<=0||app->state!=STATE_PLAYING||g->dead)return;
     if(f->impact_time>0) {
         if(priority(kind)<=priority(f->impact_kind))return;
-    }else if(f->impact_cooldown>0&&priority(kind)<=priority(f->impact_kind))return;
+    }else if(f->impact_cooldown>0&&(kind!=IMPACT_CHAMPION||f->impact_kind==IMPACT_CHAMPION))return;
     f->impact_kind=kind;f->impact_ids[0]=id;f->impact_ids[1]=second;
+    const Enemy *target=find_enemy(g->corpses,g->corpse_count,id);
+    if(!target)target=find_enemy(g->enemies,g->enemy_count,id);
+    f->impact_point=target?vadd(target->body.position,(Vec3){0,(kind==IMPACT_HEAD?1.4f:.9f)*enemy_size(target),0}):
+        vadd(player_eye(&g->player,false),vscale(look_direction(g->player.yaw,g->player.pitch),5));
     f->impact_color=(Color){1,1,1};f->impact_phase=app->motion?0:1;
-    f->impact_duration=kind==IMPACT_CHAMPION?.220f:.160f;
-    f->impact_time=f->impact_duration-(app->motion?0:(kind==IMPACT_CHAMPION?.055f:.045f));
-    f->impact_cooldown=kind==IMPACT_CHAMPION?1:.6f;
+    f->impact_duration=kind==IMPACT_CHAMPION?.170f:.110f;
+    f->impact_time=f->impact_duration-(app->motion?0:(kind==IMPACT_CHAMPION?.035f:.025f));
+    f->impact_cooldown=kind==IMPACT_CHAMPION?4:2;
     f->impact_drawn=f->hold_drawn=false;f->held_weapon=g->player.weapon;
     f->hold_time=app->motion?.040f*app->impact_intensity:0;
     shake(f,g,app,kind==IMPACT_CHAMPION?.009f:(kind==IMPACT_PIERCE?.004f:.0025f),kind==IMPACT_CHAMPION?.24f:.12f);
@@ -154,7 +159,7 @@ static void advance(Feedback *f,const Game *g,const App *app,float dt) {
     if(f->impact_drawn&&f->impact_time>0) {
         f->impact_time=fmaxf(0,f->impact_time-dt);
         bool champion=f->impact_kind==IMPACT_CHAMPION;
-        float negative=champion?.055f:.045f,positive=champion?.065f:.055f;
+        float negative=champion?.035f:.025f,positive=champion?.055f:.035f;
         float elapsed=f->impact_duration-f->impact_time;
         /* Ne jamais sauter une phase, même si une image est lente. */
         if(f->impact_phase==0&&(!app->motion||elapsed>=negative)) {
@@ -213,7 +218,7 @@ void feedback_update(Feedback *f,const Game *g,const App *app) {
     if(app->quality==0&&f->mark_count>8)f->mark_count=8;
     if(app->state==STATE_PAUSED&&!g->cooperative)dt=0;
     advance(f,g,app,dt);
-    bool active=app->state==STATE_PLAYING&&!g->round_over&&app->impact_intensity>0;
+    bool active=app->state==STATE_PLAYING&&!g->round_over&&g->intro_time<=0&&app->impact_intensity>0;
     if(!active){f->impact_time=f->hold_time=f->shake_time=0;cache(f,g);return;}
     const FeedbackActor *local=&f->actors[g->local_actor];
     if(g->damage_time>0&&(g->player.health<local->health-.1f||
@@ -309,7 +314,7 @@ Vec3 feedback_camera_shake(const Feedback *f,const App *app) {
 }
 float feedback_impact(const Feedback *f,const App *app) {
     if(!f||f->impact_time<=0||app->state!=STATE_PLAYING)return 0;
-    float tail=f->impact_kind==IMPACT_CHAMPION?.100f:.060f;
+    float tail=f->impact_kind==IMPACT_CHAMPION?.080f:.050f;
     float fade=f->impact_phase==2?clampf(f->impact_time/tail,0,1):1;
     float remaining=1-clampf(app->impact_intensity,0,1);
     return (1-remaining*remaining*remaining)*fade;

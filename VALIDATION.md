@@ -2,6 +2,26 @@
 
 Historique des contrôles sur la machine de développement ; les résultats sont datés par version.
 
+## Version 1.3.0 — 2 novembre 2026
+
+- Confirmation de nouvelle partie : clavier et souris avec parallaxe, annulation sans changement de l'état de pause, choix par défaut, touche maintenue / répétée, délai contre les doubles clics et invalidation lors d'un changement d'écran. La confirmation est placée avant le démarrage solo et celui du salon par l'hôte ; les invités conservent leur bouton prêt.
+- Compilation C11 `-O2 -Wall -Wextra -Wpedantic`, sans avertissement. `make test` : suites réseau, gameplay et mécaniques réussies. Le salon virtuel couvre quatre joueurs, paquets fragmentés, prédiction, transition de map et nouvelle manche, réanimation d'un invité et événements. Rejet des paquets tronqués et essais de données aléatoires conservés.
+- Bombes : vérification d'une bombe encore visible à 1,9 s puis explosion après 2 s. Réanimation : les dégâts reçus ne remettent plus la progression à zéro ; relâchement, portée, obstruction et mise à terre continuent d'être contrôlés.
+- Toiles : immobilisation horizontale / saut / esquive, tirs toujours possibles, retour du mouvement, immunité contre une seconde toile et prédiction. Lance-toile absent à la vague 20 et présent à la 21 ; état et type relus depuis le réseau.
+- Escalade : 0,5 s avant l'appui complet, exclusion des gros ennemis, refus sous un plafond, cible suivant une dalle déplacée. Frappe fatale : recul des ennemis proches, résistance des champions, pas de recul au-delà du rayon ou derrière un mur. Limites de l'arène maintenues en hauteur pour les rocket jumps.
+- Cinématiques : première introduction garantie, absence aux deux rencontres suivantes, introductions ultérieures avec intervalle minimal de quinze vagues. Vérification du gel des positions / santé / horloge, d'une touche Espace déjà maintenue, passage volontaire, gel coopératif et passage par un invité. Champs d'introduction validés et transmis ; une cible inexistante est refusée.
+- Régression de position verticale : la hauteur des corps reste en flottant exact. Un joueur reçu sur un quai reste au sol après une étape de prédiction. Coordonnées horizontales compactées à moins de 4 mm de leur valeur d'origine ; pas de quantification des angles de visée.
+- Réseau réel : test TCP sur loopback réussi avec l'autorisation de créer des sockets locales. Le premier essai a révélé un READY tardif après START ; ce cas est désormais ignoré proprement et couvert dans le transport virtuel. La fin de partie est également reçue avec une file d'envoi encombrée.
+- Mesure des paquets sur les mêmes deux états, avec le sérialiseur de 1.2.3 comme référence : 6 688 → 3 430 octets (48,7 %) et 15 876 → 7 760 octets (51,1 %). Intervalle 20 Hz conservé, particules limitées à seize, acteurs inactifs omis, sans compresseur ni allocation d'encodage. Temps d'encodage mesurés sur ce PC de l'ordre de 10–20 µs par état ; ces temps ne sont pas des mesures Raspberry Pi.
+- Géométrie : trois maps, vérifications des points d'apparition / itinéraires / barils et progression jusqu'à la vague 32. Barils dégagés des ascenseurs ; fixtures de transition adaptées aux réserves de renforts et aux introductions, positions de tests d'obstruction placées hors des murs. Budgets conservés : 14 586 / 15 072 / 11 598 sommets statiques et 45 / 54 / 43 volumes pour les trois maps, sous les limites de 60 000 sommets et 64 volumes.
+- Captures OpenGL ES hors écran Mesa llvmpipe : trois environnements, lance-toile, immobilisation, escalade, cadrage de champion, phases d'impact et parallaxe actif avec caméra stable. Rendu interne 1920 × 1080 capturé, aucune erreur OpenGL observée. Journaux, programmes temporaires et captures dans `build/verification-v1.3.0`, exclus de Git.
+- Parallaxe : lecture réelle d’un ancien fichier avec caméra stable, option distincte active par défaut, puis sauvegarde / relecture de son interrupteur ; contrôle d'un clic et d'un slider sur une couche déplacée malgré la caméra de combat désactivée. Douze lignes de réglages, coordonnées adaptées et option pour couper le parallaxe.
+- **À essayer sur matériel réel :** FPS / chauffe sur Raspberry Pi, équilibre des nouvelles trajectoires et toiles, confort des impacts et introductions sur une partie complète, connexion entre ordinateurs et via VPN / Internet. Le loopback et le rendu logiciel ne remplacent pas ces essais.
+
+### Références visuelles consultées
+
+Les principes de silhouette, pose dominante et timing de [Mariel Cartwright à la GDC](https://gdcvault.com/play/1021656/Powerful-and-Effective-Animation-for) ont guidé la lecture des coups marquants. L'exemple [Dark Impact Frame de ParticleFX Studio](https://particlefx.studio/effects/dark-impact-frame) fournit une référence de contraste noir / blanc / rouge, traits convergents et éclairs. Seuls ces principes visuels sont repris : les formes et shaders sont écrits dans le projet, sans import de leurs images ou animations.
+
 ## Snapshot 1.2.3 — 2 novembre 2026
 
 - Compilation C11 `-O2 -Wall -Wextra -Wpedantic`, sans avertissement, et revue du diff.

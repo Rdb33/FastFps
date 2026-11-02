@@ -114,132 +114,126 @@ bool world_init(World *w) {
 void world_set_map(World *w,int id) {
     if(id<0||id>=MAP_COUNT||id==w->map_id)return;
     w->mesh.count=0;w->mesh.glow=0;w->solid_count=0;w->platform_count=0;w->map_id=id;w->revision++;
-    world_routes(w);
-    Mesh *m=&w->mesh;
-    const Color accents[MAP_COUNT]={{.9f,.39f,.15f},{.63f,.3f,.93f},{.26f,.76f,.66f}};
-    Color accent=accents[id];
+    world_routes(w);Mesh *m=&w->mesh;
+    const Color accents[MAP_COUNT]={{.25f,.75f,1},{1,.45f,.12f},{.28f,.9f,.7f}};
+    const Color walls[MAP_COUNT]={{.16f,.22f,.28f},{.29f,.20f,.14f},{.38f,.23f,.14f}};
+    Color accent=accents[id],wall=walls[id];float wall_height=id==2?8:7;
     for(int x=-28;x<28;x+=4)for(int z=-24;z<24;z+=4) {
-        Color c=((x+z)/4)%2?(Color){.15f,.17f,.14f}:(Color){.19f,.21f,.18f};
-        if(id==1)c=(Color){c.r*.85f,c.g*.83f,c.b*1.25f};
-        if(id==2)c=(Color){c.r*.80f,c.g*1.15f,c.b*1.15f};
+        unsigned hash=(unsigned)(x+28)*31u+(unsigned)(z+24)*17u;
+        float shade=(float)(hash%7)*.008f;
+        Color c=id==0?(Color){.13f+shade,.18f+shade,.22f+shade}:
+            (id==1?(Color){.20f+shade,.17f+shade,.13f+shade}:(Color){.42f+shade,.29f+shade,.17f+shade});
         mesh_quad(m,(Vec3){x,0,z+4},(Vec3){x+4,0,z+4},(Vec3){x+4,0,z},(Vec3){x,0,z},c,(Vec3){0,1,0});
     }
-    solid(w,(Vec3){0,0,-24},(Vec3){56,7,1},(Color){.26f,.25f,.21f});
-    solid(w,(Vec3){0,0,24},(Vec3){56,7,1},(Color){.26f,.25f,.21f});
-    solid(w,(Vec3){-28,0,0},(Vec3){1,7,48},(Color){.21f,.22f,.18f});
-    solid(w,(Vec3){28,0,0},(Vec3){1,7,48},(Color){.21f,.22f,.18f});
-    for(int side=-1;side<=1;side+=2) {
-        for(int x=-24;x<=24;x+=4) {
-            Color panel=(x%8==0)?(Color){.21f,.27f,.30f}:(Color){.25f,.28f,.28f};
-            wall_panel(m,(Vec3){x,1.55f,side*23.41f},(Vec3){3.72f,2.75f,.10f},panel);
-            mesh_beveled_box(m,(Vec3){x,4.56f,side*23.40f},(Vec3){1.9f,.54f,.10f},.04f,(Color){.10f,.13f,.15f});
-            m->glow=.8f;
-            mesh_box(m,(Vec3){x,4.77f,side*23.32f},(Vec3){1.5f,.075f,.04f},(Color){.42f,.77f,.93f});
-            m->glow=0;
-        }
-        for(int z=-20;z<=20;z+=4) {
-            wall_panel(m,(Vec3){side*27.41f,1.55f,z},(Vec3){.10f,2.75f,3.72f},(Color){.20f,.25f,.28f});
-            mesh_box(m,(Vec3){side*27.32f,1.58f,z},(Vec3){.04f,.32f,2.7f},(Color){.10f,.13f,.16f});
-        }
-        for(int z=-19;z<=19;z+=38) {
-            mesh_cylinder(m,(Vec3){side*26.75f,.4f,z},(Vec3){side*26.75f,6.6f,z},.20f,(Color){.21f,.25f,.28f},8);
-            for(int y=1;y<=6;y+=2)mesh_box(m,(Vec3){side*26.75f,y,z},(Vec3){.58f,.13f,.58f},(Color){.10f,.13f,.15f});
-        }
-    }
-    for(int sign=-1;sign<=1;sign+=2) {
-        mesh_box(m,(Vec3){0,1.1f,sign*23.45f},(Vec3){55,.10f,.04f},accent);
-        mesh_box(m,(Vec3){0,5,sign*23.45f},(Vec3){55,.15f,.04f},accent);
-        mesh_box(m,(Vec3){sign*27.45f,1.1f,0},(Vec3){.04f,.1f,47},accent);
-        mesh_box(m,(Vec3){sign*27.45f,5,0},(Vec3){.04f,.15f,47},accent);
-        for(int x=-24;x<=24;x+=8)mesh_box(m,(Vec3){x,0,sign*23.45f},(Vec3){.14f,7,.05f},(Color){.36f,.34f,.26f});
-    }
-    if(id==0)for(int x=-10;x<=10;x+=20)for(int z=-8;z<=8;z+=16) {
-        solid(w,(Vec3){x,0,z},(Vec3){3.2f,4.2f,3.2f},(Color){.3f,.29f,.24f});
-        mesh_box(m,(Vec3){x,4.2f,z},(Vec3){3.35f,.1f,3.35f},accent);
-        mesh_box(m,(Vec3){x,.8f,z},(Vec3){3.28f,.14f,3.28f},(Color){.55f,.2f,.1f});
+    solid(w,(Vec3){0,0,-24},(Vec3){56,wall_height,1},wall);
+    solid(w,(Vec3){0,0,24},(Vec3){56,wall_height,1},wall);
+    solid(w,(Vec3){-28,0,0},(Vec3){1,wall_height,48},wall);
+    solid(w,(Vec3){28,0,0},(Vec3){1,wall_height,48},wall);
+    if(id==0) {
+        /* Hall froid fermé : rotation autour du coeur, colonnes pour rompre
+           les lignes de tir, balcons latéraux pour changer d'étage. */
+        solid(w,(Vec3){0,8,0},(Vec3){56,.4f,48},(Color){.08f,.12f,.17f});
         for(int side=-1;side<=1;side+=2) {
-            mesh_beveled_box(m,(Vec3){x+side*1.61f,1.5f,z},(Vec3){.06f,1.5f,1.7f},.015f,(Color){.12f,.17f,.18f});
-            m->glow=.55f;mesh_box(m,(Vec3){x+side*1.65f,1.85f,z},(Vec3){.025f,.8f,.075f},(Color){.38f,.79f,.95f});m->glow=0;
+            for(int x=-24;x<=24;x+=6) {
+                wall_panel(m,(Vec3){x,1.2f,side*23.4f},(Vec3){5.5f,3.7f,.1f},wall);
+                m->glow=.8f;mesh_box(m,(Vec3){x,5.5f,side*23.3f},(Vec3){3.8f,.16f,.1f},accent);m->glow=0;
+            }
+            for(int z=-16;z<=16;z+=8) {
+                solid(w,(Vec3){side*26.8f,0,z},(Vec3){.55f,7.8f,.65f},(Color){.1f,.15f,.22f});
+                m->glow=.6f;mesh_box(m,(Vec3){side*26.45f,1.5f,z},(Vec3){.06f,3,.13f},accent);m->glow=0;
+            }
         }
+        for(int x=-10;x<=10;x+=20)for(int z=-8;z<=8;z+=16) {
+            solid(w,(Vec3){x,0,z},(Vec3){3.2f,5.5f,3.2f},(Color){.22f,.31f,.38f});
+            mesh_box(m,(Vec3){x,5.5f,z},(Vec3){3.4f,.12f,3.4f},accent);
+            m->glow=.7f;mesh_box(m,(Vec3){x,1.2f,z+1.63f},(Vec3){.15f,3.6f,.05f},accent);m->glow=0;
+        }
+        for(int x=-19;x<=19;x+=38)for(int z=-12;z<=12;z+=24)
+            solid(w,(Vec3){x,0,z},(Vec3){3,.95f,2.5f},(Color){.23f,.33f,.39f});
+        for(int z=-18;z<=18;z+=12) {
+            mesh_box(m,(Vec3){0,7.4f,z},(Vec3){53,.35f,.65f},(Color){.12f,.19f,.25f});
+            m->glow=.7f;mesh_box(m,(Vec3){0,7.35f,z},(Vec3){26,.08f,.4f},(Color){.58f,.85f,1});m->glow=0;
+        }
+    }else if(id==1) {
+        /* Usine chaude : machines hautes, trois couloirs et traversées
+           seulement au centre / extrémités, convoyeur longitudinal. */
+        for(int side=-1;side<=1;side+=2) {
+            solid(w,(Vec3){side*18,8,0},(Vec3){19,.4f,48},(Color){.12f,.10f,.09f});
+            for(int z=-10;z<=10;z+=20) {
+                solid(w,(Vec3){side*11,0,z},(Vec3){4,3.7f,9},(Color){.26f,.22f,.19f});
+                for(int k=-2;k<=2;k+=4) {
+                    Vec3 pipe={side*11,3.7f,(float)z+k};
+                    mesh_cylinder(m,pipe,vadd(pipe,(Vec3){0,3,0}),.7f,(Color){.17f,.14f,.12f},8);
+                    m->glow=1;mesh_cylinder(m,vadd(pipe,(Vec3){0,.1f,0}),vadd(pipe,(Vec3){0,.35f,0}),.73f,accent,8);m->glow=0;
+                }
+                m->glow=.8f;mesh_box(m,(Vec3){side*8.95f,1,z},(Vec3){.08f,1.4f,5.8f},(Color){1,.22f,.045f});m->glow=0;
+            }
+            solid(w,(Vec3){side*20,0,0},(Vec3){4,1,5},(Color){.32f,.22f,.12f});
+            solid(w,(Vec3){0,0,side*13},(Vec3){6.5f,.9f,2},(Color){.30f,.22f,.14f});
+            for(int z=-20;z<=20;z+=5) {
+                solid(w,(Vec3){side*26.7f,0,z},(Vec3){.9f,8,.7f},(Color){.15f,.12f,.10f});
+                m->glow=.7f;mesh_box(m,(Vec3){side*27.36f,1.5f,z},(Vec3){.08f,2.8f,3.7f},(Color){.85f,.28f,.06f});m->glow=0;
+            }
+            for(int k=-2;k<=2;k++) {
+                float z=(float)k*8;
+                mesh_box(m,(Vec3){side*18,7.2f,z},(Vec3){18,.55f,.75f},(Color){.25f,.18f,.10f});
+                m->glow=.8f;mesh_box(m,(Vec3){side*18,7.18f,z},(Vec3){12,.08f,.2f},accent);m->glow=0;
+            }
+        }
+        for(int x=-24;x<=24;x+=8)for(int side=-1;side<=1;side+=2) {
+            mesh_box(m,(Vec3){x,0,side*23.4f},(Vec3){6.9f,3.5f,.15f},(Color){.16f,.13f,.11f});
+            m->glow=.6f;mesh_box(m,(Vec3){x,4.4f,side*23.3f},(Vec3){4,.14f,.1f},accent);m->glow=0;
+        }
+    }else {
+        /* Ruines à ciel ouvert : terrasses accessibles par bonds et escalade,
+           accès alternatifs aux balcons, repérage par obélisques et soleil. */
+        for(int side=-1;side<=1;side+=2) {
+            for(int z=-8;z<=8;z+=16) {
+                solid(w,(Vec3){side*11,0,z},(Vec3){9,.9f,7},(Color){.43f,.28f,.16f});
+                solid(w,(Vec3){side*13,0,z},(Vec3){5,1.8f,4},(Color){.50f,.34f,.20f});
+                solid(w,(Vec3){side*14,1.8f,z},(Vec3){1.6f,3.6f,1.7f},(Color){.27f,.24f,.19f});
+                m->glow=.8f;mesh_box(m,(Vec3){side*14,2.5f,z+.87f},(Vec3){.12f,1.7f,.04f},accent);m->glow=0;
+            }
+            for(int z=-20;z<=20;z+=8) {
+                float height=8+(float)((z+20)/8%3)*1.4f;
+                mesh_box(m,(Vec3){side*28.7f,0,z},(Vec3){2.3f,height,5.4f},(Color){.38f,.25f,.15f});
+                mesh_diamond(m,(Vec3){side*30.8f,height*.8f,z},2.7f,(Color){.42f,.27f,.16f});
+            }
+            for(int x=-24;x<=24;x+=8) {
+                mesh_box(m,(Vec3){x,0,side*24.6f},(Vec3){5.5f,8+(x%3),2},(Color){.42f,.28f,.17f});
+                mesh_diamond(m,(Vec3){x,9,side*27},3,(Color){.45f,.30f,.18f});
+            }
+        }
+        solid(w,(Vec3){-16.3f,0,-8},(Vec3){2.2f,2.4f,2.4f},(Color){.39f,.29f,.19f});
+        solid(w,(Vec3){14.8f,0,8},(Vec3){1.8f,2.4f,2.4f},(Color){.39f,.29f,.19f});
+        solid(w,(Vec3){16.5f,0,8},(Vec3){2.2f,3.2f,2.4f},(Color){.44f,.32f,.20f});
+        for(int side=-1;side<=1;side+=2) {
+            solid(w,(Vec3){side*3.8f,0,-17},(Vec3){1.2f,5.8f,1.4f},(Color){.29f,.27f,.21f});
+            mesh_box(m,(Vec3){side*2.6f,5.7f,-17},(Vec3){3.5f,.65f,1.5f},(Color){.40f,.36f,.27f});
+        }
+        m->glow=.7f;mesh_diamond(m,(Vec3){13,22,-44},3.3f,(Color){1,.68f,.30f});m->glow=0;
     }
-    solid(w,(Vec3){0,0,0},(Vec3){9,1.8f,7},(Color){.27f,.29f,.24f});
-    mesh_box(m,(Vec3){0,1.8f,0},(Vec3){9.15f,.04f,7.15f},(Color){.47f,.49f,.3f});
+    /* Socle du pouvoir d'équipe : même accès, habillage propre à la zone. */
+    solid(w,(Vec3){0,0,0},(Vec3){9,1.8f,7},id==2?(Color){.33f,.30f,.22f}:wall);
+    mesh_box(m,(Vec3){0,1.8f,0},(Vec3){9.15f,.04f,7.15f},accent);
     for(int i=0;i<6;i++) {
-        solid(w,(Vec3){0,0,6.25f-i*.5f},(Vec3){3,.3f*(i+1),.5f},(Color){.28f,.29f,.25f});
+        solid(w,(Vec3){0,0,6.25f-i*.5f},(Vec3){3,.3f*(i+1),.5f},wall);
         mesh_box(m,(Vec3){0,.3f*(i+1)+.005f,6.46f-i*.5f},(Vec3){3,.018f,.04f},accent);
     }
-    if(id==0)for(int x=-19;x<=19;x+=38)for(int z=-12;z<=12;z+=24) {
-        solid(w,(Vec3){x,0,z},(Vec3){3,1.15f,2.5f},(Color){.32f,.35f,.25f});
-        mesh_beveled_box(m,(Vec3){x,.025f,z},(Vec3){3.1f,.12f,2.6f},.1f,(Color){.12f,.16f,.16f});
-        mesh_beveled_box(m,(Vec3){x,1.05f,z},(Vec3){3.07f,.15f,2.57f},.1f,(Color){.15f,.20f,.20f});
-        for(int side=-1;side<=1;side+=2) {
-            mesh_box(m,(Vec3){x+side*.86f,.2f,z+1.27f},(Vec3){.10f,.73f,.06f},(Color){.14f,.18f,.19f});
-            mesh_box(m,(Vec3){x+side*.86f,.2f,z-1.27f},(Vec3){.10f,.73f,.06f},(Color){.14f,.18f,.19f});
-        }
-        mesh_beveled_box(m,(Vec3){x,.40f,z+1.3f},(Vec3){.6f,.3f,.07f},.03f,(Color){.71f,.58f,.22f});
-    }
-    if(id==1) {
-        /* Fonderie : deux lignes de machines, passages aux extrémités et au centre. */
-        for(int side=-1;side<=1;side+=2)for(int z=-11;z<=11;z+=22) {
-            Vec3 p={(float)side*11,0,(float)z};
-            solid(w,p,(Vec3){3,3.5f,10},(Color){.27f,.21f,.34f});
-            m->glow=.7f;mesh_box(m,vadd(p,(Vec3){0,3.5f,0}),(Vec3){3.1f,.09f,10.1f},accent);m->glow=0;
-            for(int k=-3;k<=3;k+=3)mesh_cylinder(m,vadd(p,(Vec3){0,3.6f,(float)k}),vadd(p,(Vec3){0,5,(float)k}),.5f,(Color){.20f,.17f,.24f},8);
-        }
-        for(int side=-1;side<=1;side+=2) {
-            solid(w,(Vec3){(float)side*20,0,0},(Vec3){4,1.2f,5},(Color){.35f,.25f,.31f});
-            solid(w,(Vec3){0,0,(float)side*13},(Vec3){7,1.1f,2},(Color){.31f,.22f,.35f});
-        }
-    }else if(id==2) {
-        /* Bastion : murs décalés, traversées latérales et couvertures basses. */
-        for(int side=-1;side<=1;side+=2) {
-            for(int lane=-1;lane<=1;lane+=2) {
-                Vec3 p={(float)side*13,0,(float)lane*10};
-                solid(w,p,(Vec3){11,2.7f,2},(Color){.19f,.32f,.31f});
-                mesh_box(m,vadd(p,(Vec3){0,2.7f,0}),(Vec3){11.1f,.08f,2.1f},accent);
-            }
-            solid(w,(Vec3){(float)side*8,0,0},(Vec3){2,4.5f,3},(Color){.24f,.36f,.33f});
-            solid(w,(Vec3){(float)side*19,0,0},(Vec3){3,1.1f,3},(Color){.23f,.29f,.27f});
-            solid(w,(Vec3){0,0,(float)side*15},(Vec3){5,1.1f,2},(Color){.22f,.32f,.28f});
-        }
-    }
-    for(int x=-15;x<=15;x+=30)mesh_box(m,(Vec3){x,.003f,0},(Vec3){.055f,.006f,41},(Color){.44f,.4f,.2f});
-    for(int z=-17;z<=17;z+=34)mesh_box(m,(Vec3){0,.003f,z},(Vec3){45,.006f,.055f},(Color){.44f,.4f,.2f});
+    mesh_beveled_box(m,(Vec3){0,1.82f,0},(Vec3){1.85f,.28f,1.85f},.26f,wall);
     for(int side=-1;side<=1;side+=2) {
-        m->glow=.5f;
-        mesh_box(m,(Vec3){side*15,.018f,0},(Vec3){.055f,.012f,41},(Color){.23f,.61f,.75f});
-        m->glow=0;
-        for(int z=-16;z<=16;z+=8) {
-            mesh_box(m,(Vec3){side*15,.014f,z},(Vec3){1.1f,.02f,1.5f},(Color){.08f,.11f,.12f});
-            for(int i=0;i<6;i++)mesh_box(m,(Vec3){side*15-.44f+(float)i*.175f,.033f,z},(Vec3){.035f,.018f,1.25f},(Color){.23f,.28f,.29f});
-        }
-    }
-    for(int z=-18;z<=18;z+=36) {
-        mesh_beveled_box(m,(Vec3){0,6.5f,z},(Vec3){52,.42f,.65f},.10f,(Color){.13f,.18f,.22f});
-        mesh_box(m,(Vec3){0,6.93f,z},(Vec3){52,.12f,.88f},(Color){.25f,.30f,.31f});
-    }
-    mesh_beveled_box(m,(Vec3){0,1.82f,0},(Vec3){1.85f,.28f,1.85f},.26f,(Color){.14f,.20f,.24f});
-    for(int side=-1;side<=1;side+=2) {
-        mesh_cylinder(m,(Vec3){side*1.1f,2.08f,0},(Vec3){side*1.1f,3.05f,0},.12f,(Color){.24f,.33f,.35f},8);
-        mesh_beveled_box(m,(Vec3){side*1.1f,2.95f,0},(Vec3){.38f,.15f,.44f},.05f,(Color){.13f,.19f,.22f});
-    }
-    wall_label(m,world_map_name(id),(Vec3){0,6.1f,-23.43f},0,(Color){.95f,.58f,.25f},.13f);
-    wall_label(m,"SURVIE",(Vec3){0,6.1f,23.43f},PI_F,(Color){.35f,.75f,.9f},.15f);
-    for(int side=-1;side<=1;side+=2) {
+        mesh_cylinder(m,(Vec3){side*1.1f,2.08f,0},(Vec3){side*1.1f,3.05f,0},.12f,wall,8);
         for(int z=-18;z<=18;z+=36) {
-            mesh_box(m,(Vec3){side*27.38f,2.8f,z},(Vec3){.08f,1.1f,2.2f},(Color){.10f,.14f,.13f});
-            wall_label(m,side<0?(z<0?"01":"02"):(z<0?"03":"04"),
-                (Vec3){side*27.31f,3.7f,z},side<0?PI_F*.5f:-PI_F*.5f,(Color){.4f,.85f,.68f},.16f);
-            mesh_box(m,(Vec3){side*23,.016f,z},(Vec3){2,.025f,2},(Color){.10f,.27f,.18f});
-            mesh_box(m,(Vec3){side*23,.02f,z},(Vec3){2.1f,.015f,.08f},(Color){.22f,.65f,.35f});
-            mesh_box(m,(Vec3){side*23,.02f,z},(Vec3){.08f,.015f,2.1f},(Color){.22f,.65f,.35f});
-        }
-        mesh_box(m,(Vec3){side*25.9f,5.8f,0},(Vec3){.45f,.45f,43},(Color){.19f,.24f,.24f});
-        for(int z=-16;z<=16;z+=16) {
-            mesh_box(m,(Vec3){side*26.0f,4.9f,z},(Vec3){.65f,.55f,2},(Color){.1f,.12f,.12f});
-            mesh_box(m,(Vec3){side*25.65f,5.04f,z},(Vec3){.04f,.25f,1.55f},(Color){.67f,.77f,.57f});
+            mesh_box(m,(Vec3){side*23,.016f,z},(Vec3){2,.025f,2},(Color){.1f,.27f,.18f});
+            m->glow=.5f;mesh_ring(m,(Vec3){side*23,.028f,z},1.1f,.045f,(Color){.3f,.8f,.45f},12);m->glow=0;
         }
     }
+    for(int side=-1;side<=1;side+=2) {
+        m->glow=.5f;mesh_box(m,(Vec3){side*15,.018f,0},(Vec3){.055f,.012f,41},accent);m->glow=0;
+    }
+    wall_label(m,world_map_name(id),(Vec3){0,6.1f,-23.43f},0,accent,.13f);
+    wall_label(m,id==0?"COEUR / SORTIE SUD":(id==1?"CONVOYEUR / QUAI SUD":"RUINES / TERRASSES"),
+        (Vec3){0,6.1f,23.43f},PI_F,accent,.11f);
     /* Each deck is oriented toward its map's shuttle lane. */
     for(int k=0;k<MAX_DECKS;k++) {
         const Deck *d=&w->decks[k];float hx=d->size.x/2,hz=d->size.z/2;

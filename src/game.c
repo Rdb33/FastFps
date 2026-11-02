@@ -58,6 +58,7 @@ static void spawn_reinforcements(Game *g,int budget) {
         if(g->wave>=3&&(index==front-1||cycle==17))next.type=ENEMY_BRUTE;
         if(g->wave>=6&&(index==front-3||cycle==15))next.type=ENEMY_BRUTE;
         if(g->wave>=11&&(index==front-2||index==front-4||index==front-5||cycle==16||cycle==14||cycle==13))next.type=ENEMY_BOMBER;
+        if(g->wave>=21&&(cycle==2||cycle==8||cycle==12))next.type=ENEMY_WEAVER;
         next.elite=g->wave%5==0&&index==front-1;
         if(next.elite)next.type=ENEMY_BRUTE;
         float scale=enemy_size(&next),best=-1;Vec3 chosen={0,0,0};
@@ -79,10 +80,19 @@ static void spawn_reinforcements(Game *g,int budget) {
         }
         if(best<0)break; /* Réessayer après déplacement des joueurs. */
         next.body=(Body){chosen,{0,0,0},true};next.id=g->next_id++;
-        next.max_health=next.type==ENEMY_BRUTE?260:(next.type==ENEMY_BOMBER?220:(next.type==ENEMY_CASTER?120:80));
+        next.max_health=next.type==ENEMY_BRUTE?260:(next.type==ENEMY_BOMBER?220:(next.type==ENEMY_WEAVER?150:(next.type==ENEMY_CASTER?120:80)));
         next.max_health*=(1+.10f*(float)(players-1))*(g->difficulty==0?.8f:(g->difficulty==2?1.25f:1));
         next.max_health*=(1+fminf(3.25f,(float)(g->wave-1)*.055f))*(next.elite?2.5f:1);
         next.health=next.max_health;next.shot_timer=1.5f+random01()*1.4f;next.spawn_time=.65f;
+        if(next.elite) {
+            g->event_rng=g->event_rng*1664525u+1013904223u;
+            bool introduce=g->intro_serial==0||(g->wave-g->intro_last_wave>=15&&g->event_rng%100<20);
+            if(introduce) {
+                g->intro_time=CHAMPION_INTRO_TIME;g->intro_enemy=next.id;g->intro_serial++;
+                g->intro_skip_ready=0;
+                g->intro_last_wave=g->wave;next.spawn_time=0;
+            }
+        }
         Vec3 d=vsub(g->player.body.position,chosen);next.yaw=atan2f(d.x,-d.z);
         g->enemies[g->enemy_count++]=next;g->wave_spawned++;g->reinforcements--;
     }
@@ -105,8 +115,8 @@ static void start_wave(Game *g) {
         game_actor_select(g,original);
         const Vec3 locations[MAP_COUNT][MAX_BARRELS]={
             {{-6,0,-15},{-2,0,-15},{-20,0,2},{-20,0,6},{18,0,5},{18,0,9}},
-            {{-6,0,-18},{-2,0,-18},{-20,0,6},{-20,0,10},{20,0,6},{20,0,10}},
-            {{-6,0,-18},{-2,0,-18},{-23,0,3},{-23,0,7},{23,0,3},{23,0,7}}};
+            {{-4,0,-17},{1,0,-17},{-20,0,6},{-20,0,10},{20,0,6},{20,0,10}},
+            {{-6,0,-18},{-2,0,-18},{-23,0,3},{-25,0,12},{23,0,3},{23,0,7}}};
         for(int i=0;i<g->barrel_count;i++)g->barrels[i]=(Barrel){.position=locations[map][i],.health=45,.owner=-1};
         for(int k=0;k<MAX_DECKS;k++)g->pickups[4+k].position=g->world->decks[k].pickup;
         encounters_map(g);
@@ -135,7 +145,8 @@ static void start_wave(Game *g) {
     game_roll_event(g);
     if(g->wave>1&&g->wave%5==1)snprintf(message,sizeof(message),"NOUVELLE MAP : %s / VAGUE %02d",world_map_name(g->map_id),g->wave);
     if(g->wave==11)snprintf(message,sizeof(message),"VAGUE 11 - BOMBARDIERS : QUITTE LES CERCLES ORANGE !");
-    say(g, message, g->wave==11?6:3.5f);
+    if(g->wave==21)snprintf(message,sizeof(message),"VAGUE 21 - LANCE-TOILE : EVITE LES PROJECTILES BLANCS !");
+    say(g,message,g->wave==11||g->wave==21?6:3.5f);
     g->wave_timer = -1;
     for(int i=0;i<g->barrel_count;i++)if(g->barrels[i].health<=0) {
         bool safe=true;
@@ -210,6 +221,7 @@ static void add_corpse(Game *g, const Enemy *e) {
     g->corpses[slot].death_time = .001f;
     g->corpses[slot].flash = 0;
     g->corpses[slot].attack_timer = 0;
+    g->corpses[slot].climb_timer=0;
     g->corpses[slot].body.velocity.x=e->knockback.x*.7f;
     g->corpses[slot].body.velocity.z=e->knockback.z*.7f;
 }
@@ -224,6 +236,7 @@ static void damage_enemy(Game *g, Enemy *e, float damage, Vec3 dir) {
         encounters_interrupt(g);
     }
     e->health -= damage;
+    e->climb_timer=0;
     e->flash = .12f;
     e->stagger = e->type == ENEMY_BRUTE ? .065f : .16f;
     e->knockback = vscale(dir, e->type == ENEMY_BRUTE ? 1.0f : 3.5f);
@@ -376,7 +389,7 @@ void game_shoot(Game *g) {
 
 void game_request_weapon(Game *g, int weapon) {
     Player *p = &g->player;
-    if (!game_weapon_available(g,weapon) || weapon == p->weapon || p->weapon_switch > 0 || p->reload_timer > 0 || g->dead || g->round_over || p->upgrade_pending) return;
+    if (!game_weapon_available(g,weapon)||g->intro_time>0||weapon==p->weapon||p->weapon_switch>0||p->reload_timer>0||g->dead||g->round_over||p->upgrade_pending)return;
     p->weapon_target = weapon;
     p->weapon_switch = WEAPON_SWITCH_TIME;
     audio_play(SOUND_SWITCH);
@@ -406,18 +419,31 @@ void game_melee(Game *g) {
         game_burst(g, vadd(victim->body.position,(Vec3){0,.9f,0}), (Color){1,.5f,.12f}, 5);
         if (victim->health <= 0) {
             p->health = fminf(player_max_health(p), p->health+10);
+            Vec3 center=vadd(victim->body.position,(Vec3){0,.8f,0});
+            /* L'onde repousse uniquement les hostiles, sans traverser les murs. */
+            for(int i=0;i<g->enemy_count;i++) {
+                Enemy *e=&g->enemies[i];if(e->health<=0)continue;
+                Vec3 point=vadd(e->body.position,(Vec3){0,.8f*enemy_size(e),0}),delta=vsub(point,center);
+                float distance=vlength(delta);
+                if(distance>4||fabsf(delta.y)>1.8f||world_ray(g->world,center,vnormalize(delta),distance)<distance-.05f)continue;
+                Vec3 direction=vnormalize((Vec3){delta.x,0,delta.z});if(distance<.01f)direction=forward;
+                float force=(8-4*distance/4)*(e->elite?.3f:(e->type==ENEMY_BRUTE?.55f:1));
+                e->knockback=vadd(e->knockback,vscale(direction,force));e->climb_timer=0;
+                e->stagger=fmaxf(e->stagger,.28f);
+            }
+            game_burst(g,center,(Color){1,.8f,.35f},12);
             say(g, "FRAPPE FATALE - +10 SANTE", 1.2f);
         } else audio_play(SOUND_HIT);
     }
 }
 
 static void begin_attack(Enemy *e, Vec3 direction, int target) {
-    e->attack_duration = e->type == ENEMY_BRUTE ? .95f : (e->type == ENEMY_CASTER ? .75f : .62f);
+    e->attack_duration = e->type == ENEMY_BRUTE ? .95f : (e->type==ENEMY_WEAVER?.95f:(e->type == ENEMY_CASTER ? .75f : .62f));
     e->attack_timer = e->attack_duration;
     e->attack_direction = direction;
     e->attack_fired = false;
     e->target_actor=target;
-    audio_play_at(e->type == ENEMY_CASTER ? SOUND_CAST : SOUND_GROWL,e->body.position);
+    audio_play_at(e->type==ENEMY_CASTER||e->type==ENEMY_WEAVER?SOUND_CAST:SOUND_GROWL,e->body.position);
 }
 
 /* La position visée reste fixe : l'esquive est possible durant toute la chute.
@@ -463,12 +489,13 @@ static void attack_update(Game *g, Enemy *e, float dt) {
     float progress = 1-e->attack_timer/e->attack_duration;
     if (progress < .62f || e->attack_fired) return;
     e->attack_fired = true;
-    if (e->type == ENEMY_CASTER) {
+    if (e->type==ENEMY_CASTER||e->type==ENEMY_WEAVER) {
         if (g->projectile_count < MAX_PROJECTILES) {
             Vec3 origin = vadd(e->body.position,(Vec3){0,1.3f,0});
-            g->projectiles[g->projectile_count++] = (Projectile){.position=origin,.velocity=vscale(e->attack_direction,14+2*game_threat(g)),.life=5,.color={.3f,1,.78f},.owner=-1};
+            bool web=e->type==ENEMY_WEAVER;
+            g->projectiles[g->projectile_count++] = (Projectile){.position=origin,.velocity=vscale(e->attack_direction,web?13:14+2*game_threat(g)),.life=web?3:5,.color=web?(Color){.8f,.9f,1}:(Color){.3f,1,.78f},.kind=web?2:0,.owner=-1};
         }
-        e->shot_timer = fmaxf(.9f,2.5f-(float)g->wave*.06f)+random01()*.5f;
+        e->shot_timer=e->type==ENEMY_WEAVER?4.5f+random01():fmaxf(.9f,2.5f-(float)g->wave*.06f)+random01()*.5f;
     } else {
         Vec3 origin = vadd(e->body.position,(Vec3){0,1.0f*enemy_scale(e),0});
         if(!actor_alive(g,e->target_actor))return;
@@ -538,6 +565,7 @@ static void update_enemies(Game *g, float dt) {
         e->spawn_time = fmaxf(0,e->spawn_time-dt);
         e->shot_timer -= dt;
         e->touch_timer = fmaxf(0,e->touch_timer-dt);e->slam_flash=fmaxf(0,e->slam_flash-dt);
+        if(enemy_update_climb(g,e,dt))continue;
         if(e->slam_state){slam_update(g,e,dt);continue;}
         int target_id=ai_target(g,e);
         if(target_id<0)continue;
@@ -549,10 +577,13 @@ static void update_enemies(Game *g, float dt) {
         if(e->elite&&e->body.grounded&&e->spawn_time==0&&e->touch_timer==0&&visible&&horizontal<14&&game_heavy_available(g,target_id)) {
             begin_slam(g,e,actor_player(g,target_id),target_id);continue;
         }
+        if(enemy_try_climb(g,e,vsub(actor_player(g,target_id)->body.position,e->body.position))) {
+            enemy_update_climb(g,e,dt);continue;
+        }
         Vec3 move=ai_move(g,e,actor_player(g,target_id),visible,dt);
         if (e->attack_timer == 0 && e->spawn_time == 0 && e->stagger == 0 && visible) {
-            if (e->type == ENEMY_CASTER && distance<36 && e->shot_timer<=0) {
-                Player *victim=actor_player(g,target_id);float lead=clampf(distance/(14+2*game_threat(g)),0,1.0f)*.6f;
+            if ((e->type==ENEMY_CASTER||e->type==ENEMY_WEAVER)&&distance<36&&e->shot_timer<=0) {
+                Player *victim=actor_player(g,target_id);float lead=clampf(distance/(e->type==ENEMY_WEAVER?13:14+2*game_threat(g)),0,1.0f)*.6f;
                 Vec3 aim=vadd(p,vscale(victim->body.velocity,lead));
                 begin_attack(e,vnormalize(vsub(aim,origin)),target_id);
             }
@@ -566,7 +597,7 @@ static void update_enemies(Game *g, float dt) {
             float turn = atan2f(sinf(desired_yaw-e->yaw),cosf(desired_yaw-e->yaw));
             e->yaw += turn*fminf(1,dt*8);
         }
-        float speed = e->type == ENEMY_BRUTE ? 2.6f : (e->type == ENEMY_BOMBER ? 2.8f : (e->type == ENEMY_CASTER ? 3.0f : 4.8f));
+        float speed=e->type==ENEMY_BRUTE?2.6f:(e->type==ENEMY_BOMBER?2.8f:(e->type==ENEMY_WEAVER?3.3f:(e->type==ENEMY_CASTER?3.0f:4.8f)));
         speed += fminf(2.2f,(float)(g->wave-1)*.12f);
         speed*=g->difficulty==0?.9f:(g->difficulty==2?1.12f:1);
         if (e->attack_timer>0 || e->stagger>0 || e->spawn_time>0) speed = 0;
@@ -586,7 +617,7 @@ static void update_enemies(Game *g, float dt) {
     }
     for (int i=0;i<g->enemy_count;i++) for (int j=i+1;j<g->enemy_count;j++) {
         Enemy *a=&g->enemies[i], *b=&g->enemies[j];
-        if (a->health<=0 || b->health<=0 || a->slam_state==2 || b->slam_state==2) continue;
+        if (a->health<=0||b->health<=0||a->slam_state==2||b->slam_state==2||a->climb_timer>0||b->climb_timer>0)continue;
         Vec3 delta=vsub(a->body.position,b->body.position); delta.y=0;
         float distance=vlength(delta), separation=ENEMY_RADIUS*(enemy_scale(a)+enemy_scale(b));
         if (distance>=separation || fabsf(a->body.position.y-b->body.position.y)>1) continue;
@@ -657,7 +688,18 @@ static void update_projectiles(Game *g,float dt) {
                 float hit=ray_box(b->position,direction,(Box){{p.x-PLAYER_RADIUS,p.y,p.z-PLAYER_RADIUS},{p.x+PLAYER_RADIUS,p.y+PLAYER_HEIGHT,p.z+PLAYER_RADIUS}},length);
                 if(hit<=nearest){nearest=hit;victim=id;}
             }
-            if(victim>=0){hurt_actor(g,victim,12,b->position);b->life=0;}
+            if(victim>=0) {
+                if(b->kind==2) {
+                    Player *p=actor_player(g,victim);
+                    if(p->web_immunity<=0&&g->actors[victim].invulnerable<=0) {
+                        p->web_timer=WEB_ROOT_TIME;p->web_immunity=WEB_ROOT_TIME+WEB_IMMUNITY_TIME;
+                        p->body.velocity.x=p->body.velocity.z=0;p->dash_timer=p->boost_timer=0;
+                        game_burst(g,vadd(p->body.position,(Vec3){0,1,0}),(Color){.8f,.9f,1},6);
+                        if(victim==g->local_actor)audio_play(SOUND_CAST);
+                    }
+                }else hurt_actor(g,victim,12,b->position);
+                b->life=0;
+            }
             else if(nearest<length){game_burst(g,vadd(b->position,vscale(direction,nearest)),(Color){1,.4f,.1f},2);b->life=0;}
             else b->position=vadd(b->position,vscale(b->velocity,dt));
         }
@@ -745,8 +787,7 @@ static void update_revives(Game *g,float dt) {
     for(int down=0;down<MAX_PLAYERS;down++)if(g->actors[down].active&&!actor_alive(g,down)) {
         int helper=-1;
         for(int id=0;id<MAX_PLAYERS;id++)if(actor_alive(g,id)&&g->actors[id].revive_held) {
-            float damage=id==g->current_actor?g->damage_time:g->actors[id].damage_time;
-            if(damage<.29f&&game_revive_target(g,id)==down){helper=id;break;}
+            if(game_revive_target(g,id)==down){helper=id;break;}
         }
         Actor *a=&g->actors[down];
         if(helper<0){a->revive_progress=0;continue;}
@@ -756,6 +797,7 @@ static void update_revives(Game *g,float dt) {
         if(world_blocked(g->world,p->body.position,PLAYER_RADIUS,PLAYER_HEIGHT,-1))continue;
         p->health=player_max_health(p)*.5f;p->body.velocity=(Vec3){0,0,0};
         p->reload_timer=p->weapon_switch=p->melee_timer=0;p->weapon_target=p->weapon;
+        p->web_timer=p->web_immunity=0;
         a->dead=false;a->revive_progress=0;a->revive_held=false;a->revive_target=-1;a->respawn_timer=0;a->invulnerable=2;
         if(down==g->current_actor){g->dead=false;g->shot_cooldown=0;g->shot_age=10;}
         else {a->shot_cooldown=0;a->shot_age=10;}
@@ -877,11 +919,19 @@ static void respawn(Game *g,int id) {
     memset(a->damage_timers,0,sizeof(a->damage_timers));
     a->shot_cooldown=0;a->dash_pressed=false;a->melee_pressed=false;a->shot_age=10;a->recoil=0;
     a->player.reload_timer=a->player.weapon_switch=a->player.melee_timer=a->player.dash_timer=0;
+    a->player.web_timer=a->player.web_immunity=0;
     a->player.weapon_target=a->player.weapon;
     for(int i=0;i<WEAPON_COUNT;i++)a->player.ammo[i]=(uint8_t)WEAPONS[i].magazine;
 }
 void game_update_coop(Game *g,const Input inputs[MAX_PLAYERS],float dt) {
     if(g->round_over)return;
+    if(g->intro_time>0) {
+        bool skip=false;for(int i=0;i<MAX_PLAYERS;i++)if(g->actors[i].active) {
+            if(!inputs[i].jump)g->intro_skip_ready|=(uint8_t)(1u<<i);
+            if((g->intro_skip_ready&(1u<<i))&&inputs[i].jump&&g->intro_time<CHAMPION_INTRO_TIME-.45f)skip=true;
+        }
+        g->intro_time=skip?0:fmaxf(0,g->intro_time-dt);g->tick++;return;
+    }
     game_actor_save(g);
     bool alive=false;for(int i=0;i<MAX_PLAYERS;i++)if(actor_alive(g,i))alive=true;
     if(!alive){g->round_over=true;return;}
@@ -901,12 +951,18 @@ void game_update_coop(Game *g,const Input inputs[MAX_PLAYERS],float dt) {
     update_world(g,dt);game_actor_save(g);
 }
 void game_predict(Game *g,Input input,float dt) {
+    if(g->intro_time>0){g->intro_time=fmaxf(0,g->intro_time-dt);return;}
     g->prediction=true;
     game_prepare_mobility(g,dt);update_actor(g,input,dt);g->time+=dt;
     g->prediction=false;game_actor_save(g);
 }
 void game_update(Game *g,Input input,float dt) {
     if(g->round_over)return;
+    if(g->intro_time>0) {
+        if(!input.jump)g->intro_skip_ready=1;
+        bool skip=input.jump&&g->intro_skip_ready&&g->intro_time<CHAMPION_INTRO_TIME-.45f;
+        g->intro_time=skip?0:fmaxf(0,g->intro_time-dt);g->tick++;return;
+    }
     if(g->dead) {
         Actor *a=&g->actors[0];a->respawn_timer=fmaxf(0,a->respawn_timer-dt);
         if(a->respawn_timer==0&&g->lives>0){

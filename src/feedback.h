@@ -45,6 +45,7 @@ typedef struct Feedback {
     int completed_waves, blast_count;
     Blast blasts[MAX_BLASTS];
     int impact_kind, impact_phase, impact_ids[2], held_weapon;
+    Vec3 impact_point;
     Color impact_color;
 } Feedback;
 

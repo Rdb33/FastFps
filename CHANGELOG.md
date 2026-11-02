@@ -1,3 +1,18 @@
+# Version 1.3.0
+
+- Confirmation avant de lancer ou recommencer en solo et avant le lancement du salon par l'hôte. Annuler sélectionné par défaut, Échap pour revenir, protection contre la touche maintenue et le double clic ; reprendre une partie ne demande pas de confirmation.
+- Bombes du bombardier : chute de 3 à 2 s, recharge de 5 s conservée. La réanimation continue sous les dégâts tant que le soigneur reste debout, à portée et maintient E.
+- Frappe fatale : onde de recul sur 4 m, bloquée par les murs, résistance accrue des gros ennemis, alliés préservés.
+- Lance-toile dès la vague 21 : silhouette vert-gris / blanche, projectile préparé et évitable, immobilisation de 0,75 s laissant viser et tirer, immunité temporaire contre les blocages en chaîne. Autorité sur l'hôte et durée prédite chez les invités.
+- Escalade de dalles basses et terrasses en 0,5 s pour traqueurs, invocateurs et lance-toiles ; animation de prise d'appui puis montée, cible ancrée aux dalles mobiles, contrôle de gabarit et plafond, interruption par les coups.
+- Refonte des environnements : hall fermé cyan du Réacteur, couloirs de machines et fours de la Fonderie, ruines / falaises / terrasses du Bastion à ciel ouvert. Volumes, lignes de vue, accès aux hauteurs, matériaux, ciel, éclairage et coeur central distincts ; routes des plateformes conservées, barils dégagés des ascenseurs.
+- Introductions de champions : première garantie, puis 20 % de chance lors d'une apparition éligible avec au moins quinze vagues d'intervalle. Présentation de 2,2 s, caméra dégagée des murs, nom, pose, bandes cinématiques et musique atténuée. Combat gelé pour l'équipe ; Espace pour passer après relâchement et délai de protection.
+- Parallaxe par profondeur indépendant du réglage F4 : nouvel interrupteur du menu, activé par défaut à la lecture des anciens réglages. Douze lignes de réglages et zones de clic adaptées.
+- Impacts avec traits convergents et éclair concentrés sur la cible, silhouette noir/blanc puis noir/rouge, restauration progressive. Durées nominales 110 / 170 ms ; délai partagé porté à 2 / 4 s pour réduire la répétition. Interface stable et réglage d'intensité conservés.
+- Profil 1080P : rendu 1920 × 1080, objectif 60 FPS, sélection dans le menu / F2 ou --quality 1080p ; profils Pi conservés.
+- Protocole 12 : positions horizontales et vitesses sur seize bits, hauteur des corps conservée en flottant complet, emplacements inactifs omis et seize particules cosmétiques maximum. 20 Hz conservés ; paquets réduits de 49 à 51 % dans les deux scénarios mesurés, sans compression lourde. État final prioritaire en cas de congestion ; message prêt tardif traité sans déconnexion. Mise à jour de toute l'équipe nécessaire.
+- Compilation C11, suites gameplay / mécaniques / réseau virtuel réussies, connexion TCP réelle locale, captures OpenGL hors écran des maps / ennemi / cinématiques / impacts et rendu 1080p. Pas d'essai Pi ni de session réelle entre ordinateurs ; coût et équilibre restent à éprouver.
+
 # Snapshot 1.2.3
 
 - Impact frames composées en trois phases : négatif noir/blanc avec contours, positif noir/blanc pour les têtes ou noir/rouge pour les autres coups marquants, puis retour aux couleurs normales. Durées nominales de 160 / 220 ms, chaque phase affichée au moins une image ; intensité accrue et détails lisibles dans les ombres. Délai partagé 0,6 / 1 s ; interface conservée.

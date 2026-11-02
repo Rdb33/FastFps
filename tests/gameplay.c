@@ -62,12 +62,17 @@ static void maps(World *w) {
     }
     Game g;game_reset(&g,w,28);
     for(int wave=1;wave<=32;wave++) {
-        g.enemy_count=0;g.projectile_count=0;g.wave_timer=.001f;
+        g.enemy_count=0;g.reinforcements=0;g.wave_spawned=g.wave_total;
+        g.intro_time=0;g.projectile_count=0;g.wave_timer=.001f;
         g.player.upgrade_pending=false;
         game_update(&g,(Input){0},FIXED_STEP);
         assert(g.wave==wave&&g.map_id==((wave-1)/5)%MAP_COUNT&&w->map_id==g.map_id);
         assert(!world_blocked(w,g.player.body.position,PLAYER_RADIUS,PLAYER_HEIGHT,-1));
-        for(int i=0;i<g.barrel_count;i++)assert(!world_blocked(w,g.barrels[i].position,.43f,1.1f,-1));
+        for(int i=0;i<g.barrel_count;i++) {
+            Vec3 p=g.barrels[i].position;bool blocked=world_blocked(w,p,.43f,1.1f,-1);
+            if(blocked)fprintf(stderr,"Baril %d bloque : map %d, vague %d, %.2f %.2f %.2f\n",i,g.map_id,wave,p.x,p.y,p.z);
+            assert(!blocked);
+        }
         assert(g.enemy_count>0&&g.enemy_count<=MAX_ENEMIES);
         for(int i=0;i<g.enemy_count;i++)assert(!world_blocked(w,g.enemies[i].body.position,ENEMY_RADIUS*enemy_size(&g.enemies[i]),ENEMY_HEIGHT*enemy_size(&g.enemies[i]),-1));
     }
@@ -107,6 +112,38 @@ static void snapshots(World *w) {
 static SDL_Event mouse(Uint32 type,int x,int y) {
     SDL_Event e={0};e.type=type;e.button.button=SDL_BUTTON_LEFT;e.button.x=x;e.button.y=y;return e;
 }
+static void new_game_confirmation(void) {
+    Renderer r={0};r.window=SDL_CreateWindow("confirmation",0,0,640,360,SDL_WINDOW_HIDDEN);assert(r.window);
+    App a={.state=STATE_PAUSED,.selected=1,.menu_motion=true,.menu_parallax_x=1,.menu_parallax_y=-1};
+    GameConfirmation accepted;
+    SDL_Event e={.type=SDL_KEYDOWN};e.key.keysym.scancode=SDL_SCANCODE_RETURN;
+    menu_confirm_open(&a,CONFIRM_SOLO);a.confirmation_ready_at=0;
+    assert(menu_confirm_event(&a,&r,&e,&accepted)&&accepted==CONFIRM_NONE&&a.game_confirmation==CONFIRM_SOLO);
+    e.type=SDL_KEYUP;menu_confirm_event(&a,&r,&e,&accepted);
+    e.type=SDL_KEYDOWN;assert(menu_confirm_event(&a,&r,&e,&accepted)&&accepted==CONFIRM_NONE);
+    assert(a.game_confirmation==CONFIRM_NONE&&a.state==STATE_PAUSED&&a.selected==1);
+    menu_confirm_open(&a,CONFIRM_SOLO);a.confirmation_ready_at=0;
+    e.type=SDL_KEYUP;menu_confirm_event(&a,&r,&e,&accepted);
+    e.type=SDL_KEYDOWN;e.key.keysym.scancode=SDL_SCANCODE_RIGHT;menu_confirm_event(&a,&r,&e,&accepted);
+    e.key.keysym.scancode=SDL_SCANCODE_RETURN;e.key.repeat=1;
+    menu_confirm_event(&a,&r,&e,&accepted);assert(accepted==CONFIRM_NONE);
+    e.key.repeat=0;assert(menu_confirm_event(&a,&r,&e,&accepted)&&accepted==CONFIRM_SOLO);
+    assert(a.game_confirmation==CONFIRM_NONE);
+    menu_confirm_open(&a,CONFIRM_SOLO);
+    e.key.keysym.scancode=SDL_SCANCODE_ESCAPE;
+    assert(menu_confirm_event(&a,&r,&e,&accepted)&&!a.game_confirmation&&a.state==STATE_PAUSED);
+    a.state=STATE_LOBBY;menu_confirm_open(&a,CONFIRM_COOP);
+    Vec3 offset=menu_offset(&a,MENU_CONTROL_DEPTH);
+    e=mouse(SDL_MOUSEBUTTONUP,0,0);menu_confirm_event(&a,&r,&e,&accepted);
+    e=mouse(SDL_MOUSEBUTTONDOWN,(int)lroundf(400+offset.x),(int)lroundf(235+offset.y));
+    a.confirmation_ready_at=SDL_GetTicks()+1000;
+    menu_confirm_event(&a,&r,&e,&accepted);assert(accepted==CONFIRM_NONE&&a.game_confirmation==CONFIRM_COOP);
+    a.confirmation_ready_at=0;
+    assert(menu_confirm_event(&a,&r,&e,&accepted)&&accepted==CONFIRM_COOP);
+    menu_confirm_open(&a,CONFIRM_COOP);a.state=STATE_PLAYING;
+    assert(!menu_confirm_event(&a,&r,&e,&accepted)&&!a.game_confirmation);
+    SDL_DestroyWindow(r.window);
+}
 static void controls(World *w) {
     Renderer r={0};r.window=SDL_CreateWindow("test",0,0,640,360,SDL_WINDOW_HIDDEN);assert(r.window);
     App a={.state=STATE_MENU,.menu_page=1,.sensitivity=1,.brightness=1,.numeric_edit=-1,.slider_drag=-1};
@@ -121,6 +158,13 @@ static void controls(World *w) {
     e=(SDL_Event){.type=SDL_TEXTINPUT};strcpy(e.text.text,"1,37");assert(settings_event(&a,&r,&e));
     e=(SDL_Event){.type=SDL_KEYDOWN};e.key.keysym.scancode=SDL_SCANCODE_RETURN;
     assert(settings_event(&a,&r,&e)&&fabsf(a.sensitivity-1.37f)<.001f);
+    a.motion=false;a.menu_motion=true;a.menu_parallax_x=1;a.menu_parallax_y=-1;
+    Vec3 offset=menu_offset(&a,MENU_CONTROL_DEPTH);assert(offset.x!=0&&offset.y!=0);
+    e=mouse(SDL_MOUSEBUTTONDOWN,(int)lroundf(320+offset.x),(int)lroundf(148+offset.y));
+    assert(settings_event(&a,&r,&e)&&a.sensitivity==.3f);
+    e=mouse(SDL_MOUSEBUTTONUP,0,0);settings_event(&a,&r,&e);
+    a.menu_page=0;assert(menu_hit(&a,&r,(int)lroundf(80+offset.x),(int)lroundf(145+offset.y))==0);
+    a.menu_motion=false;assert(menu_offset(&a,MENU_CONTROL_DEPTH).x==0);
     Game g;quiet(&g,w);game_offer_upgrades(&g);
     a.state=STATE_UPGRADE;a.upgrade_released=true;a.upgrade_ready_at=SDL_GetTicks()-1;
     e=mouse(SDL_MOUSEBUTTONDOWN,60,150);assert(upgrade_event(&a,&g,&r,&e)&&a.upgrade_choice==0&&!a.upgrade_confirm);
@@ -135,6 +179,6 @@ static void controls(World *w) {
 int main(void) {
     SDL_setenv("SDL_VIDEODRIVER","dummy",1);assert(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_TIMER)==0);
     World w;assert(world_init(&w));
-    weapons(&w);solo_lives(&w);maps(&w);modules_and_wipe(&w);snapshots(&w);controls(&w);
+    weapons(&w);solo_lives(&w);maps(&w);modules_and_wipe(&w);snapshots(&w);controls(&w);new_game_confirmation();
     mesh_free(&w.mesh);SDL_Quit();puts("OK : vies, armes, rechargement, maps, modules, game over, etats reseau, sliders et saisie");return 0;
 }

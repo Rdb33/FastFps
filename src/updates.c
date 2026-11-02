@@ -125,7 +125,7 @@ void updates_poll(App *app) {
     if(u->thread&&SDL_AtomicGet(&u->ready)) {
         SDL_WaitThread(u->thread,NULL);u->thread=NULL;u->available=newer(u->latest);
     }
-    bool show=visible(app);
+    bool show=visible(app)&&app->game_confirmation==CONFIRM_NONE;
     if(show&&!u->open){u->ready_at=SDL_GetTicks()+600;u->released=false;u->selected=1;}
     u->open=show;
     if(show&&!u->released) {

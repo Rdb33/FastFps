@@ -32,14 +32,17 @@ static void revive_tests(World *w) {
     inputs[0].revive=true;
     for(int i=0;i<60;i++)game_update_coop(&g,inputs,FIXED_STEP);
     g.projectile_count=1;g.projectiles[0]=(Projectile){.position=vadd(g.player.body.position,(Vec3){0,1,0}),.velocity={0,0,1},.life=1,.owner=-1};
-    game_update_coop(&g,inputs,FIXED_STEP);assert(g.player.health<100&&g.actors[1].revive_progress==0);
+    float progress_before=g.actors[1].revive_progress;
+    game_update_coop(&g,inputs,FIXED_STEP);assert(g.player.health<100&&g.actors[1].revive_progress>progress_before);
     for(int i=0;i<165;i++)game_update_coop(&g,inputs,FIXED_STEP);
     assert(!g.actors[1].dead&&g.actors[1].player.health==50&&g.actors[1].invulnerable>0);
     down(&g,1);g.actors[1].player.body.position.x=15;
     for(int i=0;i<180;i++)game_update_coop(&g,inputs,FIXED_STEP);
     assert(g.actors[1].dead&&g.actors[1].revive_progress==0);
     world_set_map(w,2);g.map_id=2;g.wave=11;world_platforms_update(w,g.time);
-    g.player.body=(Body){{13,0,8.61f},{0,0,0},true};g.actors[1].player.body=(Body){{13,0,11.39f},{0,0,0},true};
+    g.player.body=(Body){{2.79f,0,-17},{0,0,0},true};g.actors[1].player.body=(Body){{4.81f,0,-17},{0,0,0},true};
+    assert(!world_blocked(w,g.player.body.position,PLAYER_RADIUS,PLAYER_HEIGHT,-1));
+    assert(!world_blocked(w,g.actors[1].player.body.position,PLAYER_RADIUS,PLAYER_HEIGHT,-1));
     assert(vlength(vsub(g.player.body.position,g.actors[1].player.body.position))<REVIVE_RANGE);
     assert(game_revive_target(&g,0)==-1);
     down(&g,0);g.actors[1].revive_progress=REVIVE_TIME-.001f;
@@ -95,7 +98,7 @@ static void champion_tests(World *w) {
     g.player.body.position.y=1.2f;g.player.body.grounded=false;g.player.body.velocity.y=0;
     game_update(&g,(Input){0},FIXED_STEP);assert(e->slam_state==3&&g.player.health==100);
     quiet(&g,w,false);world_set_map(w,2);g.map_id=2;g.wave=11;
-    g.player.body.position=(Vec3){13,0,12};e=&g.enemies[0];*e=inert((Vec3){13,.01f,8});e->spawn_time=0;e->elite=true;e->type=ENEMY_BRUTE;
+    g.player.body.position=(Vec3){5,0,-17};e=&g.enemies[0];*e=inert((Vec3){2.2f,.01f,-17});e->spawn_time=0;e->elite=true;e->type=ENEMY_BRUTE;
     e->slam_state=2;e->slam_timer=1;e->body.grounded=false;e->body.velocity.y=-1;
     game_update(&g,(Input){0},FIXED_STEP);assert(g.player.health==100&&e->slam_state==3);
 }
@@ -108,7 +111,7 @@ static void ai_tests(World *w) {
     down(&g,0);assert(ai_target(&g,&g.enemies[0])==1);
     navigation_actor(w,0,(Vec3){-23,0,-19});navigation_actor(w,1,(Vec3){23,0,-19});
     assert(navigation_for_actor(w,0,0,-19).x<0&&navigation_for_actor(w,1,0,-19).x>0);
-    g.enemies[0].stuck_time=1;g.enemies[0].body.position=(Vec3){8.35f,0,-8};g.enemies[0].target_actor=1;
+    g.enemies[0].stuck_time=1;g.enemies[0].body.position=(Vec3){7.8f,0,-8};g.enemies[0].target_actor=1;
     Vec3 position=g.enemies[0].body.position;g.player.body.position=(Vec3){15,0,-8};
     move=ai_move(&g,&g.enemies[0],&g.player,true,FIXED_STEP);
     assert(!world_blocked(w,vadd(position,vscale(move,.8f)),ENEMY_RADIUS,ENEMY_HEIGHT,-1));
@@ -159,8 +162,134 @@ static void snapshot_tests(World *w) {
     data[6]=255;assert(!protocol_snapshot_read(&copy,data,len));assert(other.revision==revision&&other.map_id==map);
     printf("Etat maximal : %zu / %d octets\n",len,NET_PACKET_MAX);mesh_free(&other.mesh);
 }
+static void bomber_timing_test(World *w) {
+    Game g;quiet(&g,w,false);g.wave=11;g.pickup_count=0;g.enemies[0]=inert((Vec3){0,0,10});
+    Enemy *e=&g.enemies[0];e->type=ENEMY_BOMBER;e->spawn_time=0;e->shot_timer=0;
+    game_update(&g,(Input){0},FIXED_STEP);assert(g.bomb_count==1&&g.bombs[0].time==2);
+    e->shot_timer=1000;
+    for(int i=0;i<114;i++)game_update(&g,(Input){0},FIXED_STEP);
+    assert(g.bomb_count==1&&g.player.health==100);
+    for(int i=0;i<9;i++)game_update(&g,(Input){0},FIXED_STEP);
+    assert(g.bomb_count==0&&g.player.health<100);
+    puts("OK : bombe visible a 1,9 s, explosion apres 2 s");
+}
+static void web_tests(World *w) {
+    Game g;quiet(&g,w,false);w->solid_count=w->platform_count=0;g.pickup_count=0;
+    g.projectile_count=1;g.projectiles[0]=(Projectile){.position={0,1,16},.velocity={0,0,-1},.life=1,.kind=2,.owner=-1};
+    game_update(&g,(Input){0},FIXED_STEP);assert(g.player.web_timer==WEB_ROOT_TIME&&g.player.health==100);
+    Vec3 start=g.player.body.position;
+    for(int i=0;i<40;i++)game_update(&g,(Input){.forward=1,.right=1,.jump=true,.dash=true,.firing=true},FIXED_STEP);
+    assert(hypotf(g.player.body.position.x-start.x,g.player.body.position.z-start.z)<.001f);
+    assert(g.player.web_timer>0&&g.actors[0].shots>0);float remaining=g.player.web_timer;
+    g.projectile_count=1;g.projectiles[0]=(Projectile){.position={0,1,16},.velocity={0,0,-1},.life=1,.kind=2,.owner=-1};
+    game_update(&g,(Input){0},FIXED_STEP);assert(g.player.web_timer<remaining);
+    for(int i=0;i<7;i++)game_update(&g,(Input){0},FIXED_STEP);
+    assert(g.player.web_timer==0&&g.player.web_immunity>0);
+    game_update(&g,(Input){.forward=1},FIXED_STEP);assert(g.player.body.position.z<start.z);
+    g.player.web_timer=WEB_ROOT_TIME;start=g.player.body.position;
+    for(int i=0;i<40;i++)game_predict(&g,(Input){.right=1,.dash=true,.jump=true},FIXED_STEP);
+    assert(hypotf(g.player.body.position.x-start.x,g.player.body.position.z-start.z)<.001f);
+    puts("OK : toile, tirs pendant immobilisation, immunite et prediction");
+}
+static void climbing_tests(World *w) {
+    Game g;quiet(&g,w,false);w->solid_count=1;w->platform_count=0;
+    w->solids[0]=(Box){{-2,0,0},{2,.9f,2}};
+    Enemy e=inert((Vec3){0,0,2.6f});e.spawn_time=0;e.type=ENEMY_RUNNER;
+    assert(enemy_try_climb(&g,&e,(Vec3){0,0,-1}));
+    for(int i=0;i<29;i++)assert(enemy_update_climb(&g,&e,FIXED_STEP));
+    assert(e.climb_timer>0&&!e.body.grounded);
+    for(int i=0;i<3;i++)enemy_update_climb(&g,&e,FIXED_STEP);
+    assert(e.climb_timer==0&&e.body.grounded&&fabsf(e.body.position.y-.9f)<.001f&&e.body.position.z<1.5f);
+    e=inert((Vec3){0,0,2.6f});e.spawn_time=0;e.type=ENEMY_BRUTE;assert(!enemy_try_climb(&g,&e,(Vec3){0,0,-1}));
+    e.type=ENEMY_RUNNER;w->solid_count=2;w->solids[1]=(Box){{-2,2.2f,0},{2,2.4f,2}};
+    assert(!enemy_try_climb(&g,&e,(Vec3){0,0,-1}));
+    w->solid_count=1;assert(enemy_try_climb(&g,&e,(Vec3){0,0,-1}));
+    for(int i=0;i<15;i++)enemy_update_climb(&g,&e,FIXED_STEP);
+    w->solids[0].min.y+=.25f;w->solids[0].max.y+=.25f;
+    for(int i=0;i<17;i++)enemy_update_climb(&g,&e,FIXED_STEP);
+    assert(e.climb_timer==0&&fabsf(e.body.position.y-1.15f)<.001f);
+    puts("OK : escalade en 0,5 s, gabarit lourd, plafond et dalle mobile");
+}
+static void finisher_push_tests(World *w) {
+    Game g;quiet(&g,w,false);w->solid_count=w->platform_count=0;
+    g.enemy_count=4;g.enemies[0]=inert((Vec3){0,0,14});g.enemies[0].health=20;
+    g.enemies[1]=inert((Vec3){1.4f,0,13.4f});g.enemies[2]=inert((Vec3){-1.4f,0,13.4f});
+    g.enemies[2].elite=true;g.enemies[2].type=ENEMY_BRUTE;g.enemies[3]=inert((Vec3){8,0,12});
+    game_melee(&g);assert(g.enemies[0].health<=0&&g.enemies[1].health==1000);
+    assert(g.enemies[1].knockback.x>1&&g.enemies[1].knockback.z<0);
+    assert(fabsf(g.enemies[2].knockback.x)<g.enemies[1].knockback.x&&g.enemies[3].knockback.x==0);
+    quiet(&g,w,false);w->solid_count=1;w->platform_count=0;w->solids[0]=(Box){{.7f,0,13},{.9f,3,15}};
+    g.enemy_count=2;g.enemies[0]=inert((Vec3){0,0,14});g.enemies[0].health=20;g.enemies[1]=inert((Vec3){1.4f,0,13.4f});
+    game_melee(&g);assert(g.enemies[0].health<=0&&vlength(g.enemies[1].knockback)==0);
+    puts("OK : recul de frappe fatale, resistance du champion, obstruction");
+}
+static void intro_and_weaver_tests(World *w) {
+    Game g;game_reset(&g,w,64);g.wave=4;g.wave_timer=.001f;game_update(&g,(Input){0},FIXED_STEP);
+    assert(g.wave==5&&g.intro_time==CHAMPION_INTRO_TIME&&g.intro_serial==1);
+    Vec3 start=g.player.body.position;float clock=g.time,health=g.player.health;
+    for(int i=0;i<40;i++)game_update(&g,(Input){.forward=1,.firing=true,.jump=true},FIXED_STEP);
+    assert(g.intro_time>0&&g.time==clock&&g.player.health==health&&vlength(vsub(g.player.body.position,start))==0);
+    game_update(&g,(Input){0},FIXED_STEP);game_update(&g,(Input){.jump=true},FIXED_STEP);assert(g.intro_time==0);
+    for(int wave=10;wave<=15;wave+=5) {
+        g.wave=wave-1;g.wave_timer=.001f;g.enemy_count=g.reinforcements=0;g.wave_spawned=g.wave_total;
+        g.player.upgrade_pending=false;game_update(&g,(Input){0},FIXED_STEP);assert(g.wave==wave&&g.intro_time==0&&g.intro_serial==1);
+    }
+    int introductions=0,last=5;
+    for(int wave=20;wave<=200;wave+=5) {
+        game_end_rocket_event(&g);g.intro_time=0;g.wave=wave-1;g.wave_timer=.001f;
+        g.enemy_count=g.reinforcements=0;g.wave_spawned=g.wave_total;g.player.upgrade_pending=false;
+        game_update(&g,(Input){0},FIXED_STEP);
+        if(g.intro_time>0){assert(wave-last>=15);last=wave;introductions++;}
+    }
+    assert(introductions>0&&introductions<=13);
+    game_reset(&g,w,64);g.wave=19;g.wave_timer=.001f;game_update(&g,(Input){0},FIXED_STEP);
+    for(int i=0;i<g.enemy_count;i++)assert(g.enemies[i].type!=ENEMY_WEAVER);
+    game_reset(&g,w,64);g.wave=20;g.wave_timer=.001f;game_update(&g,(Input){0},FIXED_STEP);
+    int count=0;for(int i=0;i<g.enemy_count;i++)if(g.enemies[i].type==ENEMY_WEAVER)count++;
+    assert(g.wave==21&&count>0&&PRESETS[4].width==1920&&PRESETS[4].height==1080);
+    Body airborne={{27,20,23},{40,5,40},false};
+    move_horizontal(w,&airborne,10,10,PLAYER_RADIUS,PLAYER_HEIGHT,0);
+    assert(airborne.position.x<=ARENA_HALF_X-PLAYER_RADIUS&&airborne.position.z<=ARENA_HALF_Z-PLAYER_RADIUS);
+    puts("OK : introduction initiale, gel du combat, passage volontaire, rarete et vague 21");
+}
+static void coop_intro_test(World *w) {
+    Game g;game_reset(&g,w,64);game_start_coop(&g,(bool[MAX_PLAYERS]){true,true,false,false},0);
+    g.wave=4;g.wave_timer=.001f;Input inputs[MAX_PLAYERS]={0};game_update_coop(&g,inputs,FIXED_STEP);
+    assert(g.intro_time==CHAMPION_INTRO_TIME);float time=g.time;
+    Vec3 a=g.player.body.position,b=g.actors[1].player.body.position;
+    inputs[0]=(Input){.forward=1,.firing=true};inputs[1]=(Input){.right=1,.firing=true};
+    for(int i=0;i<40;i++)game_update_coop(&g,inputs,FIXED_STEP);
+    assert(g.intro_time>0&&g.time==time&&vlength(vsub(a,g.player.body.position))==0&&vlength(vsub(b,g.actors[1].player.body.position))==0);
+    inputs[1].jump=true;game_update_coop(&g,inputs,FIXED_STEP);assert(g.intro_time==0);
+    puts("OK : introduction cooperative gelee pour tous, passage par un invite");
+}
+static void new_protocol_tests(World *w) {
+    Game g;game_reset(&g,w,64);game_start_coop(&g,(bool[MAX_PLAYERS]){true,true,false,false},0);
+    g.wave=21;g.map_id=1;world_set_map(w,1);g.player.body.position=w->decks[0].pickup;g.player.body.position.x=-3.14159f;
+    g.actors[1].player.web_timer=.5f;g.actors[1].player.web_immunity=3;
+    g.enemy_count=1;g.enemies[0]=inert((Vec3){4,0,12});g.enemies[0].type=ENEMY_WEAVER;
+    g.enemies[0].climb_timer=.25f;g.enemies[0].climb_solid=0;g.enemies[0].climb_start=(Vec3){4,0,12};g.enemies[0].climb_target=(Vec3){1,.9f,1};
+    g.particle_count=MAX_PARTICLES;for(int i=0;i<MAX_PARTICLES;i++)g.particles[i]=(Particle){.life=1,.max_life=1,.size=.1f};
+    game_actor_save(&g);uint8_t data[NET_PACKET_MAX];size_t len=protocol_snapshot_write(data,sizeof(data),&g);assert(len>0&&len<4096);
+    World other;assert(world_init(&other));Game copy;game_reset(&copy,&other,64);copy.local_actor=1;
+    assert(protocol_snapshot_read(&copy,data,len)&&copy.player.web_timer==.5f);
+    assert(copy.enemies[0].type==ENEMY_WEAVER&&copy.enemies[0].climb_timer==.25f);
+    assert(copy.particle_count==NET_VISUAL_PARTICLES&&!copy.actors[2].active);
+    assert(fabsf(copy.actors[0].player.body.position.x+3.14159f)<.004f);
+    assert(copy.actors[0].player.body.position.y==g.player.body.position.y);
+    game_actor_select(&copy,0);float floor_y=copy.player.body.position.y;game_predict(&copy,(Input){0},FIXED_STEP);
+    assert(copy.player.body.grounded&&fabsf(copy.player.body.position.y-floor_y)<.001f);
+    assert(!protocol_snapshot_read(&copy,data,len-1));
+    g.map_id=0;g.wave=5;world_set_map(w,0);g.enemies[0].type=ENEMY_BRUTE;g.enemies[0].elite=true;g.enemies[0].id=77;
+    g.enemies[0].climb_timer=0;g.intro_time=2;g.intro_enemy=77;g.intro_serial=1;g.intro_last_wave=5;
+    len=protocol_snapshot_write(data,sizeof(data),&g);assert(protocol_snapshot_read(&copy,data,len)&&copy.intro_time==2&&copy.intro_enemy==77);
+    g.intro_enemy=98;len=protocol_snapshot_write(data,sizeof(data),&g);assert(!protocol_snapshot_read(&copy,data,len));
+    mesh_free(&other.mesh);printf("OK : protocole 12, toile, escalade, intro, precision et particules bornees (%zu octets)\n",len);
+}
+
 int main(void) {
     assert(SDL_Init(SDL_INIT_TIMER)==0);srand(1);World w;assert(world_init(&w));
     revive_tests(&w);rocket_tests(&w);champion_tests(&w);ai_tests(&w);platform_tests(&w);snapshot_tests(&w);
+    bomber_timing_test(&w);web_tests(&w);climbing_tests(&w);finisher_push_tests(&w);intro_and_weaver_tests(&w);coop_intro_test(&w);new_protocol_tests(&w);
     mesh_free(&w.mesh);SDL_Quit();puts("OK : reanimations, evenements, degats de zone, rocket jump, champions, IA, plateformes et protocole");return 0;
 }
