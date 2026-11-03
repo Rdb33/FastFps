@@ -1,3 +1,15 @@
+# Snapshot 1.3.2
+
+- IA : choix de cible tenant compte de la hauteur et de la pression des autres ennemis, trajets vérifiés avec le gabarit réel après séparation, demi-tour possible dans une impasse et prudence au bord des plateformes. Les tireurs cherchent un angle découvert et privilégient un couvert latéral pendant leur recharge. Les invocateurs et lance-toiles vérifient obstacles et alliés avant de préparer puis libérer leur tir ; l'escalade ne contredit plus un recul à distance. Décisions autoritaires sur l'hôte, sans modification du protocole 12.
+
+- Affinage des transitions : champ de vision de vitesse lissé et limité à cinq degrés supplémentaires, retour amorti de l'arme après atterrissage, impulsions de recharge alignées sur les clics existants et frappe à extension rapide / retour plus lent.
+- Signal discret au retour de l'esquive et au changement d'arme, curseur de progression sur la recharge. Extinction progressive du flash de bouche, également sur les armes des alliés. Pas de son ajouté en doublon.
+
+- Ressenti nerveux et lisible : retour amorti et légère torsion alternée de l'arme, réponse plus lourde du fusil à pompe et des roquettes, retour plus rapide de la mitrailleuse. Visée et simulation préservées.
+- Flash de bouche qui se déploie puis se résorbe, noyau allongé et branches orientées selon le tir. Flash de touche progressif sur la peau et l'armure des ennemis vivants.
+- HUD : marqueurs de touche convergents, accent supplémentaire pour une élimination, petit rebond des munitions et de la santé touchée, trace de santé perdue, signaux distincts de soin et de recharge terminée. Seuil de munitions basses proportionnel au chargeur.
+- Éclats locaux sur les explosions proches dans le budget existant : 40 particules sur le profil Pi, 112 maximum ailleurs. Pas de nouvelle passe graphique, texture ou donnée réseau ; protocole 12 conservé. Réglages F4 et intensité pris en compte pour les nouveaux mouvements.
+
 # Snapshot 1.3.1
 
 - Notification : bouton Mettre à jour avec confirmation, téléchargement par `git pull --ff-only origin main`, compilation en arrière-plan puis relance via `lancer.sh` seulement après réussite. Boutons Copier commandes et Plus tard conservés, interactions adaptées au parallaxe.

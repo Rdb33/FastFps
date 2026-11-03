@@ -222,11 +222,11 @@ void renderer_draw(Renderer *r,const Game *g,const App *app) {
         glBufferData(GL_ARRAY_BUFFER,(GLsizeiptr)g->world->mesh.count*(GLsizeiptr)sizeof(Vertex),g->world->mesh.data,GL_STATIC_DRAW);
         r->world_vertices=g->world->mesh.count;r->world_revision=g->world->revision;
     }
-    const Player *p=&g->player;float speed=hypotf(p->body.velocity.x,p->body.velocity.z);
+    const Player *p=&g->player;
     Vec3 eye=player_eye(p,app->motion),shake=feedback_camera_shake(r->feedback,app);
     float yaw=p->yaw+shake.y,pitch=p->pitch+shake.x;
     bool intro=intro_camera(g,app,&eye,&yaw,&pitch);
-    float fov=(intro?65:87+(app->motion?speed*.2f:0))*PI_F/180;
+    float fov=(intro?65:87+(app->motion?r->feedback->speed_fov:0))*PI_F/180;
     Mat4 projection=perspective(fov,(float)r->width/(float)r->height,.05f,100);
     if(app->menu_motion&&menu_visible(app)) {
         float x=app->menu_parallax_x,y=app->menu_parallax_y;
@@ -368,12 +368,17 @@ void renderer_draw(Renderer *r,const Game *g,const App *app) {
     glUniform3f(r->light_color,0,0,0);glUniform3f(r->sector_color,.75f,.85f,1);
     glUniform3f(r->light_color2,0,0,0);glUniform3f(r->eye,0,0,0);
     Mat4 gun_matrix=mat_multiply(projection,view_matrix((Vec3){0,0,0},shake.y*.35f,shake.x*.35f));
+    float landing=feedback_landing(r->feedback,app);
+    if(landing!=0&&!intro) {
+        Mat4 settle={{1,0,0,0,0,1,0,0,0,0,1,0,0,landing,0,1}};
+        gun_matrix=mat_multiply(projection,mat_multiply(settle,view_matrix((Vec3){0,0,0},shake.y*.35f,shake.x*.35f)));
+    }
     if(menu_visible(app)) {
         Vec3 offset=menu_offset(app,.65f);Mat4 layer={{1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1}};
         layer.m[12]=offset.x*2/640;layer.m[13]=-offset.y*2/360;gun_matrix=mat_multiply(layer,gun_matrix);
     }
     glClear(GL_DEPTH_BUFFER_BIT);upload(r->gun_buffer,m);draw(r,r->gun_buffer,m->count,gun_matrix,0,0);
-    ui_build(&r->ui,g,app);ui_teammates(&r->ui,g,app,matrix);updates_build(&r->ui,app);
+    ui_build(&r->ui,g,app);feedback_ui(r->feedback,&r->ui,g,app);ui_teammates(&r->ui,g,app,matrix);updates_build(&r->ui,app);
     menu_confirm_build(&r->ui,app);
     menu_parallax_apply(&r->ui,app);upload(r->ui_buffer,&r->ui);
     /* L'interface est dessinée après l'agrandissement, à la résolution de la fenêtre. */

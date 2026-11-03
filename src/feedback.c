@@ -147,6 +147,8 @@ static void cache(Feedback *f,const Game *g) {
         a->damage_time=id==g->local_actor?g->damage_time:g->actors[id].damage_time;
         a->kills=g->actors[id].run_kills;a->heads=g->actors[id].run_headshots;a->active=g->actors[id].active;
     }
+    f->cached_dash=g->player.dash_cooldown;
+    f->cached_ammo=g->player.ammo[g->player.weapon];f->cached_weapon=g->player.weapon;f->cached_reload=g->player.reload_timer;
     f->reactor_cooldown=g->reactor_cooldown;f->wave=g->wave;f->tick=g->tick;
     f->revision=g->world->revision;f->local_actor=g->local_actor;
     f->event_serial=g->event_serial;f->unlock_notice=g->unlock_time;f->completed_waves=g->completed_waves;
@@ -154,6 +156,15 @@ static void cache(Feedback *f,const Game *g) {
     for(int i=0;i<g->barrel_count;i++)f->barrel_times[i]=g->barrels[i].explosion_time;
 }
 static void advance(Feedback *f,const Game *g,const App *app,float dt) {
+    f->dash_ready=fmaxf(0,f->dash_ready-dt);f->weapon_ready=fmaxf(0,f->weapon_ready-dt);
+    f->land_time=app->motion?fmaxf(0,f->land_time-dt):0;
+    float target=app->motion&&app->state==STATE_PLAYING&&!g->dead?
+        clampf(hypotf(g->player.body.velocity.x,g->player.body.velocity.z)*.2f,0,5):0;
+    f->speed_fov+=(target-f->speed_fov)*(1-expf(-dt*(target>f->speed_fov?12:7)));
+    if(!app->motion)f->speed_fov=0;
+    f->health_delay=fmaxf(0,f->health_delay-dt);
+    f->heal_pop=fmaxf(0,f->heal_pop-dt);f->reload_pop=fmaxf(0,f->reload_pop-dt);
+    if(f->health_delay<=0)f->health_trail+=(g->player.health-f->health_trail)*(1-expf(-dt*7));
     f->shake_time=app->motion?fmaxf(0,f->shake_time-dt):0;
     f->impact_cooldown=fmaxf(0,f->impact_cooldown-dt);
     if(f->impact_drawn&&f->impact_time>0) {
@@ -200,7 +211,7 @@ void feedback_update(Feedback *f,const Game *g,const App *app) {
     bool reset=!f->initialized||f->revision!=g->world->revision||g->tick<f->tick||g->wave<f->wave||g->local_actor!=f->local_actor;
     if(reset) {
         bool next_wave=f->initialized&&g->tick>=f->tick&&g->wave>f->wave&&g->local_actor==f->local_actor;
-        memset(f,0,sizeof(*f));f->rng=0x6f65a11u;f->initialized=true;cache(f,g);f->clock=now;
+        memset(f,0,sizeof(*f));f->rng=0x6f65a11u;f->initialized=true;cache(f,g);f->clock=now;f->health_trail=g->player.health;
         if(next_wave) {
             if(g->unlock_time>5)shake(f,g,app,.003f,.18f);
             if(g->rocket_event)shake(f,g,app,.006f,.28f);
@@ -212,6 +223,7 @@ void feedback_update(Feedback *f,const Game *g,const App *app) {
     if(app->impact_intensity<=0) {
         f->particle_count=f->mark_count=f->ring_count=0;
         f->impact_time=f->hold_time=f->impact_cooldown=f->reactor_pulse=f->shake_time=0;
+        f->health_trail=g->player.health;f->heal_pop=f->reload_pop=f->health_delay=0;f->dash_ready=f->weapon_ready=f->land_time=f->speed_fov=0;
         cache(f,g);return;
     }
     if(f->particle_count>budget(app))f->particle_count=budget(app);
@@ -219,8 +231,17 @@ void feedback_update(Feedback *f,const Game *g,const App *app) {
     if(app->state==STATE_PAUSED&&!g->cooperative)dt=0;
     advance(f,g,app,dt);
     bool active=app->state==STATE_PLAYING&&!g->round_over&&g->intro_time<=0&&app->impact_intensity>0;
-    if(!active){f->impact_time=f->hold_time=f->shake_time=0;cache(f,g);return;}
+    if(!active){f->impact_time=f->hold_time=f->shake_time=0;f->health_trail=g->player.health;f->heal_pop=f->reload_pop=f->health_delay=0;f->dash_ready=f->weapon_ready=f->land_time=f->speed_fov=0;cache(f,g);return;}
     const FeedbackActor *local=&f->actors[g->local_actor];
+    if(!g->dead&&f->cached_dash>0&&g->player.dash_cooldown<=0)f->dash_ready=.4f;
+    if(!g->dead&&f->cached_weapon!=g->player.weapon)f->weapon_ready=.35f;
+    if(g->player.health<local->health-.1f&&!g->dead) {
+        f->health_trail=fmaxf(f->health_trail,local->health);f->health_delay=.25f;
+    }else if(g->player.health>local->health+.1f&&!g->dead) {
+        f->health_trail=g->player.health;f->heal_pop=.45f;
+    }
+    if(f->cached_weapon==g->player.weapon&&f->cached_reload>0&&g->player.reload_timer==0
+        &&g->player.ammo[g->player.weapon]>f->cached_ammo)f->reload_pop=.35f;
     if(g->damage_time>0&&(g->player.health<local->health-.1f||
         (g->player.shield<local->shield-.1f&&g->damage_time>local->damage_time+.02f)))
         shake(f,g,app,.005f,.16f);
@@ -232,7 +253,11 @@ void feedback_update(Feedback *f,const Game *g,const App *app) {
         const Blast *b=&g->blasts[i];bool seen=false;
         for(int j=0;j<f->blast_count;j++)if(vlength(vsub(b->position,f->blasts[j].position))<.1f
             &&f->blasts[j].time>=b->time-.05f){seen=true;break;}
-        if(!seen&&b->time>.5f)nearby_shake(f,g,app,b->position,18,.010f,.24f);
+        if(!seen&&b->time>.5f) {
+            nearby_shake(f,g,app,b->position,18,.010f,.24f);
+            if(vlength(vsub(b->position,g->player.body.position))<24)
+                debris(f,app,b->position,(Vec3){0,1.4f,0},(Color){1,.60f,.22f},app->quality==0?6:12,SHARD);
+        }
     }
     for(int i=0;i<g->barrel_count;i++)if(g->barrels[i].explosion_time>f->barrel_times[i]+.15f)
         nearby_shake(f,g,app,g->barrels[i].position,16,.009f,.22f);
@@ -287,8 +312,12 @@ void feedback_update(Feedback *f,const Game *g,const App *app) {
         const Player *p=id==g->local_actor?&g->player:&g->actors[id].player;
         FeedbackActor *old=&f->actors[id];old->dust_cooldown=fmaxf(0,old->dust_cooldown-dt);
         if(old->active&&g->actors[id].shots>old->shots)shot_surface(f,g,app,id);
-        if(old->active&&!old->grounded&&p->body.grounded&&old->fall_speed<-3)
+        if(old->active&&!old->grounded&&p->body.grounded&&old->fall_speed<-3) {
+            if(id==g->local_actor&&app->motion) {
+                f->land_time=.32f;f->land_strength=clampf(-old->fall_speed/14,0,1);
+            }
             debris(f,app,vadd(p->body.position,(Vec3){0,.06f,0}),(Vec3){0,.35f,0},(Color){.44f,.43f,.38f},7,DUST);
+        }
         float distance=vlength(vsub(p->body.position,old->position));
         if(app->motion&&p->dash_timer>0&&old->active&&distance>.04f&&distance<3&&old->dust_cooldown==0) {
             Vec3 a=vadd(old->position,(Vec3){0,.6f,0}),b=vadd(p->body.position,(Vec3){0,.6f,0});
@@ -304,6 +333,11 @@ void feedback_update(Feedback *f,const Game *g,const App *app) {
         debris(f,app,(Vec3){0,4.1f,0},(Vec3){0,1,0},(Color){.4f,1,.7f},16,SPARK);
     }
     cache(f,g);
+}
+float feedback_landing(const Feedback *f,const App *app) {
+    if(!f||!app->motion||app->state!=STATE_PLAYING||f->land_time<=0)return 0;
+    float age=.32f-f->land_time;
+    return -.022f*f->land_strength*app->impact_intensity*expf(-age*15)*sinf(age*35);
 }
 Vec3 feedback_camera_shake(const Feedback *f,const App *app) {
     if(!f||!app->motion||app->impact_intensity<=0||app->state!=STATE_PLAYING||f->shake_time<=0)
@@ -366,4 +400,38 @@ void feedback_draw(Feedback *f,Mesh *m,const Game *g,const App *app) {
         mesh_ring(m,p->position,.3f+(1-fade)*p->radius,.06f+.10f*fade,c,app->quality==0?16:24);
     }
     m->glow=0;(void)g;
+}
+
+/* Surimpression dans la passe HUD existante ; aucune allocation ni nouvelle passe. */
+void feedback_ui(const Feedback *f,Mesh *m,const Game *g,const App *app) {
+    if(app->state!=STATE_PLAYING||g->intro_time>0||g->dead||app->show_build||app->impact_intensity<=0)return;
+    if(f->dash_ready>0) {
+        float t=f->dash_ready/.4f;
+        Color ready={.55f*t,t,.75f*t};
+        mesh_rect(m,498,332,123,1,ready);
+        float reach=app->motion?(1-t)*4:0;
+        mesh_rect(m,495-reach,330,2,8*t,ready);mesh_rect(m,623+reach,330,2,8*t,ready);
+    }
+    if(f->weapon_ready>0&&g->player.weapon_switch<=0) {
+        float t=f->weapon_ready/.35f;
+        Color c=WEAPONS[g->player.weapon].color;
+        mesh_rect(m,284,328,72*t,1,(Color){c.r*t,c.g*t,c.b*t});
+    }
+    float maximum=player_max_health(&g->player);
+    float current=clampf(g->player.health/maximum,0,1),trail=clampf(f->health_trail/maximum,current,1);
+    if(trail>current+.005f)mesh_rect(m,79+70*current,334,70*(trail-current),5,(Color){.95f,.46f,.23f});
+    if(f->heal_pop>0) {
+        float t=f->heal_pop/.45f;
+        mesh_rect(m,14,355,54*t,2,(Color){.4f*t,.9f*t,.6f*t});
+        mesh_rect(m,10,329,2,20*t,(Color){.4f*t,.9f*t,.6f*t});
+    }
+    if(f->reload_pop>0&&g->player.reload_timer==0) {
+        float t=f->reload_pop/.35f;
+        mesh_rect(m,260,345,120,2,(Color){.35f*t,.85f*t,t});
+        if(app->motion) {
+            float spread=(1-t)*12;
+            mesh_rect(m,256-spread,342,2,7*t,(Color){.35f*t,.85f*t,t});
+            mesh_rect(m,382+spread,342,2,7*t,(Color){.35f*t,.85f*t,t});
+        }
+    }
 }

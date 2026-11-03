@@ -6,6 +6,16 @@ Application en **C11**, **SDL2** (fenêtre, clavier, souris et son) et **OpenGL 
 
 Le mode solo fonctionne hors ligne. Pour jouer ensemble, sélectionne **Multijoueur** ; voir [MULTIJOUEUR.md](MULTIJOUEUR.md) pour la création, la connexion sur Internet et les limites de cette première version.
 
+## Snapshot 1.3.2 — retours de combat
+
+Les ennemis évaluent mieux leur terrain : contournement validé avec leur taille, séparation entre voisins du même étage, demi-tour en impasse et vérification des bords avant de reculer. Les combattants au sol pénalisent les cibles très hautes ; la pression du groupe est mieux répartie entre joueurs vivants. Les tireurs cherchent une ouverture et un couvert latéral pendant la recharge, et les projectiles des invocateurs / lance-toiles attendent un couloir dégagé d'obstacles et d'alliés. Le couloir est revérifié à la libération, sans changer la direction de l'attaque annoncée. Ce sont des décisions locales autour de la navigation existante, pas une planification complète de tous les étages. En coopération, la version de l'hôte pilote l'IA.
+
+L'arme revient avec un amortissement propre à son poids ; son flash de bouche se déploie brièvement. Les touches éclairent aussi l'armure, les marqueurs convergent vers le réticule et les explosions proches projettent quelques éclats supplémentaires. Le HUD conserve brièvement la portion de santé perdue et signale séparément les soins et la recharge terminée. Les chiffres réagissent légèrement aux coups et aux tirs.
+
+Les accélérations et esquives font évoluer progressivement le champ de vision, avec une amplitude limitée. L'arme amortit les atterrissages ; ses petites impulsions de recharge suivent les clics mécaniques existants. Une frappe part plus vite puis revient plus doucement. Le HUD signale brièvement le retour de l'esquive et le changement d'arme, et un curseur rend la recharge plus facile à suivre. Les flashes des alliés ont aussi une extinction progressive.
+
+Le réglage **Intensité des impacts** module les nouveaux mouvements et permet de couper les traces / accents du HUD et les éclats supplémentaires. **F4** supprime les nouveaux rebonds et la torsion de l'arme ; les informations de combat restent lisibles. Les dégâts et cadences restent ceux de la 1.3.1 ; le protocole réseau 12 est conservé. Ces retouches réutilisent les maillages et budgets du moteur ; leur confort et les performances sur Pi restent à confirmer en jeu.
+
 ## Licence et musiques
 
 Le code et la documentation originaux de FastFps sont sous [licence MIT](LICENSE). Les dépendances et les contenus tiers conservent leurs propres conditions ; voir [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

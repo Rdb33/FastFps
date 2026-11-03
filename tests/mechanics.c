@@ -115,6 +115,48 @@ static void ai_tests(World *w) {
     Vec3 position=g.enemies[0].body.position;g.player.body.position=(Vec3){15,0,-8};
     move=ai_move(&g,&g.enemies[0],&g.player,true,FIXED_STEP);
     assert(!world_blocked(w,vadd(position,vscale(move,.8f)),ENEMY_RADIUS,ENEMY_HEIGHT,-1));
+    quiet(&g,w,false);g.player.body.position=(Vec3){0,0,16};
+    e=&g.enemies[0];*e=inert((Vec3){0,0,10});e->type=ENEMY_CASTER;e->spawn_time=0;
+    e->attack_timer=.37f;e->attack_duration=1;e->attack_direction=(Vec3){0,0,1};e->target_actor=0;
+    w->solids[w->solid_count++]=(Box){{-2,0,12},{2,3,12.2f}};
+    game_update(&g,(Input){0},FIXED_STEP);
+    assert(g.projectile_count==0&&g.enemies[0].attack_fired&&g.enemies[0].shot_timer>.4f);
+    w->solid_count--;
+}
+static void tactical_ai_tests(void) {
+    World w={0};Game g={.world=&w,.current_actor=0,.enemy_count=1};
+    g.actors[0].active=true;g.player.body.position=(Vec3){0,0,6};
+    Enemy *e=&g.enemies[0];*e=inert((Vec3){0,0,0});e->type=ENEMY_CASTER;e->id=2;
+    Vec3 aim=player_eye(&g.player,false);assert(ai_can_fire(&g,e,aim));
+    g.enemy_count=2;g.enemies[1]=inert((Vec3){0,0,3});assert(!ai_can_fire(&g,e,aim));
+    g.enemies[1].body.position.y=4;assert(ai_can_fire(&g,e,aim));
+    g.enemy_count=1;w.solids[0]=(Box){{-2,0,2},{2,3,2.1f}};w.solid_count=1;
+    assert(!ai_can_fire(&g,e,aim));
+    w.solids[0]=(Box){{-2,0,-.85f},{2,3,-.75f}};
+    Vec3 move=ai_move(&g,e,&g.player,true,FIXED_STEP);assert(vlength(move)>.5f);
+    for(int step=1;step<=9;step++)assert(!world_blocked(&w,vadd(e->body.position,vscale(move,(float)step*.1f)),ENEMY_RADIUS,ENEMY_HEIGHT,-1));
+    w.solids[0]=(Box){{-2,0,-2},{2,4,2}};e->body.position=(Vec3){0,4,-1.4f};
+    g.player.body.position=(Vec3){0,4,4};move=ai_move(&g,e,&g.player,true,FIXED_STEP);
+    assert(vlength(move)>.5f);
+    Vec3 probe=vadd(e->body.position,vscale(move,.9f));probe.y+=.08f;
+    assert(world_ray(&w,probe,(Vec3){0,-1,0},2)<.2f);
+    w.solid_count=3;w.solids[0]=(Box){{-.95f,0,-3},{-.8f,3,3}};
+    w.solids[1]=(Box){{.8f,0,-3},{.95f,3,3}};w.solids[2]=(Box){{-.95f,0,1},{.95f,3,1.2f}};
+    e->type=ENEMY_BRUTE;e->body.position=(Vec3){0,0,0};g.player.body.position=(Vec3){0,0,6};
+    move=ai_move(&g,e,&g.player,true,FIXED_STEP);assert(move.z<-.9f);
+    /* Un tireur en recharge cherche un couvert latéral réellement accessible. */
+    w.solid_count=1;w.solids[0]=(Box){{.2f,0,4},{2,3,5}};
+    e->type=ENEMY_CASTER;e->shot_timer=3;e->body.position=(Vec3){0,0,0};g.player.body.position=(Vec3){0,0,10};
+    move=ai_move(&g,e,&g.player,true,FIXED_STEP);assert(vlength(move)>.5f);
+    Vec3 eye=vadd(vscale(move,.9f),(Vec3){0,1.3f,0});
+    Vec3 sight=vsub(player_eye(&g.player,false),eye);float range=vlength(sight);
+    assert(world_ray(&w,eye,vnormalize(sight),range)<range-.05f);
+    /* Un combattant au sol préfère un joueur accessible à un voisin très haut. */
+    w.solid_count=0;e->type=ENEMY_RUNNER;e->body.position=(Vec3){0,0,0};e->target_actor=0;
+    g.player.body.position=(Vec3){0,6,1};g.actors[1].active=true;
+    g.actors[1].player.body.position=(Vec3){0,0,8};assert(ai_target(&g,e)==1);
+    g.actors[1].dead=true;assert(ai_target(&g,e)==0);
+    puts("OK : couloir de tir, allies en hauteur, recul contre mur, bord de plateforme et cible accessible");
 }
 static void platform_tests(World *w) {
     Game host,guest;World other;assert(world_init(&other));quiet(&host,w,false);quiet(&guest,&other,false);
@@ -289,7 +331,7 @@ static void new_protocol_tests(World *w) {
 
 int main(void) {
     assert(SDL_Init(SDL_INIT_TIMER)==0);srand(1);World w;assert(world_init(&w));
-    revive_tests(&w);rocket_tests(&w);champion_tests(&w);ai_tests(&w);platform_tests(&w);snapshot_tests(&w);
+    revive_tests(&w);rocket_tests(&w);champion_tests(&w);ai_tests(&w);tactical_ai_tests();platform_tests(&w);snapshot_tests(&w);
     bomber_timing_test(&w);web_tests(&w);climbing_tests(&w);finisher_push_tests(&w);intro_and_weaver_tests(&w);coop_intro_test(&w);new_protocol_tests(&w);
     mesh_free(&w.mesh);SDL_Quit();puts("OK : reanimations, evenements, degats de zone, rocket jump, champions, IA, plateformes et protocole");return 0;
 }

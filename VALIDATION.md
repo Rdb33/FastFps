@@ -2,6 +2,18 @@
 
 Historique des contrôles sur la machine de développement ; les résultats sont datés par version.
 
+## Snapshot 1.3.2 — 3 novembre 2026
+
+- IA : suites réseau virtuel / gameplay / mécaniques réussies après modification. Scénarios ajoutés pour obstacle dans le couloir de tir, allié au même étage ou en hauteur, recul près d'un mur, bord de plateforme, demi-tour en couloir étroit, couvert pendant recharge, cible plus accessible et joueur à terre. Simulation d'une attaque préparée dont le couloir est bloqué : aucun projectile libéré.
+- Mesure indicative sur le PC de développement : environ 0,63 ms pour les décisions de dix-huit ennemis (mille lots à positions fixes, visibilité alternée). Ce chiffre couvre sélection de cible et direction locale ; ce n'est ni le coût complet d'une image ni une mesure Pi. Aucune limitation liée au profil graphique n'est appliquée à l'IA.
+
+- Affinage : comparaison du champ de vision après une seconde simulée à 30 et 144 Hz (écart inférieur à 0,03 degré, maximum cinq degrés), détection d'un atterrissage, extinction du signal d'esquive sans redéclenchement, contrôle de vingt-cinq phases de recharge par arme et capture de la frappe. Mode F4 : champ de vision fixe et retour d'atterrissage coupé. Captures des gestes et contrôle d'absence de modification de Game pendant les recharges.
+
+- Architecture examinée : monde statique conservé sur GPU, maillage dynamique des acteurs / effets, arme avec profondeur séparée, HUD composé après agrandissement. Caméra calculée dans renderer.c, animation géométrique dans animation.c / graphics.c ; événements de combat autoritaires dans game.c, effets locaux dans Feedback. Aucune réorganisation structurelle.
+- Compilation C11 et suites existantes. Programme temporaire lié aux objets réels : rendu OpenGL ES hors écran des cinq armes sur trente instants chacune, positions finies, limites des maillages respectées, aucune erreur OpenGL.
+- Contrôles des transitions perte de santé / soin / recharge terminée, pause, intensité zéro et caméra stable. Explosion proche : particules locales sous le plafond Pi de 40. Une capture de dégâts vérifie que Game et le générateur aléatoire de gameplay ne sont pas modifiés par le rendu.
+- Captures et programme de vérification dans build/verification-v1.3.2 (hors Git). Rendu logiciel sur PC : aucune mesure de FPS Raspberry Pi et aucun essai entre deux ordinateurs pour ce snapshot.
+
 ## Snapshot 1.3.1 — 3 novembre 2026
 
 - Compilation C11 sans avertissement et suites réseau virtuel, gameplay et mécaniques réussies. Protocole 12 et gameplay conservés.

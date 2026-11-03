@@ -123,7 +123,9 @@ void animate_teammate(Mesh *m,const Actor *actor,int id,float time,int detail,fl
         Color accent=WEAPONS[p->weapon].color;float muzzle=held_weapon(m,p->weapon,sides,accent,gesture);
         animate_weapon_effects(m,p,(Vec3){0,0,0},muzzle,time,detail,effects);
         if(actor->shot_age<.06f&&p->reload_timer<=0&&p->weapon_switch<=0&&!helping) {
-            float size=.10f*(1-actor->shot_age/.06f);m->glow=1;
+            float phase=clampf(actor->shot_age/.06f,0,1);
+            float weight=p->weapon==WEAPON_ROCKET?1.4f:(p->weapon==1?1.25f:1);
+            float size=.10f*weight*(.55f+.75f*sinf(phase*PI_F))*sqrtf(1-phase);m->glow=1;
             mesh_diamond(m,(Vec3){0,.03f,-muzzle},size,(Color){1,.79f,.35f});
             mesh_cylinder(m,(Vec3){0,.03f,-muzzle},(Vec3){0,.03f,-muzzle-size*2},size*.25f,(Color){1,.9f,.55f},6);m->glow=0;
         }

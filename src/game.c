@@ -490,8 +490,12 @@ static void attack_update(Game *g, Enemy *e, float dt) {
     if (progress < .62f || e->attack_fired) return;
     e->attack_fired = true;
     if (e->type==ENEMY_CASTER||e->type==ENEMY_WEAVER) {
+        Vec3 muzzle=vadd(e->body.position,(Vec3){0,1.3f*enemy_size(e),0});
+        if(!actor_alive(g,e->target_actor)){e->shot_timer=.5f;return;}
+        float range=vlength(vsub(player_eye(actor_player(g,e->target_actor),false),muzzle));
+        if(!ai_can_fire(g,e,vadd(muzzle,vscale(e->attack_direction,range)))){e->shot_timer=.5f;return;}
         if (g->projectile_count < MAX_PROJECTILES) {
-            Vec3 origin = vadd(e->body.position,(Vec3){0,1.3f,0});
+            Vec3 origin = muzzle;
             bool web=e->type==ENEMY_WEAVER;
             g->projectiles[g->projectile_count++] = (Projectile){.position=origin,.velocity=vscale(e->attack_direction,web?13:14+2*game_threat(g)),.life=web?3:5,.color=web?(Color){.8f,.9f,1}:(Color){.3f,1,.78f},.kind=web?2:0,.owner=-1};
         }
@@ -577,7 +581,9 @@ static void update_enemies(Game *g, float dt) {
         if(e->elite&&e->body.grounded&&e->spawn_time==0&&e->touch_timer==0&&visible&&horizontal<14&&game_heavy_available(g,target_id)) {
             begin_slam(g,e,actor_player(g,target_id),target_id);continue;
         }
-        if(enemy_try_climb(g,e,vsub(actor_player(g,target_id)->body.position,e->body.position))) {
+        if((e->type==ENEMY_RUNNER||e->type==ENEMY_BRUTE||!visible
+            ||actor_player(g,target_id)->body.position.y>e->body.position.y+.4f)
+            &&enemy_try_climb(g,e,vsub(actor_player(g,target_id)->body.position,e->body.position))) {
             enemy_update_climb(g,e,dt);continue;
         }
         Vec3 move=ai_move(g,e,actor_player(g,target_id),visible,dt);
@@ -585,7 +591,8 @@ static void update_enemies(Game *g, float dt) {
             if ((e->type==ENEMY_CASTER||e->type==ENEMY_WEAVER)&&distance<36&&e->shot_timer<=0) {
                 Player *victim=actor_player(g,target_id);float lead=clampf(distance/(e->type==ENEMY_WEAVER?13:14+2*game_threat(g)),0,1.0f)*.6f;
                 Vec3 aim=vadd(p,vscale(victim->body.velocity,lead));
-                begin_attack(e,vnormalize(vsub(aim,origin)),target_id);
+                if(!ai_can_fire(g,e,aim))aim=p;
+                if(ai_can_fire(g,e,aim))begin_attack(e,vnormalize(vsub(aim,origin)),target_id);
             }
             else if(e->type==ENEMY_BOMBER&&distance<BOMBER_RANGE&&e->shot_timer<=0&&g->bomb_count<MAX_BOMBS&&game_heavy_available(g,target_id))
                 begin_bomb(g,e,target_id);

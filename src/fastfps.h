@@ -252,6 +252,7 @@ void world_routes(World *world);
 const char *world_route_name(int map);
 void game_prepare_mobility(Game *game, float dt);
 int ai_target(Game *game, const Enemy *enemy);
+bool ai_can_fire(const Game *game, const Enemy *enemy, Vec3 aim);
 Vec3 ai_move(Game *game, Enemy *enemy, const Player *target, bool visible, float dt);
 
 /* physics.c */

@@ -48,7 +48,15 @@ void ui_build(Mesh *m,const Game *g,const App *app) {
         mesh_rect(m,0,307,640,1,(Color){.25f,.27f,.19f});
         mesh_text(m,14,315,1,muted,"SANTE");
         snprintf(text,sizeof(text),"%03d",(int)ceilf(g->player.health));
+        int health_first=m->count;
         mesh_text(m,14,329,3,g->player.health<30?orange:ink,text);
+        if(app->motion&&g->damage_time>0) {
+            float t=clampf(g->damage_time/.32f,0,1),scale=1+.07f*t*t*app->impact_intensity;
+            for(int i=health_first;i<m->count;i++) {
+                m->data[i].position.x=41+(m->data[i].position.x-41)*scale;
+                m->data[i].position.y=339+(m->data[i].position.y-339)*scale;
+            }
+        }
         mesh_rect(m,79,334,70,5,(Color){.22f,.23f,.16f});
         mesh_rect(m,79,334,70*g->player.health/player_max_health(&g->player),5,g->player.health<30?orange:green);
         snprintf(text,sizeof(text),"/%d",(int)player_max_health(&g->player));mesh_text(m,80,345,1,muted,text);
@@ -57,10 +65,15 @@ void ui_build(Mesh *m,const Game *g,const App *app) {
             snprintf(text,sizeof(text),"RECHARGE %.1f S",g->player.reload_timer);
             centered(m,352,1,orange,text);
             mesh_rect(m,260,345,120,3,(Color){.17f,.22f,.24f});
-            mesh_rect(m,260,345,120*(1-g->player.reload_timer/g->player.reload_duration),3,(Color){.35f,.8f,1});
+            float progress=clampf(1-g->player.reload_timer/fmaxf(.001f,g->player.reload_duration),0,1);
+            mesh_rect(m,260,345,120*progress,3,(Color){.35f,.8f,1});
+            mesh_rect(m,259+120*progress,344,2,5,(Color){.75f,.94f,1});
+            const float steps[]={.24f,.66f,.86f};
+            for(int step=0;step<3;step++)mesh_rect(m,260+120*steps[step],349,1,1,progress>=steps[step]?ink:muted);
         }else {
             snprintf(text,sizeof(text),"%d / %d MUNITIONS / R : RECHARGER",g->player.ammo[g->player.weapon],WEAPONS[g->player.weapon].magazine);
-            centered(m,352,1,g->player.ammo[g->player.weapon]<3?orange:muted,text);
+            float tap=app->motion?2*expf(-clampf(g->shot_age,0,2)*26)*app->impact_intensity:0;
+            centered(m,352-tap,1,g->player.ammo[g->player.weapon]<=WEAPONS[g->player.weapon].magazine/4?orange:muted,text);
         }
         if(!g->cooperative){snprintf(text,sizeof(text),"%d VIES",g->lives);mesh_text(m,160,318,1,green,text);}
         snprintf(text,sizeof(text),"NIVEAU %02d / %d MODULES",player_level(&g->player),player_level(&g->player)-1);centered(m,336,1,ink,text);
@@ -155,8 +168,12 @@ void ui_build(Mesh *m,const Game *g,const App *app) {
         mesh_rect(m,319,179,2,2,ink);
         if(g->hit_time>0||g->kill_time>0) {
             Color color=g->kill_time>0?(Color){1,.85f,.35f}:(g->headshot_time>0?(Color){.35f,.9f,1}:orange);
-            mesh_rect(m,309,171,3,3,color);mesh_rect(m,328,171,3,3,color);
-            mesh_rect(m,309,186,3,3,color);mesh_rect(m,328,186,3,3,color);
+            float snap=app->motion?clampf(g->hit_time/.14f,0,1)*4*app->impact_intensity:0;
+            for(int x=-1;x<=1;x+=2)for(int y=-1;y<=1;y+=2) {
+                float cx=320+x*(9+snap),cy=180+y*(8+snap);
+                mesh_rect(m,cx-1,cy-1,3,3,color);
+                if(g->kill_time>0)mesh_rect(m,cx-1+x*3,cy-1+y*3,2,2,color);
+            }
             if(g->headshot_time>0)centered(m,207,1,color,"TETE / X2");
             else if(g->kill_time>0)centered(m,207,1,color,"ELIMINATION");
         }

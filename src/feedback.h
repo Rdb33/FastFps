@@ -40,6 +40,10 @@ typedef struct Feedback {
     float impact_time, impact_duration, impact_cooldown, hold_time;
     float reactor_cooldown, reactor_pulse;
     float shake_time, shake_duration, shake_strength;
+    float health_trail, health_delay, heal_pop, reload_pop;
+    int cached_ammo, cached_weapon;
+    float cached_reload, cached_dash;
+    float dash_ready, weapon_ready, land_time, land_strength, speed_fov;
     float unlock_notice, barrel_times[MAX_BARRELS];
     uint32_t event_serial;
     int completed_waves, blast_count;
@@ -51,10 +55,12 @@ typedef struct Feedback {
 
 void feedback_update(Feedback *feedback, const Game *game, const App *app);
 void feedback_draw(Feedback *feedback, Mesh *mesh, const Game *game, const App *app);
+void feedback_ui(const Feedback *feedback, Mesh *mesh, const Game *game, const App *app);
 void feedback_tint(const Feedback *feedback, Mesh *mesh, int first, int enemy, float intensity);
 bool feedback_hold_weapon(const Feedback *feedback, const Game *game, const App *app);
 float feedback_impact(const Feedback *feedback, const App *app);
 Vec3 feedback_camera_shake(const Feedback *feedback, const App *app);
+float feedback_landing(const Feedback *feedback, const App *app);
 Color feedback_enemy_color(const Enemy *enemy);
 
 #endif

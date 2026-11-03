@@ -6,6 +6,12 @@ static float smooth(float t) {
     return t*t*(3-2*t);
 }
 
+/* Impulsion courte après le clic mécanique, sans dérive liée au framerate. */
+static float mechanical_tap(float age) {
+    if(age<0||age>.22f)return 0;
+    return expf(-age*26)*sinf(age*65);
+}
+
 /* Le rig est construit en espace local, puis orienté en une seule passe.
    Aucune texture, allocation ou appel de dessin supplémentaire. */
 void animate_creature(Mesh *mesh, const Enemy *e, float time) {
@@ -39,7 +45,11 @@ void animate_creature(Mesh *mesh, const Enemy *e, float time) {
     } else if(e->type==ENEMY_WEAVER) {
         skin=(Color){.12f,.37f,.35f};armor=(Color){.64f,.73f,.71f};eye=(Color){.78f,.96f,1};width=.68f;
     }
-    if(e->flash>0)skin=(Color){1,.88f,.67f};
+    if(e->flash>0&&!dead) {
+        float hit=clampf(e->flash/.12f,0,1);hit*=hit;
+        skin=(Color){skin.r+(1-skin.r)*hit,skin.g+(.88f-skin.g)*hit,skin.b+(.67f-skin.b)*hit};
+        armor=(Color){armor.r+(.95f-armor.r)*hit,armor.g+(.85f-armor.g)*hit,armor.b+(.65f-armor.b)*hit};
+    }
     if(e->elite){armor=(Color){.88f,.59f,.18f};eye=(Color){1,.87f,.36f};skin=(Color){.37f,.26f,.16f};}
     float health=clampf(e->health/fmaxf(1,e->max_health),0,1);
     float stagger=dead?0:e->stagger*.24f;
@@ -199,6 +209,16 @@ void animate_weapon(Mesh *mesh, const Game *g, const App *app) {
     if(g->dead)return;
     const Player *p=&g->player;
     float motion=app->motion?1:0;
+    /* Réponse analytique : retour amorti indépendant du nombre d'images,
+       uniquement sur le modèle de l'arme, jamais sur la visée autoritaire. */
+    float age=clampf(g->shot_age,0,1);
+    float weight=p->weapon==1?1.18f:(p->weapon==WEAPON_ROCKET?1.35f:1);
+    float kick=g->recoil;
+    if(app->motion&&app->impact_intensity>0&&age<.45f&&p->weapon_switch==0&&p->reload_timer<=0) {
+        float response=expf(-age*(p->weapon==2?24:17))*(cosf(age*27)+.35f*sinf(age*27));
+        kick+=(weight*response-g->recoil)*clampf(app->impact_intensity,0,1);
+    }
+    float twist=motion*app->impact_intensity*kick*.018f*((g->actors[g->local_actor].shots&1)?1:-1);
     float blend=p->movement_blend*(p->body.grounded?1:.2f);
     float hurry=clampf((hypotf(p->body.velocity.x,p->body.velocity.z)-PLAYER_SPEED*(1+.03f*p->upgrades[UPGRADE_MOBILITY]))/4,0,1);
     float sway=(sinf(p->bob)*.020f+sinf(p->bob*.5f)*.006f)*blend*motion;
@@ -211,12 +231,23 @@ void animate_weapon(Mesh *mesh, const Game *g, const App *app) {
     bool helping=g->cooperative&&g->actors[g->local_actor].revive_held&&g->actors[g->local_actor].revive_target>=0;
     ReloadPose gesture=helping?(ReloadPose){0}:weapon_reload_pose(p);
     float reload=gesture.progress,reload_pose=gesture.lower;
+    float mechanism=0;
+    if(gesture.active&&app->motion) {
+        const float magazine[]={.24f,.66f,.86f},shell[]={.28f,.47f,.66f,.86f};
+        const float *clicks=p->weapon==1?shell:magazine;int count=p->weapon==1?4:3;
+        for(int i=0;i<count;i++)mechanism+=mechanical_tap((reload-clicks[i])*p->reload_duration);
+        mechanism*=app->impact_intensity;
+    }
     float lower=switching*.36f+reload_pose*.10f+hurry*.035f*motion;
     if(helping)lower+=.30f;
     float melee_age=MELEE_COOLDOWN-p->melee_timer;
-    float punch=p->melee_timer>0&&melee_age<.30f?sinf(melee_age/.30f*PI_F):0;
-    Vec3 base={sway-p->sway_x*motion-p->strafe_blend*.014f*motion,-.39f-vertical-lower-g->recoil*.035f+(p->landing*.6f+p->sway_y)*motion,
-        -.62f+g->recoil*.10f};
+    float punch=0;
+    if(p->melee_timer>0&&melee_age>=0&&melee_age<.30f) {
+        float t=melee_age/.30f;
+        punch=t<.22f?smooth(t/.22f):1-smooth((t-.22f)/.78f);
+    }
+    Vec3 base={sway-p->sway_x*motion-p->strafe_blend*.014f*motion,-.39f-vertical-lower-kick*.035f+(p->landing*.6f+p->sway_y)*motion,
+        -.62f+kick*.10f+mechanism*.018f};
     if(punch>0)base.y-=punch*.22f;
     base.y-=p->dash_timer/DASH_DURATION*.06f*motion;
     Color metal={.35f,.39f,.35f},dark={.13f,.16f,.13f},glove={.30f,.36f,.21f},skin={.63f,.43f,.28f};
@@ -343,10 +374,15 @@ void animate_weapon(Mesh *mesh, const Game *g, const App *app) {
     }
     if(g->shot_age<.055f&&p->weapon_switch==0) {
         mesh->glow=1;
-        mesh_diamond(mesh,vadd(base,(Vec3){0,.17f,p->weapon>=2?-.66f:-.45f}),p->weapon==1?.14f:.085f,(Color){1,.85f,.40f});
+        float phase=clampf(g->shot_age/.055f,0,1);
+        float bloom=(.55f+.75f*sinf(phase*PI_F))*sqrtf(1-phase);
+        Vec3 muzzle=vadd(base,(Vec3){0,.17f,p->weapon>=2?-.66f:-.45f});
+        Color fire=p->weapon==3?(Color){.65f,.85f,1}:(Color){1,.85f,.40f};
+        mesh_diamond(mesh,muzzle,(p->weapon==1?.14f:.085f)*bloom,fire);
+        mesh_cylinder(mesh,muzzle,vadd(muzzle,(Vec3){0,0,-(.12f+.18f*bloom)}),.025f*bloom,fire,4);
         for(int i=0;i<4;i++) {
-            float angle=(float)i*PI_F/2+g->shot_age*18;
-            mesh_diamond(mesh,vadd(base,(Vec3){sinf(angle)*.11f,.17f+cosf(angle)*.11f,p->weapon>=2?-.67f:-.46f}),.022f,(Color){1,.66f,.25f});
+            float angle=(float)i*PI_F/2+g->shot_age*30+(float)(g->actors[g->local_actor].shots%4)*.7f;
+            mesh_diamond(mesh,vadd(base,(Vec3){sinf(angle)*.11f,.17f+cosf(angle)*.11f,p->weapon>=2?-.67f:-.46f}),.022f*bloom,WEAPONS[p->weapon].color);
         }
         mesh->glow=0;
     }
@@ -354,8 +390,8 @@ void animate_weapon(Mesh *mesh, const Game *g, const App *app) {
         app->motion?g->time:0,graphics_detail(app->quality),app->impact_intensity);
     float air=motion&&!p->body.grounded?clampf(-p->body.velocity.y*.002f,-.03f,.03f):0;
     mesh_rotate(mesh,0,vadd(base,(Vec3){0,.08f,.15f}),
-        g->recoil*(p->weapon==1?.12f:.08f)+reload_pose*.14f+gesture.rack*.04f+hurry*.025f*motion+air,
-        reload_pose*.08f-switching*.10f,reload_pose*.23f-gesture.seat*.035f-p->strafe_blend*.025f*motion);
+        mechanism*.025f+kick*(p->weapon==1?.12f:.08f)+reload_pose*.14f+gesture.rack*.04f+hurry*.025f*motion+air,
+        reload_pose*.08f-switching*.10f,twist+reload_pose*.23f-gesture.seat*.035f-p->strafe_blend*.025f*motion);
     if(punch>0) {
         Vec3 fist={-.18f+punch*.13f,-.39f+punch*.16f,-.36f-punch*.42f};
         mesh_box(mesh,fist,(Vec3){.20f,.19f,.23f},glove);
