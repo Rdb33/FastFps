@@ -357,5 +357,7 @@ int main(int argc,char **argv) {
     if(!demo&&frame_limit==0){settings_write(&app);network_preferences(&app,true);}
     if(frame_limit)SDL_Log("%d images / vague %d / score %d / %d creatures / FPS %d",rendered,game.wave,game.score,game.enemy_count,app.fps);
     updates_shutdown(&updates);
-    net_close(network);free(network);audio_shutdown();renderer_shutdown(&renderer);mesh_free(&world.mesh);SDL_Quit();return exit_code;
+    net_close(network);free(network);audio_shutdown();renderer_shutdown(&renderer);mesh_free(&world.mesh);SDL_Quit();
+    if(updates.installer.restart)return updater_relaunch(&updates.installer);
+    return exit_code;
 }

@@ -1,4 +1,5 @@
 #include "updates.h"
+#include "network.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
@@ -110,7 +111,7 @@ static int check_thread(void *data) {
 }
 
 void updates_start(UpdateChecker *u) {
-    memset(u,0,sizeof(*u));u->selected=1;
+    memset(u,0,sizeof(*u));u->selected=2;
     u->thread=SDL_CreateThread(check_thread,"verification-version",u);
 }
 
@@ -125,8 +126,10 @@ void updates_poll(App *app) {
     if(u->thread&&SDL_AtomicGet(&u->ready)) {
         SDL_WaitThread(u->thread,NULL);u->thread=NULL;u->available=newer(u->latest);
     }
+    updater_poll(&u->installer);
+    if(u->installer.restart){app->running=false;return;}
     bool show=visible(app)&&app->game_confirmation==CONFIRM_NONE;
-    if(show&&!u->open){u->ready_at=SDL_GetTicks()+600;u->released=false;u->selected=1;}
+    if(show&&!u->open){u->ready_at=SDL_GetTicks()+600;u->released=false;u->selected=2;}
     u->open=show;
     if(show&&!u->released) {
         const Uint8 *keys=SDL_GetKeyboardState(NULL);
@@ -136,14 +139,14 @@ void updates_poll(App *app) {
 }
 
 static bool enabled(const UpdateChecker *u) {
-    return u->released&&SDL_TICKS_PASSED(SDL_GetTicks(),u->ready_at);
+    return !updater_busy(&u->installer)&&u->released&&SDL_TICKS_PASSED(SDL_GetTicks(),u->ready_at);
 }
 
 static int button_at(const App *app,Renderer *r,int x,int y) {
     float px,py;if(!menu_coordinates(app,r,x,y,&px,&py))return -1;
     if(py<231||py>263)return -1;
-    if(px>=104&&px<=312)return 0;
-    return px>=328&&px<=536?1:-1;
+    for(int i=0;i<3;i++)if(px>=88+160*i&&px<=232+160*i)return i;
+    return -1;
 }
 
 static bool copy_commands(void) {
@@ -164,30 +167,35 @@ static bool copy_commands(void) {
     return SDL_SetClipboardText(commands)==0;
 }
 
-static void activate(UpdateChecker *u) {
-    if(u->selected==1){u->dismissed=true;u->open=false;return;}
+static void activate(App *app) {
+    UpdateChecker *u=app->updates;
+    if(u->selected==2){u->dismissed=true;u->open=false;return;}
+    if(u->selected==1){u->copied=copy_commands();u->copy_error=!u->copied;return;}
     if(!u->details) {
         u->details=true;u->selected=0;u->ready_at=SDL_GetTicks()+300;u->released=false;
-    }else {u->copied=copy_commands();u->copy_error=!u->copied;}
+    }else if(app->network&&app->network->mode!=NET_OFF) {
+        snprintf(u->installer.error,sizeof(u->installer.error),"QUITTE D'ABORD LE SALON AVANT LA MISE A JOUR.");
+    }else updater_start(&u->installer,NULL);
 }
 
 bool updates_event(App *app,Renderer *r,const SDL_Event *event) {
     UpdateChecker *u=app->updates;
     if(!visible(app)||!u->open)return false;
     if(event->type==SDL_QUIT||event->type==SDL_WINDOWEVENT)return false;
+    if(updater_busy(&u->installer))return true;
     if(event->type==SDL_KEYDOWN&&!event->key.repeat) {
         SDL_Scancode key=event->key.keysym.scancode;
         if(key==SDL_SCANCODE_ESCAPE){u->dismissed=true;u->open=false;}
         else if(enabled(u)) {
-            if(key==SDL_SCANCODE_LEFT||key==SDL_SCANCODE_RIGHT||key==SDL_SCANCODE_TAB
-                ||key==SDL_SCANCODE_UP||key==SDL_SCANCODE_DOWN)u->selected=1-u->selected;
-            else if(key==SDL_SCANCODE_RETURN||key==SDL_SCANCODE_KP_ENTER||key==SDL_SCANCODE_SPACE)activate(u);
+            if(key==SDL_SCANCODE_LEFT||key==SDL_SCANCODE_UP)u->selected=(u->selected+2)%3;
+            else if(key==SDL_SCANCODE_RIGHT||key==SDL_SCANCODE_TAB||key==SDL_SCANCODE_DOWN)u->selected=(u->selected+1)%3;
+            else if(key==SDL_SCANCODE_RETURN||key==SDL_SCANCODE_KP_ENTER||key==SDL_SCANCODE_SPACE)activate(app);
         }
     }else if(enabled(u)&&event->type==SDL_MOUSEMOTION) {
         int hit=button_at(app,r,event->motion.x,event->motion.y);if(hit>=0)u->selected=hit;
     }else if(enabled(u)&&event->type==SDL_MOUSEBUTTONDOWN&&event->button.button==SDL_BUTTON_LEFT) {
         int hit=button_at(app,r,event->button.x,event->button.y);
-        if(hit>=0){u->selected=hit;activate(u);}
+        if(hit>=0){u->selected=hit;activate(app);}
     }
     return event->type==SDL_KEYDOWN||event->type==SDL_KEYUP||event->type==SDL_TEXTINPUT
         ||event->type==SDL_MOUSEBUTTONDOWN||event->type==SDL_MOUSEBUTTONUP
@@ -196,35 +204,45 @@ bool updates_event(App *app,Renderer *r,const SDL_Event *event) {
 
 void updates_build(Mesh *m,const App *app) {
     if(!visible(app)||!app->updates->open)return;
-    const UpdateChecker *u=app->updates;char text[96];
+    UpdateChecker *u=app->updates;char text[96];
     Color blue={.32f,.8f,1},ink={.91f,.96f,1},muted={.51f,.64f,.72f};
     mesh_rect(m,-24,-16,688,392,(Color){.012f,.022f,.032f});
     mesh_rect(m,80,72,480,216,(Color){.035f,.07f,.10f});mesh_rect(m,80,72,480,3,blue);
     mesh_text(m,104,94,2,blue,u->details?"METTRE FASTFPS A JOUR":"MISE A JOUR DISPONIBLE");
     snprintf(text,sizeof(text),"VERSION INSTALLEE : %s / DISPONIBLE : %s",GAME_VERSION,u->latest);
     mesh_text(m,104,124,1,ink,text);
-    if(u->details) {
-        mesh_text(m,104,149,1,ink,"1. COPIE ET COLLE DANS UN TERMINAL SANS VALIDER.");
-        mesh_text(m,104,166,1,ink,"2. FERME LE JEU, PUIS APPUIE SUR ENTREE.");
-        mesh_text(m,104,193,1,u->copy_error?(Color){1,.6f,.3f}:muted,
-            u->copied?"COMMANDES COPIEES : COLLE AVANT DE FERMER LE JEU.":
-            (u->copy_error?"COPIE IMPOSSIBLE : CONSULTE LE README DU JEU.":"LE JEU SERA MIS A JOUR, RECOMPILE ET RELANCE."));
+    bool busy=updater_busy(&u->installer);
+    if(busy) {
+        const char *stages[]={"","VERIFICATION DU CLONE GIT...","TELECHARGEMENT DE LA MISE A JOUR...","COMPILATION EN COURS..."};
+        int stage=SDL_AtomicGet(&u->installer.stage);
+        mesh_text(m,104,151,1,blue,stages[stage>=1&&stage<=3?stage:1]);
+        mesh_text(m,104,174,1,ink,"LE JEU SERA RELANCE APRES UNE COMPILATION REUSSIE.");
+        mesh_text(m,104,194,1,muted,"SUR RASPBERRY PI, CELA PEUT PRENDRE QUELQUES MINUTES.");
+    }else if(u->details) {
+        mesh_text(m,104,149,1,ink,"GIT PULL --FF-ONLY ORIGIN MAIN, PUIS COMPILATION.");
+        mesh_text(m,104,166,1,muted,"LE JEU REDEMARRERA. LA PARTIE EN COURS SERA FERMEE.");
+        mesh_text(m,104,187,1,u->installer.error[0]?(Color){1,.6f,.3f}:muted,
+            u->installer.error[0]?u->installer.error:"TES MODIFICATIONS LOCALES NE SERONT PAS ECRASEES.");
+        mesh_text(m,104,204,1,muted,"JOURNAL : BUILD/MISE-A-JOUR.LOG DANS LE DOSSIER DU JEU.");
     }else {
         mesh_text(m,104,151,1,ink,"UNE NOUVELLE VERSION EST DISPONIBLE SUR GITHUB.");
         mesh_text(m,104,171,1,muted,"POUR JOUER ENSEMBLE, METTEZ L'EQUIPE A JOUR.");
         mesh_text(m,104,193,1,muted,"TU PEUX CONTINUER A JOUER AVEC CETTE VERSION.");
     }
-    for(int i=0;i<2;i++) {
-        float x=i?328:104;bool active=enabled(u)&&u->selected==i;
-        mesh_rect(m,x,231,208,32,active?(Color){.10f,.28f,.37f}:(Color){.06f,.12f,.16f});
-        mesh_rect(m,x,261,208,2,active?blue:muted);
-        const char *label=i?(u->details?"FERMER":"PLUS TARD"):(u->details?"COPIER LES COMMANDES":"VOIR LA MISE A JOUR");
-        mesh_text(m,x+(208-(float)strlen(label)*6)/2,243,1,active?ink:muted,label);
+    if(!busy&&(u->copied||u->copy_error))mesh_text(m,104,215,1,blue,u->copied?"COMMANDES COPIEES : FERME LE JEU AVANT DE LES LANCER.":"COPIE IMPOSSIBLE : CONSULTE LE README.");
+    for(int i=0;i<3;i++) {
+        float x=88+160*(float)i;bool active=enabled(u)&&u->selected==i;
+        mesh_rect(m,x,231,144,32,active?(Color){.10f,.28f,.37f}:(Color){.06f,.12f,.16f});
+        mesh_rect(m,x,261,144,2,active?blue:muted);
+        const char *label=i==2?"PLUS TARD":(i==1?"COPIER COMMANDES":(u->details?"CONFIRMER ET RELANCER":"METTRE A JOUR"));
+        if(busy)label=i==0?"MISE A JOUR...":"";
+        mesh_text(m,x+(144-(float)strlen(label)*6)/2,243,1,active?ink:muted,label);
     }
-    mesh_text(m,269,274,1,muted,"ECHAP : PLUS TARD");
+    mesh_text(m,230,274,1,muted,busy?"MERCI DE PATIENTER":"ECHAP : PLUS TARD");
 }
 
 void updates_shutdown(UpdateChecker *u) {
     SDL_AtomicSet(&u->cancel,1);
     if(u->thread){SDL_WaitThread(u->thread,NULL);u->thread=NULL;}
+    updater_shutdown(&u->installer);
 }

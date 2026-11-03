@@ -2,6 +2,15 @@
 
 Historique des contrôles sur la machine de développement ; les résultats sont datés par version.
 
+## Snapshot 1.3.1 — 3 novembre 2026
+
+- Compilation C11 sans avertissement et suites réseau virtuel, gameplay et mécaniques réussies. Protocole 12 et gameplay conservés.
+- Mise à jour essayée sans réseau dans des clones Git temporaires : avance rapide depuis un dépôt local, compilation d'un exécutable factice et relance par `lancer.sh`. Détection du clone depuis le chemin réel de l'exécutable, y compris avec espaces et apostrophe ; aucun shell utilisé pour composer la commande Git.
+- Refus vérifiés avec modifications locales suivies, autre branche et historique divergent ; le commit local et les fichiers personnels restent intacts. Un échec de compilation ne demande pas de relance. Installation sans clone refusée ; seconde activation sans effet pendant le travail.
+- Fermeture pendant une compilation lente : commande et descendants interrompus en moins de deux secondes ; une commande différée témoin ne s'exécute pas. Fermeture juste après compilation : pas de relance sans réception du succès par la boucle du jeu.
+- Notification : navigation entre les trois boutons, choix par défaut Plus tard, délai et relâchement avant confirmation, souris avec parallaxe, refus pendant la connexion à un salon. Captures OpenGL ES hors écran du rappel, de la confirmation, d'une erreur et de la progression de compilation, sans erreur OpenGL observée.
+- **Limites :** la mise à jour complète depuis GitHub et la relance du vrai jeu sur Raspberry Pi n'ont pas été essayées ; les tests utilisent un dépôt local et un lanceur témoin. La première installation de ce snapshot reste manuelle pour les versions antérieures.
+
 ## Version 1.3.0 — 2 novembre 2026
 
 - Confirmation de nouvelle partie : clavier et souris avec parallaxe, annulation sans changement de l'état de pause, choix par défaut, touche maintenue / répétée, délai contre les doubles clics et invalidation lors d'un changement d'écran. La confirmation est placée avant le démarrage solo et celui du salon par l'hôte ; les invités conservent leur bouton prêt.

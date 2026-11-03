@@ -32,18 +32,23 @@ build/test-network: $(TEST_SOURCES) src/fastfps.h src/network.h src/config.h | c
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) -I src $(TEST_SOURCES) $(LDLIBS) -o $@
 
-build/test-gameplay: tests/gameplay.c $(filter-out tests/network.c,$(TEST_SOURCES)) src/settings.c src/menu.c src/fastfps.h src/network.h src/config.h | check-deps
+build/test-gameplay: tests/gameplay.c $(filter-out tests/network.c,$(TEST_SOURCES)) src/settings.c src/menu.c src/updates.c src/updater.c src/updates.h src/fastfps.h src/network.h src/config.h | check-deps
 	@mkdir -p build
-	$(CC) $(CPPFLAGS) $(CFLAGS) -I src tests/gameplay.c $(filter-out tests/network.c,$(TEST_SOURCES)) src/settings.c src/menu.c $(LDLIBS) -o $@
+	$(CC) $(CPPFLAGS) $(CFLAGS) -I src tests/gameplay.c $(filter-out tests/network.c,$(TEST_SOURCES)) src/settings.c src/menu.c src/updates.c src/updater.c $(LDLIBS) -o $@
 
 build/test-mechanics: tests/mechanics.c $(filter-out tests/network.c,$(TEST_SOURCES)) src/fastfps.h src/network.h src/config.h | check-deps
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) -I src tests/mechanics.c $(filter-out tests/network.c,$(TEST_SOURCES)) $(LDLIBS) -o $@
 
-test: build/test-network build/test-gameplay build/test-mechanics
+build/test-updates: tests/updates.c src/updater.c src/updates.h src/fastfps.h src/config.h | check-deps
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -I src tests/updates.c src/updater.c $(LDLIBS) -o $@
+
+test: build/test-network build/test-gameplay build/test-mechanics build/test-updates
 	./build/test-network
 	./build/test-gameplay
 	./build/test-mechanics
+	python3 tests/updates.py ./build/test-updates
 
 test-tcp: build/test-network
 	./build/test-network --tcp

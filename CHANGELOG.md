@@ -1,3 +1,9 @@
+# Snapshot 1.3.1
+
+- Notification : bouton Mettre à jour avec confirmation, téléchargement par `git pull --ff-only origin main`, compilation en arrière-plan puis relance via `lancer.sh` seulement après réussite. Boutons Copier commandes et Plus tard conservés, interactions adaptées au parallaxe.
+- Refus sur une autre branche, en présence de modifications suivies ou avant d'avoir quitté le salon. Erreur affichée sans fermer le jeu si Git ou la compilation échoue ; journal local `build/mise-a-jour.log`, aucune réinitialisation des fichiers. Fermeture propre des commandes et sous-processus à l'arrêt du jeu.
+- Protocole 12 et gameplay de la 1.3.0 conservés. La 1.3.1 doit être installée une première fois pour que le bouton soit disponible lors des futures publications.
+
 # Version 1.3.0
 
 - Confirmation avant de lancer ou recommencer en solo et avant le lancement du salon par l'hôte. Annuler sélectionné par défaut, Échap pour revenir, protection contre la touche maintenue et le double clic ; reprendre une partie ne demande pas de confirmation.

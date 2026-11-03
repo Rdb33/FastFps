@@ -1,4 +1,5 @@
 #include "network.h"
+#include "updates.h"
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
@@ -112,6 +113,29 @@ static void snapshots(World *w) {
 static SDL_Event mouse(Uint32 type,int x,int y) {
     SDL_Event e={0};e.type=type;e.button.button=SDL_BUTTON_LEFT;e.button.x=x;e.button.y=y;return e;
 }
+static void update_notification(void) {
+    Renderer r={0};r.window=SDL_CreateWindow("mise a jour",0,0,640,360,SDL_WINDOW_HIDDEN);assert(r.window);
+    UpdateChecker u={.available=true};Network n={.mode=NET_CLIENT};
+    App a={.state=STATE_MENU,.running=true,.editing=-1,.numeric_edit=-1,.slider_drag=-1,
+        .menu_motion=true,.menu_parallax_x=1,.menu_parallax_y=-1,.updates=&u,.network=&n};
+    updates_poll(&a);assert(u.open&&u.selected==2);
+    SDL_Event e={.type=SDL_KEYDOWN};e.key.keysym.scancode=SDL_SCANCODE_RETURN;
+    u.released=true;u.ready_at=SDL_GetTicks()+1000;
+    assert(updates_event(&a,&r,&e)&&!u.dismissed);
+    u.ready_at=0;assert(updates_event(&a,&r,&e)&&u.dismissed&&a.running);
+    u.dismissed=false;updates_poll(&a);u.ready_at=0;u.released=true;u.selected=0;
+    assert(updates_event(&a,&r,&e)&&u.details&&!updater_busy(&u.installer));
+    assert(updates_event(&a,&r,&e)&&!updater_busy(&u.installer));
+    u.ready_at=0;u.released=true;
+    assert(updates_event(&a,&r,&e)&&strstr(u.installer.error,"QUITTE D'ABORD LE SALON"));
+    assert(!updater_busy(&u.installer)&&a.running);
+    e.key.keysym.scancode=SDL_SCANCODE_LEFT;updates_event(&a,&r,&e);assert(u.selected==2);
+    e.key.keysym.scancode=SDL_SCANCODE_RIGHT;updates_event(&a,&r,&e);assert(u.selected==0);
+    Vec3 offset=menu_offset(&a,MENU_CONTROL_DEPTH);
+    e=mouse(SDL_MOUSEBUTTONDOWN,(int)lroundf(470+offset.x),(int)lroundf(244+offset.y));
+    assert(updates_event(&a,&r,&e)&&u.dismissed&&!updater_busy(&u.installer));
+    updates_shutdown(&u);SDL_DestroyWindow(r.window);
+}
 static void new_game_confirmation(void) {
     Renderer r={0};r.window=SDL_CreateWindow("confirmation",0,0,640,360,SDL_WINDOW_HIDDEN);assert(r.window);
     App a={.state=STATE_PAUSED,.selected=1,.menu_motion=true,.menu_parallax_x=1,.menu_parallax_y=-1};
@@ -179,6 +203,6 @@ static void controls(World *w) {
 int main(void) {
     SDL_setenv("SDL_VIDEODRIVER","dummy",1);assert(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_TIMER)==0);
     World w;assert(world_init(&w));
-    weapons(&w);solo_lives(&w);maps(&w);modules_and_wipe(&w);snapshots(&w);controls(&w);new_game_confirmation();
+    weapons(&w);solo_lives(&w);maps(&w);modules_and_wipe(&w);snapshots(&w);controls(&w);new_game_confirmation();update_notification();
     mesh_free(&w.mesh);SDL_Quit();puts("OK : vies, armes, rechargement, maps, modules, game over, etats reseau, sliders et saisie");return 0;
 }

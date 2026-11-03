@@ -171,15 +171,17 @@ Quatre modules rejoignent les six existants, chacun jusqu'au rang 5 :
 
 **Multijoueur : protocole 12, v1.3.0 requise sur toutes les machines.** Renforts, objectifs, réacteur, objets et dégâts sont décidés par l'hôte ; les invités prédisent leur déplacement et affichent les états reçus. Les armes restent débloquées aux vagues **11 / 21 / 31**, et les maps changent toutes les cinq vagues. Aucun service réseau ni dépendance supplémentaire. Voir [VALIDATION.md](VALIDATION.md) pour les limites de validation.
 
-## Nouveautés — version 1.1.1
+## Notification et mise à jour — snapshot 1.3.1
 
 Au démarrage, le jeu vérifie **une seule fois, en arrière-plan**, si une version plus récente est publiée sur la branche `main` de GitHub. Une petite requête HTTPS lit la version dans `src/config.h` ; les nombres sont comparés séparément, donc 1.10.0 est bien plus récent que 1.9.0. Le menu reste utilisable pendant la vérification.
 
 Si une mise à jour est disponible, une fenêtre **« Mise à jour disponible »** affiche la version installée et la version proposée :
 
-- **Voir la mise à jour** : ouvre les explications en français. **Copier les commandes** prépare la commande pour le dossier réel de ton installation, avec `git pull --ff-only origin main` puis `./lancer.sh`.
-- Colle cette commande dans un terminal **sans valider**, ferme le jeu, puis appuie sur **Entrée** dans le terminal. La copie reste ainsi utilisable même sur un bureau qui ne conserve pas le presse-papiers après la fermeture d'une application.
-- **Plus tard**, **Fermer** ou **Échap** retire la fenêtre pour le reste de ce lancement. Elle pourra réapparaître au prochain lancement si le jeu n'a pas été mis à jour.
+- **Mettre à jour** : ouvre une confirmation, puis **Confirmer et relancer** exécute `git pull --ff-only origin main` dans le clone, compile avec `make -s`, ferme proprement le jeu et le relance via `lancer.sh`. La progression de la partie en cours n'est pas sauvegardée. Quitte d'abord ton salon si tu joues en multijoueur.
+- **Copier commandes** conserve l'option manuelle : colle dans un terminal sans valider, ferme le jeu, puis appuie sur Entrée. La commande utilise le dossier réel de ton installation, même si son chemin contient des espaces.
+- **Plus tard** ou **Échap** retire la fenêtre pour le reste de ce lancement. Cette option est sélectionnée par défaut ; la fenêtre pourra réapparaître au prochain lancement.
+
+La mise à jour nécessite un clone Git sur la branche `main`, sans modification des fichiers suivis, ainsi que les outils de compilation habituels. Aucun reset, stash automatique ou fusion de branches n'est effectué par le jeu. Les fichiers locaux ignorés, dont la musique, restent en place. En cas d'erreur Git ou de compilation, le jeu reste ouvert et affiche une erreur ; le détail figure dans `build/mise-a-jour.log`. Un téléchargement réussi peut déjà avoir avancé les sources même si la compilation échoue : corrige l'erreur puis réessaie, ou lance `./lancer.sh` depuis un terminal. La fenêtre reste animée pendant le travail ; le téléchargement est limité à 90 s et la compilation à dix minutes. Fermer le jeu interrompt la commande et ses sous-processus.
 
 La notification attend un menu si la vérification se termine pendant le combat ou le choix de modules. Une courte protection contre les clics accidentels impose le relâchement du bouton et un délai avant l'activation des boutons. Elle est locale à chaque ordinateur ; l'hôte et les autres joueurs continuent leur session.
 
@@ -189,9 +191,9 @@ La requête utilise **curl**, avec vérification des certificats HTTPS, un déla
 sudo apt install curl ca-certificates
 ```
 
-Pour jouer sans cette vérification : `./lancer.sh --no-update-check`. Les modes `--demo` et `--frames`, ainsi que `--help` et `--version`, ne lancent pas de requête. Aucun téléchargement du jeu ni installation automatique n'est effectué ; la commande copiée attend ton exécution dans le terminal.
+Pour jouer sans cette vérification : `./lancer.sh --no-update-check`. Les modes `--demo` et `--frames`, ainsi que `--help` et `--version`, ne lancent pas de requête. Le téléchargement du jeu démarre uniquement après confirmation dans la notification.
 
-**Il faut installer la 1.1.1 une première fois pour recevoir ces notifications lors des mises à jour suivantes.** La 1.1.0 ne possède pas encore ce mécanisme. La 1.1.1 conserve le protocole 10 et les règles de gameplay de la 1.1.0 : les deux versions restent compatibles en coopération. Voir [VALIDATION.md](VALIDATION.md) pour les contrôles et essais restant à faire.
+**Il faut installer la 1.3.1 une première fois avec `git pull --ff-only origin main` pour disposer du bouton de mise à jour lors des publications suivantes.** Les anciennes versions gardent leur notification et leurs boutons d'origine. Le protocole réseau 12 est conservé : la 1.3.1 reste compatible avec la 1.3.0. Voir [VALIDATION.md](VALIDATION.md) pour les contrôles réalisés. Les essais de l'outil de mise à jour dans `make test` nécessitent Python 3, Git et Make ; Python n'est pas requis pour jouer ou utiliser le bouton.
 
 ## Nouveautés — version 1.1.0
 
