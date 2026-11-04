@@ -158,3 +158,7 @@ make test-tcp
 `make test-tcp` ouvre réellement un hôte et un client sur `127.0.0.1:37991`, sans fenêtre, et vérifie la connexion et les échanges. Le port doit être libre. Ce contrôle doit être lancé dans un environnement qui autorise les sockets.
 
 Les contrôles en mémoire et les tests de gameplay ont été exécutés pour la version 0.8, qui compile sans avertissement. L’environnement de développement bloque la création de sockets : **une connexion réelle ou une partie entre deux machines reste à valider**. Le résultat détaillé est dans [VALIDATION.md](VALIDATION.md).
+
+## Intelligence des créatures — 1.3.3
+
+La perception, la reconnaissance des habitudes, les rôles collectifs et la navigation A* sont exécutés uniquement par l'hôte. Les clients gardent leur prédiction de déplacement du joueur et reçoivent les états habituels des créatures, attaques et projectiles. Aucune mémoire d'observation ni aucun chemin d'IA n'est ajouté aux paquets du protocole 12. Pour obtenir ces comportements, l'hôte doit utiliser la 1.3.3 ; le profil graphique ne change pas l'IA.

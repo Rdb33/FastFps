@@ -17,7 +17,7 @@ static void say(Game *g, const char *text, float duration) {
 
 void game_reset(Game *g, World *world, int limit) {
     memset(g, 0, sizeof(*g));
-    g->world = world;world_set_map(world,0);g->map_id=0;g->lives=3;
+    ai_reset(world);g->world = world;world_set_map(world,0);g->map_id=0;g->lives=3;
     world_platforms_update(world,0);g->unlock_weapon=-1;g->event_last_wave=-5;g->event_rng=(uint32_t)rand();
     g->particle_limit = limit;
     g->motion = true;
@@ -561,6 +561,7 @@ static void slam_update(Game *g,Enemy *e,float dt) {
 }
 
 static void update_enemies(Game *g, float dt) {
+    ai_update(g,dt);
     for (int i = 0; i < g->enemy_count; i++) {
         Enemy *e = &g->enemies[i];
         if (e->health <= 0) continue;
@@ -581,16 +582,12 @@ static void update_enemies(Game *g, float dt) {
         if(e->elite&&e->body.grounded&&e->spawn_time==0&&e->touch_timer==0&&visible&&horizontal<14&&game_heavy_available(g,target_id)) {
             begin_slam(g,e,actor_player(g,target_id),target_id);continue;
         }
-        if((e->type==ENEMY_RUNNER||e->type==ENEMY_BRUTE||!visible
-            ||actor_player(g,target_id)->body.position.y>e->body.position.y+.4f)
-            &&enemy_try_climb(g,e,vsub(actor_player(g,target_id)->body.position,e->body.position))) {
-            enemy_update_climb(g,e,dt);continue;
-        }
         Vec3 move=ai_move(g,e,actor_player(g,target_id),visible,dt);
+        if(e->climb_timer>0){enemy_update_climb(g,e,dt);continue;}
         if (e->attack_timer == 0 && e->spawn_time == 0 && e->stagger == 0 && visible) {
             if ((e->type==ENEMY_CASTER||e->type==ENEMY_WEAVER)&&distance<36&&e->shot_timer<=0) {
-                Player *victim=actor_player(g,target_id);float lead=clampf(distance/(e->type==ENEMY_WEAVER?13:14+2*game_threat(g)),0,1.0f)*.6f;
-                Vec3 aim=vadd(p,vscale(victim->body.velocity,lead));
+                Player *victim=actor_player(g,target_id);
+                Vec3 aim=ai_predict(g,e,victim,e->type==ENEMY_WEAVER?13:14+2*game_threat(g));
                 if(!ai_can_fire(g,e,aim))aim=p;
                 if(ai_can_fire(g,e,aim))begin_attack(e,vnormalize(vsub(aim,origin)),target_id);
             }
@@ -599,7 +596,7 @@ static void update_enemies(Game *g, float dt) {
             else if (!e->elite&&(e->type==ENEMY_RUNNER||e->type==ENEMY_BRUTE) && horizontal<(e->type == ENEMY_BRUTE ? 2.5f : 1.6f)
                 && fabsf(delta.y)<1.7f && e->touch_timer==0) begin_attack(e,dir,target_id);
         }
-        float desired_yaw = atan2f(delta.x,-delta.z);
+        float desired_yaw = visible?atan2f(delta.x,-delta.z):(vlength(move)>.1f?atan2f(move.x,-move.z):e->yaw);
         if (e->attack_timer==0) {
             float turn = atan2f(sinf(desired_yaw-e->yaw),cosf(desired_yaw-e->yaw));
             e->yaw += turn*fminf(1,dt*8);

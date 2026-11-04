@@ -2,6 +2,19 @@
 
 Historique des contrôles sur la machine de développement ; les résultats sont datés par version.
 
+## Snapshot 1.3.3 — 4 novembre 2026
+
+- Portabilité du module de mise à jour : erreur `O_CLOEXEC` reproduite en retirant le `-D_GNU_SOURCE` que pkg-config fournit sur Arch. Contournement validé sur l'ancien updater avec `_POSIX_C_SOURCE=200809L`. Après correction, tous les fichiers sources sont compilés puis liés en C11 avec POSIX 2008, sans option GNU, et `-Wall -Wextra -Wpedantic -Werror` ; tests de mise à jour réussis avec cette configuration. Il s'agit d'une reproduction sur PC des options de compilation, pas d'un essai exécuté sur le Pi du joueur.
+
+- Compilation C11 sans avertissement ; `make test` réussi, incluant les suites réseau virtuel / gameplay / mécaniques et une suite dédiée à l'IA. Connexion TCP réelle sur loopback réussie ; comparaison des octets de snapshots identiques après modification de la mémoire et des chemins privés. La prédiction d'un client ne lance pas la perception ni le planificateur.
+- Escalier central : blocage reproduit avant correction, puis 36 poursuites physiques réussies sur les trois maps, depuis quatre côtés, avec traqueur, brute et champion. Le joueur attend sur le socle ; chaque créature doit monter et arriver à moins de trois mètres. Pas de téléportation ni de modification des collisions.
+- Navigation : détour A* autour d'un mur, validation de chaque tronçon, lissage sans traverser les obstacles, chemin partiel en présence d'un mur infranchissable, passage sous plafond selon le gabarit et montée de 0,9 m réservée aux petites créatures. Simulation physique d'une poursuite autour d'un mur pendant huit secondes.
+- Plateformes : lien planifié entre deux paliers, attente en cabine, déplacement physique avec la plateforme puis sortie effective sur le quai. Correction des noeuds d'embarquement et des sondes d'appui au franchissement du petit intervalle cabine / quai. Cela valide le scénario d'ascenseur du test ; toutes les trajectoires des trois maps restent à éprouver en partie.
+- Observation : mémoire créée après visibilité, historique de zigzags, déplacement latéral soutenu et sauts ; prédiction finie et bornée. Un joueur caché ne met pas à jour sa position mémorisée ; baisse de confiance, remise à zéro à la nouvelle partie. Rôles de pression / flanc, couvert d'un tireur pendant recharge avec ligne de front, retour au soutien après perte des alliés, suppression des anciens cerveaux après changement d'identité. Évitement d'une roquette en approche.
+- AddressSanitizer et UndefinedBehaviorSanitizer : suite IA réussie. Détection des fuites désactivée car LeakSanitizer ne fonctionne pas sous le traçage de cet environnement ; les contrôles d'accès mémoire et de comportement indéfini sont actifs.
+- Sur le PC de développement : 816 / 808 / 899 noeuds dans les trois maps, environ 90–105 ms de construction initiale du graphe hors instrumentation ; mémoire d'IA fixe de 691 152 octets par monde. Ce sont des mesures de construction, pas de coût complet d'image ni des mesures Pi. Les chemins sont mis en cache et les décisions / reconstructions de chemin sont espacées avec décalage entre créatures.
+- Exécution native hors écran, rendu logiciel Mesa : démonstration de 180 images terminée (vague 1, score 330), capture enregistrée. Journaux dans build/verification-v1.3.3, hors Git. Aucun playtest humain prolongé ni session Internet entre ordinateurs pour ce snapshot ; équilibre des stratégies et cas particuliers de géométrie restent à vérifier.
+
 ## Snapshot 1.3.2 — 3 novembre 2026
 
 - IA : suites réseau virtuel / gameplay / mécaniques réussies après modification. Scénarios ajoutés pour obstacle dans le couloir de tir, allié au même étage ou en hauteur, recul près d'un mur, bord de plateforme, demi-tour en couloir étroit, couvert pendant recharge, cible plus accessible et joueur à terre. Simulation d'une attaque préparée dont le couloir est bloqué : aucun projectile libéré.

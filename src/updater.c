@@ -81,7 +81,8 @@ static bool command(UpdateInstaller *u,char *const args[],FILE *log,char *output
 }
 static int install_thread(void *data) {
     UpdateInstaller *u=data;char output[1024];
-    int fd=open(u->log_path,O_WRONLY|O_CREAT|O_TRUNC|O_CLOEXEC,0600);
+    int fd=open(u->log_path,O_WRONLY|O_CREAT|O_TRUNC,0600);
+    if(fd>=0&&fcntl(fd,F_SETFD,FD_CLOEXEC)<0){close(fd);fd=-1;}
     FILE *log=fd<0?NULL:fdopen(fd,"w");
     if(!log){if(fd>=0)close(fd);snprintf(u->error,sizeof(u->error),"IMPOSSIBLE D'OUVRIR LE JOURNAL DE MISE A JOUR.");goto done;}
     char *branch[]={"git","-C",u->directory,"symbolic-ref","--quiet","HEAD",NULL};

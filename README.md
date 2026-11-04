@@ -1,10 +1,22 @@
 # FASTFPS — Secteur zéro
 
-**FPS 3D natif, style Doom, pensé pour le Raspberry Pi 4.** Base à améliorer progressivement : déplacement nerveux, quatre armes principales et survie dans trois arènes industrielles. Version **1.3.0** : environnements distincts, lance-toile dès la vague 21, escalade des petites créatures, introductions rares de champions et réseau allégé.
+**FPS 3D natif, style Doom, pensé pour le Raspberry Pi 4.** Base à améliorer progressivement : déplacement nerveux, quatre armes principales et survie dans trois arènes industrielles. Snapshot **1.3.3** : navigation A* en hauteur, observation des habitudes de déplacement et stratégies collectives des ennemis.
 
 Application en **C11**, **SDL2** (fenêtre, clavier, souris et son) et **OpenGL ES 2** (rendu 3D). Graphismes, police et bruitages sont générés localement. Les musiques MP3 locales et facultatives sont lues avec **mpg123**.
 
 Le mode solo fonctionne hors ligne. Pour jouer ensemble, sélectionne **Multijoueur** ; voir [MULTIJOUEUR.md](MULTIJOUEUR.md) pour la création, la connexion sur Internet et les limites de cette première version.
+
+## Snapshot 1.3.3 — navigation et stratégies collectives
+
+Les créatures disposent maintenant d'un graphe de navigation à plusieurs hauteurs. La recherche A* distingue les passages où un petit ennemi peut escalader de ceux accessibles aux gros gabarits. Les chemins sont conservés entre les décisions, les tronçons marchables sont lissés, et le coût augmente près des autres créatures et de leur prochain point de passage. Les accès aux marches étroites sont échantillonnés selon le volume des créatures, notamment pour rejoindre le centre par son escalier après un détour autour du socle. Des paliers représentent les extrémités des plateformes mobiles : les ennemis peuvent s'en approcher, attendre, embarquer et sortir à l'autre bout.
+
+Le groupe partage les positions qu'il a observées. Un joueur qui disparaît derrière un obstacle n'est plus suivi à sa position exacte : les ennemis poursuivent la dernière observation pendant quelques secondes, puis cherchent dans les accès et croisements de l'arène. La nouvelle partie efface cette mémoire. Le changement de map invalide les chemins et les anciennes positions.
+
+L'IA analyse une courte histoire des vitesses observées : zigzags, tendance à se déplacer latéralement et fréquence des sauts. Les tireurs ajustent leur anticipation en conséquence ; certains poursuivants cherchent à couper une sortie habituelle. Cette adaptation repose sur des règles et des mesures pendant la partie, sans modèle entraîné ni profil conservé entre lancements. Une attaque déjà préparée garde sa direction annoncée.
+
+Les combattants proches mettent la pression ; d'autres contournent. Les tireurs choisissent un poste de soutien ou un couvert selon leur distance, leur santé, leur recharge et la présence d'une ligne de front. Les positions visées par les alliés entrent aussi dans leur choix, et la perte d'un allié peut changer leur stratégie. Une roquette visible en approche peut provoquer un écart, sans bonus de vitesse ni déplacement instantané.
+
+En coopération, **l'hôte calcule toute cette IA**. Les invités reçoivent les états des créatures, projectiles et attaques puis les affichent avec l'interpolation existante. Les graphes, observations et chemins ne sont pas transmis ; le protocole reste **12**. C'est la version de l'hôte qui détermine les nouveaux comportements, quel que soit le profil graphique choisi. La navigation demeure une représentation échantillonnée des arènes : le comportement sur tous les coins de map et l'équilibre d'une longue partie restent à éprouver.
 
 ## Snapshot 1.3.2 — retours de combat
 
@@ -398,6 +410,14 @@ make -j2
 Le binaire fourni dans `build/` est compilé pour la machine de développement et ne doit pas être utilisé tel quel sur ARM. `make clean` efface uniquement les fichiers compilés. Une fois les dépendances installées et le jeu compilé, il fonctionne hors ligne.
 
 Le Pi 4 possède un GPU compatible OpenGL ES ([documentation Raspberry Pi](https://www.raspberrypi.com/documentation/computers/processors.html)). Le jeu utilise uniquement les API OpenGL ES 2. Le démarrage direct sur Raspberry Pi OS Lite sans session graphique n’est pas pris en charge dans ce guide.
+
+Si un ancien clone s'arrête avec `O_CLOEXEC undeclared` dans `src/updater.c`, le compilateur n'expose pas les déclarations POSIX attendues. La 1.3.3 les active explicitement. En attendant cette mise à jour, lance depuis le dossier du jeu :
+
+```bash
+CFLAGS="-O2 -D_POSIX_C_SOURCE=200809L" ./lancer.sh
+```
+
+Cette commande ne modifie pas les fichiers du dépôt.
 
 ## Commandes
 

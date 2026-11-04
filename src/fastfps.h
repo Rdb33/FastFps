@@ -24,6 +24,44 @@ typedef enum { UPGRADE_POWER, UPGRADE_HASTE, UPGRADE_MOBILITY,
 typedef enum { CHALLENGE_NONE, CHALLENGE_SURVIVE, CHALLENGE_INTERRUPT, CHALLENGE_CHAMPION } Challenge;
 typedef enum { BONUS_SHIELD, BONUS_POWER, BONUS_SPEED } Bonus;
 typedef struct { Vec3 position; float cooldown; int kind; } Supply;
+/* État d'IA privé à l'autorité, jamais encodé dans les paquets. */
+#define AI_NAV_NODES 3072
+#define AI_NAV_EDGES 24
+#define AI_PATH_LENGTH 64
+#define AI_HISTORY 16
+typedef enum { AI_PRESSURE, AI_FLANK, AI_SUPPORT, AI_COVER, AI_SEARCH } AiRole;
+typedef struct { int16_t to; uint8_t mask; int8_t lift; float cost; } AiEdge;
+typedef struct {
+    Vec3 position;
+    int16_t next;
+    int8_t platform;
+    uint8_t mask, count;
+    AiEdge edges[AI_NAV_EDGES];
+} AiNode;
+typedef struct {
+    Vec3 position, velocity, acceleration, history[AI_HISTORY];
+    float seen_at, sample_at, confidence, reversals, strafe_bias, jump_bias;
+    int samples, cursor;
+    bool known;
+} AiContact;
+typedef struct {
+    int id, target, role, path_count, path_cursor;
+    int16_t path[AI_PATH_LENGTH];
+    Vec3 goal, destination, last_position;
+    float decide_at, plan_at, progress_at;
+    uint32_t revision;
+    bool used, riding;
+} AiBrain;
+typedef struct {
+    AiNode nodes[AI_NAV_NODES];int node_count;
+    int16_t cells[NAV_W*NAV_H];
+    AiContact contacts[MAX_PLAYERS];AiBrain brains[MAX_ENEMIES];
+    float costs[AI_NAV_NODES];int16_t parents[AI_NAV_NODES],heap[AI_NAV_NODES],heap_pos[AI_NAV_NODES];
+    uint8_t closed[AI_NAV_NODES];
+    float next_observation;
+    uint32_t revision, searches, expansions;
+    bool initialized;
+} AiState;
 typedef struct {
     Mesh mesh;
     int map_id;
@@ -37,6 +75,7 @@ typedef struct {
     Deck decks[MAX_DECKS];
     int platform_count;
     float platform_time;
+    AiState ai;
 } World;
 typedef struct {
     Body body;
@@ -251,6 +290,15 @@ Vec3 platform_velocity(const Platform *platform, float time);
 void world_routes(World *world);
 const char *world_route_name(int map);
 void game_prepare_mobility(Game *game, float dt);
+void ai_reset(World *world);
+void ai_update(Game *game, float dt);
+AiBrain *ai_brain(Game *game, const Enemy *enemy);
+void ai_nav_build(World *world);
+int ai_profile(const Enemy *enemy);
+bool ai_nav_segment(const World *world, Vec3 from, Vec3 to, int profile);
+bool ai_plan(Game *game, Enemy *enemy, AiBrain *brain, Vec3 goal);
+Vec3 ai_waypoint(Game *game, Enemy *enemy, AiBrain *brain);
+Vec3 ai_predict(const Game *game, const Enemy *enemy, const Player *player, float projectile_speed);
 int ai_target(Game *game, const Enemy *enemy);
 bool ai_can_fire(const Game *game, const Enemy *enemy, Vec3 aim);
 Vec3 ai_move(Game *game, Enemy *enemy, const Player *target, bool visible, float dt);

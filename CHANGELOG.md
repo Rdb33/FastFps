@@ -1,3 +1,13 @@
+# Snapshot 1.3.3
+
+- Escaliers : points d’accès adaptés au volume de chaque créature autour des marches étroites et rebords. Les ennemis peuvent contourner le socle central pour rejoindre son escalier, plutôt que pousser contre ses parois.
+
+- Compilation Raspberry Pi OS : déclarations POSIX 2008 explicites, sans dépendre des options GNU fournies par SDL sur certaines distributions. Le journal de mise à jour utilise `fcntl(FD_CLOEXEC)` ; correction de l'erreur `O_CLOEXEC` non déclaré.
+- Navigation A* à plusieurs hauteurs, passages classés selon le gabarit et la capacité à escalader, chemins mémorisés et tronçons marchables lissés. Coût des détours tenant compte des voisins et de leurs prochains déplacements réservés. Liaisons d'ascenseur avec paliers d'embarquement, attente, trajet et sortie ; attente estimée selon la position courante de la plateforme.
+- Perception collective avec mémoire spatiale limitée : un joueur caché laisse sa dernière position observée, puis les créatures explorent des accès et croisements. Observation des vitesses, changements de direction, déplacements latéraux répétés et sauts ; anticipation des projectiles adaptée à ces mesures, sans modification d'une attaque déjà annoncée.
+- Stratégies de groupe : pression de front, contournement, soutien à distance, couvert pendant recharge et recherche. Réévaluation en fonction du rôle, de la santé, des alliés présents, de la pression sur la cible et des positions déjà choisies par les autres créatures. Évitement local des roquettes visibles en approche, dans les limites du mouvement normal.
+- Calcul sur l'hôte uniquement en coopération. Mémoire, graphes et chemins privés au monde, absents des snapshots ; mêmes états de créatures et protocole 12. Aucun réglage d'IA lié à la qualité graphique ; réinitialisation de la mémoire à la nouvelle partie et des positions observées au changement de map.
+
 # Snapshot 1.3.2
 
 - IA : choix de cible tenant compte de la hauteur et de la pression des autres ennemis, trajets vérifiés avec le gabarit réel après séparation, demi-tour possible dans une impasse et prudence au bord des plateformes. Les tireurs cherchent un angle découvert et privilégient un couvert latéral pendant leur recharge. Les invocateurs et lance-toiles vérifient obstacles et alliés avant de préparer puis libérer leur tir ; l'escalade ne contredit plus un recul à distance. Décisions autoritaires sur l'hôte, sans modification du protocole 12.

@@ -1,6 +1,6 @@
 CC ?= cc
 PKG_CONFIG ?= pkg-config
-CPPFLAGS += $(shell $(PKG_CONFIG) --cflags sdl2 glesv2 libmpg123)
+CPPFLAGS += -D_POSIX_C_SOURCE=200809L $(shell $(PKG_CONFIG) --cflags sdl2 glesv2 libmpg123)
 CFLAGS ?= -O2
 CFLAGS += -std=c11 -Wall -Wextra -Wpedantic
 LDLIBS += $(shell $(PKG_CONFIG) --libs sdl2 glesv2 libmpg123) -lm
@@ -27,7 +27,7 @@ run: all
 clean:
 	rm -rf build
 
-TEST_SOURCES := tests/network.c src/network.c src/discovery.c src/protocol.c src/game.c src/presets.c src/ai.c src/climbing.c src/mobility.c src/routes.c src/poses.c src/weapons.c src/progression.c src/encounters.c src/physics.c src/world.c src/math.c src/mesh.c
+TEST_SOURCES := tests/network.c src/network.c src/discovery.c src/protocol.c src/game.c src/presets.c src/ai.c src/ai_nav.c src/ai_memory.c src/climbing.c src/mobility.c src/routes.c src/poses.c src/weapons.c src/progression.c src/encounters.c src/physics.c src/world.c src/math.c src/mesh.c
 build/test-network: $(TEST_SOURCES) src/fastfps.h src/network.h src/config.h | check-deps
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) -I src $(TEST_SOURCES) $(LDLIBS) -o $@
@@ -44,10 +44,15 @@ build/test-updates: tests/updates.c src/updater.c src/updates.h src/fastfps.h sr
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) -I src tests/updates.c src/updater.c $(LDLIBS) -o $@
 
-test: build/test-network build/test-gameplay build/test-mechanics build/test-updates
+build/test-ai: tests/ai.c $(filter-out tests/network.c,$(TEST_SOURCES)) src/fastfps.h src/config.h | check-deps
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -I src tests/ai.c $(filter-out tests/network.c,$(TEST_SOURCES)) $(LDLIBS) -o $@
+
+test: build/test-network build/test-gameplay build/test-mechanics build/test-updates build/test-ai
 	./build/test-network
 	./build/test-gameplay
 	./build/test-mechanics
+	./build/test-ai
 	python3 tests/updates.py ./build/test-updates
 
 test-tcp: build/test-network
