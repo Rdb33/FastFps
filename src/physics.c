@@ -58,6 +58,12 @@ void update_player(World *world,Player *p,Input input,float dt) {
         input.forward=input.right=0;input.jump=input.dash=input.sprint=false;
         b->velocity.x=b->velocity.z=0;p->dash_timer=p->boost_timer=0;
     }
+    /* Une pression légèrement anticipée et un départ de rebord tardif
+       restent utilisables ; une impulsion ascendante ne donne pas de double saut. */
+    p->jump_buffer=input.jump?.10f:fmaxf(0,p->jump_buffer-dt);
+    p->jump_grace=b->grounded?.10f:fmaxf(0,p->jump_grace-dt);
+    if(!b->grounded&&b->velocity.y>0)p->jump_grace=0;
+    if(webbed)p->jump_buffer=p->jump_grace=0;
     p->boost_timer=fmaxf(0,p->boost_timer-dt);
     p->dash_cooldown=fmaxf(0,p->dash_cooldown-dt);
     p->dash_timer=fmaxf(0,p->dash_timer-dt);
@@ -86,7 +92,7 @@ void update_player(World *world,Player *p,Input input,float dt) {
     if(p->dash_timer==0&&current>limit) {
         b->velocity.x*=limit/current;b->velocity.z*=limit/current;
     }
-    if(b->grounded&&input.jump) {
+    if(p->jump_buffer>0&&(b->grounded||p->jump_grace>0)) {
         Vec3 ride={0,0,0};
         for(int k=0;k<world->platform_count;k++) {
             Box box=world->solids[world->platforms[k].solid];
@@ -98,7 +104,7 @@ void update_player(World *world,Player *p,Input input,float dt) {
         b->velocity.x+=ride.x;b->velocity.z+=ride.z;
         b->velocity.y=PLAYER_JUMP+fmaxf(0,ride.y);
         if(hypotf(ride.x,ride.z)>.1f)p->boost_timer=.6f;
-        b->grounded=false;audio_play(SOUND_JUMP);
+        b->grounded=false;p->jump_buffer=p->jump_grace=0;audio_play(SOUND_JUMP);
     }
     move_horizontal(world,b,b->velocity.x*dt,b->velocity.z*dt,PLAYER_RADIUS,PLAYER_HEIGHT,PLAYER_STEP);
     bool was_grounded=b->grounded;float fall_speed=b->velocity.y;

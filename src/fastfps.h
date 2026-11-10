@@ -86,6 +86,7 @@ typedef struct {
     uint8_t ammo[WEAPON_COUNT];
     float reload_timer, reload_duration, upgrade_lock;
     float boost_timer;
+    float jump_buffer, jump_grace;
     float shield, shield_time, speed_time, power_time, reactor_time;
     float dash_power_time, switch_power_time;
     float web_timer, web_immunity;
@@ -324,6 +325,7 @@ void game_end_rocket_event(Game *game);
 void game_roll_event(Game *game);
 int game_revive_target(const Game *game, int actor);
 void game_cycle_weapon(Game *game, int direction);
+int game_melee_target(const Game *game);
 void game_melee(Game *game);
 void game_actor_save(Game *game);
 void game_actor_select(Game *game, int id);

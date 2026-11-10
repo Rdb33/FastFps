@@ -123,9 +123,62 @@ bool upgrade_event(App *app,const Game *g,Renderer *r,const SDL_Event *event) {
 static void centered(Mesh *m,float y,int scale,Color c,const char *text) {
     mesh_text(m,(640-(float)strlen(text)*6*(float)scale)/2,y,scale,c,text);
 }
+/* Valeurs permanentes du module : les bonus temporaires ne brouillent pas
+   la comparaison. Le tir et l'esquive réutilisent leurs formules de gameplay. */
+static void upgrade_preview(const Player *p,int id,char *first,size_t first_size,char *second,size_t second_size) {
+    Player next=*p;int rank=p->upgrades[id];next.upgrades[id]++;
+    switch(id) {
+    case UPGRADE_POWER:
+        snprintf(first,first_size,"DEGATS +%d%% -> +%d%%",rank*12,(rank+1)*12);
+        snprintf(second,second_size,"TOUTES LES ARMES");break;
+    case UPGRADE_HASTE:
+        snprintf(first,first_size,"CADENCE +%d%% -> +%d%%",rank*10,(rank+1)*10);
+        snprintf(second,second_size,"TIR %.3f -> %.3f S",player_fire_interval(p),player_fire_interval(&next));break;
+    case UPGRADE_MOBILITY:
+        snprintf(first,first_size,"ESQUIVE %.2f -> %.2f S",player_dash_cooldown(p),player_dash_cooldown(&next));
+        snprintf(second,second_size,"VITESSE +%d%% -> +%d%%",rank*3,(rank+1)*3);break;
+    case UPGRADE_VITALITY:
+        snprintf(first,first_size,"SANTE MAX %.0f -> %.0f",player_max_health(p),player_max_health(&next));
+        snprintf(second,second_size,"SOIGNE AUSSI DE 15 PV");break;
+    case UPGRADE_ARMOR:
+        snprintf(first,first_size,"REDUCTION %d%% -> %d%%",rank*6,(rank+1)*6);
+        snprintf(second,second_size,"SUR LES DEGATS RECUS");break;
+    case UPGRADE_VAMPIRE:
+        snprintf(first,first_size,"SOIN %d -> %d PV",rank,rank+1);
+        snprintf(second,second_size,"PAR ELIMINATION");break;
+    case UPGRADE_PRECISION:
+        snprintf(first,first_size,"MUNITIONS +%d -> +%d",rank,rank+1);
+        snprintf(second,second_size,"PAR TETE FATALE");break;
+    case UPGRADE_DASH_POWER:
+        snprintf(first,first_size,"DEGATS +%d%% -> +%d%%",rank*8,(rank+1)*8);
+        snprintf(second,second_size,"APRES ESQUIVE : 1.25 S");break;
+    case UPGRADE_SWITCH_POWER:
+        snprintf(first,first_size,"DEGATS +%d%% -> +%d%%",rank*10,(rank+1)*10);
+        snprintf(second,second_size,"1ER TIR APRES CHANGEMENT");break;
+    case UPGRADE_PIERCE:
+        snprintf(first,first_size,"2E CIBLE %d%% -> %d%%",rank?35+rank*10:0,35+(rank+1)*10);
+        snprintf(second,second_size,"TRAVERSE UN ENNEMI");break;
+    default:first[0]=second[0]='\0';break;
+    }
+}
+static const char *upgrade_advice(const Player *p,int id) {
+    switch(id) {
+    case UPGRADE_POWER:return p->upgrades[UPGRADE_PIERCE]?"SYNERGIE : LA SURCHARGE RENFORCE AUSSI LE TIR QUI TRAVERSE.":"SURCHARGE : AUGMENTE AUSSI LES DEGATS DE TA FRAPPE.";
+    case UPGRADE_HASTE:return "CADENCE : L'INTERVALLE AFFICHE EST CELUI DE TON ARME ACTUELLE.";
+    case UPGRADE_MOBILITY:return p->upgrades[UPGRADE_DASH_POWER]?"SYNERGIE : DES ESQUIVES PLUS FREQUENTES POUR DECLENCHER ASSAUT.":"REFLEXES : PLUS DE MOBILITE POUR EVITER LES BOMBES ET LES TOILES.";
+    case UPGRADE_VITALITY:return p->upgrades[UPGRADE_VAMPIRE]?"SYNERGIE : UNE RESERVE DE SANTE PLUS GRANDE POUR LE VAMPIRISME.":"VITALITE : LA SANTE MAXIMALE ET LE SOIN AUGMENTENT DES LA VALIDATION.";
+    case UPGRADE_ARMOR:return "BLINDAGE : LA REDUCTION S'APPLIQUE AVANT L'ABSORPTION DU BOUCLIER.";
+    case UPGRADE_VAMPIRE:return "VAMPIRISME : CHAQUE ELIMINATION TE SOIGNE, JUSQU'A TA SANTE MAXIMALE.";
+    case UPGRADE_PRECISION:return p->weapon==WEAPON_ROCKET?"PRECISION : UTILISE UNE ARME A BALLES POUR REALISER DES TETES FATALES.":"PRECISION : LES MUNITIONS REVIENNENT DIRECTEMENT DANS LE CHARGEUR.";
+    case UPGRADE_DASH_POWER:return p->upgrades[UPGRADE_MOBILITY]?"SYNERGIE : REFLEXES REDUIT L'ATTENTE ENTRE DEUX BONUS D'ASSAUT.":"ASSAUT : ESQUIVE, PUIS TIRE PENDANT LES 1.25 SECONDES DU BONUS.";
+    case UPGRADE_SWITCH_POWER:return "ALTERNANCE : CHANGE D'ARME, PUIS TIRE DANS LES 2.5 SECONDES.";
+    case UPGRADE_PIERCE:return p->weapon==WEAPON_ROCKET?"PERFORATION : UTILISE UNE ARME A BALLES POUR TRAVERSER UN ENNEMI.":"PERFORATION : ALIGNE DEUX ENNEMIS ; LES MURS ARRETENT TOUJOURS LE TIR.";
+    default:return "";
+    }
+}
 void upgrade_ui(Mesh *m,const Game *g,const App *app) {
     const Player *p=&g->player;char text[96];
-    mesh_rect(m,24,36,592,251,(Color){.035f,.055f,.07f});
+    mesh_rect(m,24,36,592,313,(Color){.035f,.055f,.07f});
     mesh_rect(m,24,36,592,3,(Color){.4f,.83f,1});
     snprintf(text,sizeof(text),"VAGUE %02d TERMINEE / +250 POINTS",g->completed_waves);
     centered(m,49,1,(Color){1,.78f,.3f},text);
@@ -147,13 +200,19 @@ void upgrade_ui(Mesh *m,const Game *g,const App *app) {
         /* Emblème géométrique animé au-dessus du nom du module. */
         float glow=app->motion?.75f+.25f*sinf(app->ui_time*5+(float)i):1;
         Color bright={c.r*glow,c.g*glow,c.b*glow};
-        mesh_triangle(m,(Vec3){x+90,y+18,0},(Vec3){x+107,y+35,0},(Vec3){x+90,y+52,0},bright,(Vec3){0,0,1});
-        mesh_triangle(m,(Vec3){x+90,y+18,0},(Vec3){x+90,y+52,0},(Vec3){x+73,y+35,0},bright,(Vec3){0,0,1});
-        mesh_text(m,x+(180-(float)strlen(upgrade_name(id))*12)/2,y+61,2,c,upgrade_name(id));
-        snprintf(text,sizeof(text),"RANG %d / %d",p->upgrades[id]+1,UPGRADE_MAX_LEVEL);
-        mesh_text(m,x+(180-(float)strlen(text)*6)/2,y+82,1,(Color){.9f,.93f,.86f},text);
-        const char *description=upgrade_description(id);
-        mesh_text(m,x+(180-(float)strlen(description)*6)/2,y+101,1,(Color){.69f,.77f,.8f},description);
+        mesh_triangle(m,(Vec3){x+90,y+10,0},(Vec3){x+104,y+24,0},(Vec3){x+90,y+38,0},bright,(Vec3){0,0,1});
+        mesh_triangle(m,(Vec3){x+90,y+10,0},(Vec3){x+90,y+38,0},(Vec3){x+76,y+24,0},bright,(Vec3){0,0,1});
+        mesh_text(m,x+(180-(float)strlen(upgrade_name(id))*12)/2,y+44,2,c,upgrade_name(id));
+        snprintf(text,sizeof(text),"RANG %d -> %d / %d",p->upgrades[id],p->upgrades[id]+1,UPGRADE_MAX_LEVEL);
+        mesh_text(m,x+(180-(float)strlen(text)*6)/2,y+64,1,(Color){.9f,.93f,.86f},text);
+        for(int rank=0;rank<UPGRADE_MAX_LEVEL;rank++) {
+            float left=x+55+(float)rank*15;
+            mesh_rect(m,left,y+77,11,3,rank<p->upgrades[id]?c:(Color){.19f,.25f,.29f});
+            if(rank==p->upgrades[id])mesh_rect(m,left,y+77,11,3,bright);
+        }
+        char first[64],second[64];upgrade_preview(p,id,first,sizeof(first),second,sizeof(second));
+        mesh_text(m,x+(180-(float)strlen(first)*6)/2,y+88,1,(Color){.88f,.94f,1},first);
+        mesh_text(m,x+(180-(float)strlen(second)*6)/2,y+104,1,(Color){.69f,.77f,.8f},second);
     }
     if(!SDL_TICKS_PASSED(SDL_GetTicks(),app->upgrade_ready_at)||g->player.upgrade_lock>0) {
         Uint32 now=SDL_GetTicks();
@@ -175,4 +234,18 @@ void upgrade_ui(Mesh *m,const Game *g,const App *app) {
         snprintf(text,sizeof(text),"CLIC / 1-3 : SELECTION / ENTREE : VALIDER / AUTO %.0f S",ceilf(fmaxf(0,g->wave_timer)));
         centered(m,264,1,(Color){.68f,.77f,.79f},text);
     }
+    if(app->selected>=0&&app->selected<UPGRADE_CHOICES)
+        centered(m,299,1,(Color){.68f,.83f,.9f},upgrade_advice(p,p->offers[app->selected]));
+    int next_weapon=game_unlocked_weapons(g);
+    if(next_weapon<STANDARD_WEAPONS) {
+        int unlock=WEAPONS[next_weapon].unlock_wave;
+        snprintf(text,sizeof(text),"PROCHAINE ARME : %s / VAGUE %d / ENCORE %d VAGUE%s",
+            WEAPONS[next_weapon].name,unlock,unlock-g->wave,unlock-g->wave>1?"S":"");
+        centered(m,322,1,(Color){.9f,.82f,.52f},text);
+        int previous=WEAPONS[next_weapon-1].unlock_wave;
+        float progress=clampf((float)(g->completed_waves-previous+1)/(float)(unlock-previous),0,1);
+        mesh_rect(m,115,337,410,3,(Color){.17f,.23f,.26f});
+        mesh_rect(m,115,337,410*progress,3,WEAPONS[next_weapon].color);
+    }else centered(m,322,1,(Color){.65f,.9f,.75f},"ARSENAL PRINCIPAL COMPLET / PERFECTIONNE TES MODULES");
+
 }

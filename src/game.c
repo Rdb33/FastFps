@@ -108,6 +108,7 @@ static void start_wave(Game *g) {
         for(int i=0;i<MAX_PLAYERS;i++)if(g->actors[i].active) {
             game_actor_select(g,i);
             g->player.body=(Body){{(float)i*1.7f,0,19},{0,0,0},true};
+            g->player.jump_buffer=g->player.jump_grace=0;
             g->player.yaw=0;g->player.pitch=0;g->player.dash_timer=0;
             game_actor_save(g);g->actors[i].invulnerable=2;
             g->actors[i].revive_progress=0;g->actors[i].revive_held=false;g->actors[i].revive_target=-1;
@@ -202,6 +203,7 @@ static void hurt_actor(Game *g,int id,float damage,Vec3 source) {
         encounters_down(g);
         p->shield=p->shield_time=p->power_time=p->speed_time=p->reactor_time=0;
         p->dash_power_time=p->switch_power_time=0;
+        p->jump_buffer=p->jump_grace=0;
         g->actors[id].respawn_timer=g->cooperative?0:3;
         g->actors[id].revive_progress=0;g->actors[id].revive_target=-1;
         p->reload_timer=0;
@@ -395,24 +397,32 @@ void game_request_weapon(Game *g, int weapon) {
     audio_play(SOUND_SWITCH);
 }
 
-void game_melee(Game *g) {
-    Player *p = &g->player;
-    if (p->melee_timer > 0 || p->weapon_switch > 0 || p->reload_timer>0) return;
-    p->melee_timer = MELEE_COOLDOWN;
-    if(g->prediction){audio_play(SOUND_MELEE);return;}
+int game_melee_target(const Game *g) {
+    const Player *p = &g->player;
     Vec3 origin = player_eye(p, g->motion), forward = look_direction(p->yaw, p->pitch);
-    Enemy *victim = NULL;
+    int victim = -1;
     float nearest = MELEE_RANGE;
     for (int i = 0; i < g->enemy_count; i++) {
-        Enemy *e = &g->enemies[i];
+        const Enemy *e = &g->enemies[i];
         if (e->health <= 0) continue;
         Vec3 target = vadd(e->body.position, (Vec3){0, .95f*enemy_scale(e), 0});
         Vec3 delta = vsub(target, origin), dir = vnormalize(delta);
         float distance = vlength(delta), dot = dir.x*forward.x + dir.y*forward.y + dir.z*forward.z;
         if (distance < nearest && dot > .62f && world_ray(g->world, origin, dir, distance) >= distance-.01f) {
-            victim = e; nearest = distance;
+            victim = i; nearest = distance;
         }
     }
+    return victim;
+}
+
+void game_melee(Game *g) {
+    Player *p = &g->player;
+    if (p->melee_timer > 0 || p->weapon_switch > 0 || p->reload_timer>0) return;
+    p->melee_timer = MELEE_COOLDOWN;
+    if(g->prediction){audio_play(SOUND_MELEE);return;}
+    Vec3 forward = look_direction(p->yaw, p->pitch);
+    int target = game_melee_target(g);
+    Enemy *victim = target>=0?&g->enemies[target]:NULL;
     audio_play(SOUND_MELEE);
     if (victim) {
         damage_enemy(g, victim, 95*player_damage_multiplier(p), forward);
@@ -427,7 +437,7 @@ void game_melee(Game *g) {
                 float distance=vlength(delta);
                 if(distance>4||fabsf(delta.y)>1.8f||world_ray(g->world,center,vnormalize(delta),distance)<distance-.05f)continue;
                 Vec3 direction=vnormalize((Vec3){delta.x,0,delta.z});if(distance<.01f)direction=forward;
-                float force=(8-4*distance/4)*(e->elite?.3f:(e->type==ENEMY_BRUTE?.55f:1));
+                float force=(16-8*distance/4)*(e->elite?.3f:(e->type==ENEMY_BRUTE?.55f:1));
                 e->knockback=vadd(e->knockback,vscale(direction,force));e->climb_timer=0;
                 e->stagger=fmaxf(e->stagger,.28f);
             }
@@ -802,6 +812,7 @@ static void update_revives(Game *g,float dt) {
         p->health=player_max_health(p)*.5f;p->body.velocity=(Vec3){0,0,0};
         p->reload_timer=p->weapon_switch=p->melee_timer=0;p->weapon_target=p->weapon;
         p->web_timer=p->web_immunity=0;
+        p->jump_buffer=p->jump_grace=0;
         a->dead=false;a->revive_progress=0;a->revive_held=false;a->revive_target=-1;a->respawn_timer=0;a->invulnerable=2;
         if(down==g->current_actor){g->dead=false;g->shot_cooldown=0;g->shot_age=10;}
         else {a->shot_cooldown=0;a->shot_age=10;}
@@ -924,6 +935,7 @@ static void respawn(Game *g,int id) {
     a->shot_cooldown=0;a->dash_pressed=false;a->melee_pressed=false;a->shot_age=10;a->recoil=0;
     a->player.reload_timer=a->player.weapon_switch=a->player.melee_timer=a->player.dash_timer=0;
     a->player.web_timer=a->player.web_immunity=0;
+    a->player.jump_buffer=a->player.jump_grace=0;
     a->player.weapon_target=a->player.weapon;
     for(int i=0;i<WEAPON_COUNT;i++)a->player.ammo[i]=(uint8_t)WEAPONS[i].magazine;
 }

@@ -1,3 +1,13 @@
+# Version 1.4.0
+
+- Frappe fatale : impulsion de recul doublée sur les ennemis touchés par l'onde.
+
+- Sauts plus tolérants : pression mémorisée 100 ms avant l'atterrissage et marge de 100 ms après un rebord. Maintien du saut, esquive et impulsion des plateformes conservés ; pas de saut supplémentaire après un lancement ascendant, ni de saut stocké pendant une toile.
+- Coopération : repères des alliés à terre avec nom, distance, direction même hors champ, indication des obstacles et temps de réanimation restant. Le joueur à terre voit qui le relève.
+- Modules : comparaison chiffrée du rang actuel et suivant, conseils de combinaison, progression vers la prochaine arme aux vagues 11, 21 et 31.
+- Combats : indication contextuelle de Frappe fatale quand la cible réellement sélectionnée est à portée et éliminable. Barre du temps restant pour prolonger une série ; segments de recharge visibles sur les emplacements de bonus.
+- Protocole réseau 13 : deux temporisations de saut synchronisées, soit huit octets supplémentaires par joueur actif. Toute l'équipe doit mettre à jour ; l'IA reste calculée sur l'hôte.
+
 # Snapshot 1.3.3
 
 - Escaliers : points d’accès adaptés au volume de chaque créature autour des marches étroites et rebords. Les ennemis peuvent contourner le socle central pour rejoindre son escalier, plutôt que pousser contre ses parois.

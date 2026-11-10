@@ -162,3 +162,7 @@ Les contrôles en mémoire et les tests de gameplay ont été exécutés pour la
 ## Intelligence des créatures — 1.3.3
 
 La perception, la reconnaissance des habitudes, les rôles collectifs et la navigation A* sont exécutés uniquement par l'hôte. Les clients gardent leur prédiction de déplacement du joueur et reçoivent les états habituels des créatures, attaques et projectiles. Aucune mémoire d'observation ni aucun chemin d'IA n'est ajouté aux paquets du protocole 12. Pour obtenir ces comportements, l'hôte doit utiliser la 1.3.3 ; le profil graphique ne change pas l'IA.
+
+## Compatibilité 1.4.0 — protocole 13
+
+Tous les joueurs d'un salon doivent utiliser la 1.4.0. Les deux temporisations du saut (pression anticipée et tolérance au rebord) sont incluses dans les instantanés : huit octets de plus par joueur actif. La prédiction des invités repart des temporisations validées par l'hôte. Les repères des alliés à terre utilisent les positions et états de réanimation déjà transmis. L'IA reste exécutée uniquement par l'hôte.

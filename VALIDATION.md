@@ -2,6 +2,16 @@
 
 Historique des contrôles sur la machine de développement ; les résultats sont datés par version.
 
+## Version 1.4.0 — 9 novembre 2026
+
+- Compilation C11 sans avertissement et `make test` réussis : gameplay, mécaniques, IA, mouvement, protocole et mise à jour. Le correctif de compilation POSIX pour Raspberry Pi est conservé.
+- Saut : départ réel d'un rebord, marge expirée, pression avant atterrissage puis relâchement, absence de double saut, maintien du saut, toile, impulsion ascendante, esquive et vitesse héritée des plateformes. Après lecture d'un instantané, mouvement vertical et temporisations identiques entre simulation hôte et prédiction invitée. Les temporisations négatives, excessives et non finies sont rejetées.
+- Protocole 13 : salon TCP réel local réussi, en plus du transport simulé hôte/invités. Aucune session Internet entre machines pour cette version.
+- Frappe : le HUD partage la sélection de cible de l'attaque ; tests de portée, direction, obstruction et force de recul. L'onde garde la résistance des champions et le blocage par les murs.
+- Repères de secours : contrôle de cent angles de caméra, avec trois alliés à terre. Tous les repères restent présents et les sommets sont finis, dans les limites du HUD ; aucun changement de l’état de jeu pendant le rendu.
+- Interface : rendu OpenGL hors écran et inspection des cartes de modules, des repères de secours et du message de Frappe fatale. Comparaisons de texte vérifiées sur tous les modules, armes et rangs. Captures et journaux locaux dans `build/verification-v1.4.0/`.
+- Pas de playtest prolongé ni de mesure sur Raspberry Pi pour cette version ; confort des sauts et lisibilité dans une partie chargée restent à éprouver.
+
 ## Snapshot 1.3.3 — 4 novembre 2026
 
 - Portabilité du module de mise à jour : erreur `O_CLOEXEC` reproduite en retirant le `-D_GNU_SOURCE` que pkg-config fournit sur Arch. Contournement validé sur l'ancien updater avec `_POSIX_C_SOURCE=200809L`. Après correction, tous les fichiers sources sont compilés puis liés en C11 avec POSIX 2008, sans option GNU, et `-Wall -Wextra -Wpedantic -Werror` ; tests de mise à jour réussis avec cette configuration. Il s'agit d'une reproduction sur PC des options de compilation, pas d'un essai exécuté sur le Pi du joueur.

@@ -24,6 +24,14 @@ void encounters_draw(Mesh *m,const Game *g) {
         const Supply *s=&g->supplies[i];Color c=supply_color(s->kind);
         if(s->cooldown>0) {
             mesh_ring(m,vadd(s->position,(Vec3){0,.04f,0}),.4f,.035f,(Color){c.r*.3f,c.g*.3f,c.b*.3f},12);
+            /* Les segments se rallument à mesure que le bonus se recharge. */
+            int ready=(int)(12*clampf(1-s->cooldown/30,0,1));
+            for(int j=0;j<12;j++) {
+                float angle=(float)j*2*PI_F/12;
+                Color segment=j<ready?c:(Color){c.r*.15f,c.g*.15f,c.b*.15f};
+                mesh_box(m,vadd(s->position,(Vec3){sinf(angle)*.57f,.045f,cosf(angle)*.57f}),
+                    (Vec3){.075f,.025f,.075f},segment);
+            }
             continue;
         }
         Vec3 p=vadd(s->position,(Vec3){0,.65f+.12f*sinf(time*2+(float)i),0});
@@ -66,6 +74,14 @@ void encounters_ui(Mesh *m,const Game *g,const App *app) {
     directional_damage(m,g);
     if(app->show_build||g->dead)return;
     char text[100];Color blue={.4f,.8f,1},gold={1,.8f,.3f};
+    const Player *p=&g->player;
+    if(app->state==STATE_PLAYING&&!g->round_over&&g->intro_time<=0&&!p->upgrade_pending
+        &&p->melee_timer==0&&p->reload_timer==0&&p->weapon_switch==0
+        &&g->hit_time==0&&g->kill_time==0) {
+        int target=game_melee_target(g);
+        if(target>=0&&g->enemies[target].health<=95*player_damage_multiplier(p))
+            center(m,195,gold,"F : FRAPPE FATALE");
+    }
     if(g->wave>0) {
         if(g->reactor_cooldown>0)snprintf(text,sizeof(text),"REACTEUR : RECHARGE %.0f S",ceilf(g->reactor_cooldown));
         else snprintf(text,sizeof(text),"REACTEUR %d/%d%s",g->reactor_charge,REACTOR_CHARGE,g->reactor_charge==REACTOR_CHARGE?" / PRET":"");
@@ -93,7 +109,6 @@ void encounters_ui(Mesh *m,const Game *g,const App *app) {
         center(m,265,blue,"+15 PV / VITESSE +15% / RECHARGE +25% / 15 S");
     }
     float y=119;
-    const Player *p=&g->player;
     if(p->shield>0){snprintf(text,sizeof(text),"BOUCLIER %.0f / %.0f S",ceilf(p->shield),ceilf(p->shield_time));mesh_text(m,12,y,1,blue,text);y+=12;}
     if(p->speed_time>0){snprintf(text,sizeof(text),"CELERITE %.0f S",ceilf(p->speed_time));mesh_text(m,12,y,1,supply_color(BONUS_SPEED),text);y+=12;}
     if(p->power_time>0){snprintf(text,sizeof(text),"SURTENSION : PROCHAIN TIR / %.0f S",ceilf(p->power_time));mesh_text(m,12,y,1,supply_color(BONUS_POWER),text);y+=12;}

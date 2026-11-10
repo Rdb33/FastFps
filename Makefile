@@ -48,11 +48,16 @@ build/test-ai: tests/ai.c $(filter-out tests/network.c,$(TEST_SOURCES)) src/fast
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) -I src tests/ai.c $(filter-out tests/network.c,$(TEST_SOURCES)) $(LDLIBS) -o $@
 
-test: build/test-network build/test-gameplay build/test-mechanics build/test-updates build/test-ai
+build/test-movement: tests/movement.c $(filter-out tests/network.c,$(TEST_SOURCES)) src/fastfps.h src/config.h src/network.h | check-deps
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -I src tests/movement.c $(filter-out tests/network.c,$(TEST_SOURCES)) $(LDLIBS) -o $@
+
+test: build/test-network build/test-gameplay build/test-mechanics build/test-updates build/test-ai build/test-movement
 	./build/test-network
 	./build/test-gameplay
 	./build/test-mechanics
 	./build/test-ai
+	./build/test-movement
 	python3 tests/updates.py ./build/test-updates
 
 test-tcp: build/test-network

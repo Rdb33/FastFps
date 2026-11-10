@@ -1,10 +1,22 @@
 # FASTFPS — Secteur zéro
 
-**FPS 3D natif, style Doom, pensé pour le Raspberry Pi 4.** Base à améliorer progressivement : déplacement nerveux, quatre armes principales et survie dans trois arènes industrielles. Snapshot **1.3.3** : navigation A* en hauteur, observation des habitudes de déplacement et stratégies collectives des ennemis.
+**FPS 3D natif, style Doom, pensé pour le Raspberry Pi 4.** Base à améliorer progressivement : déplacement nerveux, quatre armes principales et survie dans trois arènes industrielles. Version **1.4.0** : déplacements plus tolérants, entraide plus lisible et modules mieux expliqués.
 
 Application en **C11**, **SDL2** (fenêtre, clavier, souris et son) et **OpenGL ES 2** (rendu 3D). Graphismes, police et bruitages sont générés localement. Les musiques MP3 locales et facultatives sont lues avec **mpg123**.
 
 Le mode solo fonctionne hors ligne. Pour jouer ensemble, sélectionne **Multijoueur** ; voir [MULTIJOUEUR.md](MULTIJOUEUR.md) pour la création, la connexion sur Internet et les limites de cette première version.
+
+## Version 1.4.0 — déplacements, entraide et progression
+
+Le saut accepte une pression jusqu'à **100 ms avant l'atterrissage** et reste possible pendant **100 ms après avoir quitté un rebord**. Maintenir Espace continue de sauter à chaque réception. Les toiles annulent les sauts mémorisés ; une impulsion ascendante, notamment une roquette, n'accorde pas de double saut.
+
+En coopération, les **alliés à terre restent repérables hors champ et derrière les obstacles** : flèche, nom, distance et indication du contournement nécessaire. La réanimation affiche le temps restant ; le joueur secouru voit le nom de son sauveteur.
+
+Les cartes de modules comparent **l'effet actuel au prochain rang**, proposent un conseil de combinaison et indiquent la progression vers la prochaine arme. La fenêtre restante pour prolonger une série apparaît sous son compteur. Les emplacements de bonus se rallument progressivement pendant leurs trente secondes de recharge.
+
+Le message **F : FRAPPE FATALE** apparaît près du viseur lorsque F peut éliminer sa cible effective : la portée, les obstacles, les dégâts de tes modules et la disponibilité de l'arme sont pris en compte. L'onde de la frappe repousse désormais deux fois plus fort qu'en 1.3.3.
+
+**Multijoueur : toute l'équipe doit utiliser la 1.4.0.** Le protocole 13 transmet les temporisations de saut pour accorder la simulation de l'hôte et la prédiction des invités. Aucun élément de gameplay existant n'est retiré.
 
 ## Snapshot 1.3.3 — navigation et stratégies collectives
 
@@ -48,7 +60,7 @@ Pour un signalement sensible, suis la [politique de sécurité](SECURITY.md). Le
 
 - Les bombes du bombardier tombent en **2 secondes**, avec une position visée fixe et une recharge de **5 secondes** après l'attaque.
 - Une réanimation continue lorsque le soigneur subit des dégâts, tant qu'il reste debout, à portée et maintient **E** avec une ligne de vue libre. Relâcher E ou quitter la portée interrompt toujours la progression.
-- Une **frappe fatale** repousse les ennemis dans un rayon de **4 mètres** autour de la victime. Les murs bloquent l'onde ; brutes et champions résistent davantage. Les alliés ne sont pas poussés et l'onde n'ajoute pas de dégâts.
+- Une **frappe fatale** repousse les ennemis dans un rayon de **4 mètres** autour de la victime, avec une impulsion doublée par rapport à la 1.3.3. Les murs bloquent l'onde ; brutes et champions résistent davantage. Les alliés ne sont pas poussés et l'onde n'ajoute pas de dégâts.
 - Traqueurs, invocateurs et lance-toiles peuvent monter sur une dalle basse ou une terrasse accessible, avec une animation de **0,5 seconde**. Ils s'exposent pendant le mouvement ; les gros ennemis conservent leurs limites de déplacement. Une dalle mobile peut être abordée lorsqu'elle est suffisamment basse.
 
 Le **lance-toile apparaît dès la vague 21** : silhouette vert-gris, protections claires et appendices de tisseur. Il prépare son tir avant de lancer un projectile blanc évitable. Une toile qui touche immobilise les déplacements pendant **0,75 seconde** ; viser, tirer et recharger restent possibles. Une immunité temporaire empêche de prolonger immédiatement le blocage avec plusieurs toiles. L'hôte décide des touches ; les invités affichent et prédisent la durée reçue.

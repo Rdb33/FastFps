@@ -100,16 +100,28 @@ void ui_build(Mesh *m,const Game *g,const App *app) {
             }
             if(g->dead) {
                 centered(m,145,2,orange,"TU ES A TERRE");
-                centered(m,166,1,ink,"UN ALLIE DOIT MAINTENIR E PRES DE TOI");
+                const Actor *down=&g->actors[g->local_actor];int helper=-1;
+                for(int id=0;id<MAX_PLAYERS;id++)if(g->actors[id].active&&!g->actors[id].dead
+                    &&g->actors[id].revive_target==g->local_actor)helper=id;
+                if(helper>=0&&down->revive_progress>0)
+                    snprintf(text,sizeof(text),"%s TE REANIME / %.1f S",g->actors[helper].name,
+                        fmaxf(0,REVIVE_TIME-down->revive_progress));
+                else snprintf(text,sizeof(text),"UN ALLIE DOIT MAINTENIR E PRES DE TOI");
+                centered(m,166,1,ink,text);
                 mesh_rect(m,230,180,180,5,(Color){.13f,.20f,.23f});
-                mesh_rect(m,230,180,180*g->actors[g->local_actor].revive_progress/REVIVE_TIME,5,(Color){.4f,1,.7f});
+                mesh_rect(m,230,180,180*clampf(down->revive_progress/REVIVE_TIME,0,1),5,(Color){.4f,1,.7f});
             }
         }
         int revive=game_revive_target(g,g->local_actor);
         if(revive>=0&&!g->dead) {
             snprintf(text,sizeof(text),"MAINTIENS E : REANIMER %s",g->actors[revive].name);centered(m,253,1,(Color){.4f,1,.7f},text);
             mesh_rect(m,240,268,160,4,(Color){.13f,.20f,.23f});
-            mesh_rect(m,240,268,160*g->actors[revive].revive_progress/REVIVE_TIME,4,(Color){.4f,1,.7f});
+            float progress=clampf(g->actors[revive].revive_progress/REVIVE_TIME,0,1);
+            mesh_rect(m,240,268,160*progress,4,(Color){.4f,1,.7f});
+            if(progress>0) {
+                snprintf(text,sizeof(text),"%.1f S",fmaxf(0,REVIVE_TIME-g->actors[revive].revive_progress));
+                mesh_text(m,408,265,1,(Color){.4f,1,.7f},text);
+            }
         }
         if(g->dead&&!g->cooperative&&!g->round_over) {
             snprintf(text,sizeof(text),"%d VIES / RETOUR DANS %.0f S",g->lives,ceilf(g->actors[0].respawn_timer));
@@ -137,6 +149,8 @@ void ui_build(Mesh *m,const Game *g,const App *app) {
             int multiplier=1+(g->combo-1)/3;if(multiplier>4)multiplier=4;
             snprintf(text,sizeof(text),"SERIE %02d / X%d",g->combo,multiplier);
             centered(m,44,1,orange,text);
+            mesh_rect(m,280,54,80,2,(Color){.18f,.12f,.07f});
+            mesh_rect(m,280,54,80*clampf(g->combo_timer/3.5f,0,1),2,orange);
         }
         float bomb_time=BOMB_FALL_TIME+1;
         for(int i=0;i<g->bomb_count;i++) {
@@ -245,47 +259,90 @@ void ui_build(Mesh *m,const Game *g,const App *app) {
     menu_build(m,g,app);
 }
 
-/* Names and health stay crisp in the HUD pass, with the same projection as
- * the world. Occluded teammates keep only their existing team-list entry. */
+/* Rescue information remains available around obstacles and behind the camera.
+ * All positions and revive states come from the existing actor snapshots. */
+static void rescue_arrow(Mesh *m,float x,float y,float dx,float dy,Color color) {
+    float length=hypotf(dx,dy);if(length<.001f){dx=0;dy=1;}else{dx/=length;dy/=length;}
+    Vec3 tip={x+dx*5,y+dy*5,0},left={x-dx*3-dy*4,y-dy*3+dx*4,0},right={x-dx*3+dy*4,y-dy*3-dx*4,0};
+    mesh_triangle(m,tip,left,right,color,(Vec3){0,0,1});
+}
 void ui_teammates(Mesh *m,const Game *g,const App *app,Mat4 matrix) {
-    if(!g->cooperative||app->state!=STATE_PLAYING||app->show_build||g->intro_time>0)return;
+    if(!g->cooperative||app->state!=STATE_PLAYING||app->show_build||g->intro_time>0||g->round_over)return;
     Vec3 eye=player_eye(&g->player,app->motion);
     float previous_x[MAX_PLAYERS],previous_y[MAX_PLAYERS],previous_w[MAX_PLAYERS],previous_h[MAX_PLAYERS];int used=0;
-    for(int id=0;id<MAX_PLAYERS;id++)if(id!=g->local_actor&&g->actors[id].active) {
-        const Actor *a=&g->actors[id];Vec3 head=vadd(a->player.body.position,(Vec3){0,a->dead?.38f:1.48f,0});
+    /* Place rescue markers first so a living teammate label cannot hide them. */
+    for(int pass=0;pass<2;pass++)for(int id=0;id<MAX_PLAYERS;id++)if(id!=g->local_actor&&g->actors[id].active) {
+        const Actor *a=&g->actors[id];if(a->dead!=(pass==0))continue;
+        Vec3 head=vadd(a->player.body.position,(Vec3){0,a->dead?.38f:1.48f,0});
         Vec3 delta=vsub(head,eye);float distance=vlength(delta);
-        if(distance<.8f||distance>48||world_ray(g->world,eye,vscale(delta,1/distance),distance)<distance-.05f)continue;
+        bool visible=distance<.01f||world_ray(g->world,eye,vscale(delta,1/distance),distance)>=distance-.05f;
+        if(!a->dead&&(distance<.8f||distance>48||!visible))continue;
         Vec3 label=vadd(a->player.body.position,(Vec3){0,a->dead?1.02f:2.12f,0});
         float w=matrix.m[3]*label.x+matrix.m[7]*label.y+matrix.m[11]*label.z+matrix.m[15];
-        if(w<=.2f)continue;
-        float x=(matrix.m[0]*label.x+matrix.m[4]*label.y+matrix.m[8]*label.z+matrix.m[12])/w;
-        float y=(matrix.m[1]*label.x+matrix.m[5]*label.y+matrix.m[9]*label.z+matrix.m[13])/w;
-        if(fabsf(x)>.96f||fabsf(y)>.85f)continue;
-        x=(x*.5f+.5f)*640;y=(.5f-y*.5f)*360-18;
-        char name[PLAYER_NAME_LENGTH+8];snprintf(name,sizeof(name),"J%d %s",id+1,a->name[0]?a->name:"ALLIE");
-        float width=(float)strlen(name)*6+12,height=a->dead?27:17;
-        x=clampf(x,width/2+8,632-width/2);
-        for(int attempt=0;attempt<MAX_PLAYERS;attempt++) {
+        float clip_x=matrix.m[0]*label.x+matrix.m[4]*label.y+matrix.m[8]*label.z+matrix.m[12];
+        float clip_y=matrix.m[1]*label.x+matrix.m[5]*label.y+matrix.m[9]*label.z+matrix.m[13];
+        float x=320,y=170;
+        if(w>.2f){x=(clip_x/w*.5f+.5f)*640;y=(.5f-clip_y/w*.5f)*360-18;}
+        bool edge=w<=.2f||x<16||x>624||y<84||y>242;
+        if(!a->dead&&(w<=.2f||fabsf(clip_x/w)>.96f||fabsf(clip_y/w)>.85f))continue;
+        char name[PLAYER_NAME_LENGTH+8],status[48],hint[48];hint[0]=0;
+        snprintf(name,sizeof(name),"J%d %s",id+1,a->name[0]?a->name:"ALLIE");
+        float progress=clampf(a->dead?a->revive_progress/REVIVE_TIME:a->player.health/player_max_health(&a->player),0,1);
+        if(a->dead) {
+            float meters=vlength(vsub(a->player.body.position,g->player.body.position));
+            snprintf(status,sizeof(status),"A TERRE / %.0f M",meters);
+            if(progress>0)snprintf(hint,sizeof(hint),"REANIMATION / %.1f S",fmaxf(0,REVIVE_TIME-a->revive_progress));
+            else if(w<=.2f)snprintf(hint,sizeof(hint),"DERRIERE TOI");
+            else if(!visible)snprintf(hint,sizeof(hint),"OBSTACLE A CONTOURNER");
+            else if(!g->dead&&game_revive_target(g,g->local_actor)==id)snprintf(hint,sizeof(hint),"MAINTIENS E");
+        }
+        float width=(float)strlen(name)*6+12,height=a->dead?(hint[0]?38:27):17;
+        if(a->dead)width=fmaxf(width,6*(float)fmaxf((float)strlen(status),(float)strlen(hint))+12);
+        float dx=0,dy=1;
+        if(a->dead&&edge) {
+            dx=clip_x;dy=-clip_y;
+            /* A target behind us stays on the side we must turn towards.
+               Straight behind uses the lower edge instead of a mirrored label. */
+            if(w<=.2f)dy=fmaxf(fabsf(dy),fabsf(w)*.6f);
+            if(hypotf(dx,dy)<.01f){dx=0;dy=1;}
+            float factor=fminf((304-width/2)/fmaxf(.001f,fabsf(dx)),
+                (dy<0?64:75)/fmaxf(.001f,fabsf(dy)));
+            x=320+dx*factor;y=170+dy*factor-height/2;
+        }
+        x=clampf(x,width/2+16,624-width/2);
+        /* Keep the reticle and short combat prompts unobstructed. */
+        bool central=x-width/2<410&&x+width/2>230;
+        if(central&&y<212&&y+height>150)y=148-height;
+        float original_y=y;bool placed=false;
+        for(int attempt=0;attempt<MAX_PLAYERS*2+49;attempt++) {
+            y=attempt<MAX_PLAYERS*2?original_y+(float)((attempt+1)/2)*(height+5)*(attempt%2?-1:1)
+                :44+(float)(attempt-MAX_PLAYERS*2)*5;
+            if(y<44||y+height>286||(central&&y<212&&y+height>150))continue;
             bool overlap=false;
             for(int k=0;k<used;k++)if(fabsf(x-previous_x[k])<(width+previous_w[k])/2+3
-                &&y<previous_y[k]+previous_h[k]+3&&y+height>previous_y[k]-3) {
-                y=previous_y[k]-height-3;overlap=true;
-            }
-            if(!overlap)break;
+                &&y<previous_y[k]+previous_h[k]+3&&y+height>previous_y[k]-3)overlap=true;
+            if(!overlap){placed=true;break;}
         }
-        if(y<44||y+height>286)continue;
+        if(!placed)continue;
         Color color=a->dead?orange:teammate_color(id);
         mesh_rect(m,x-width/2-1,y-4,width+2,height+2,(Color){.015f,.022f,.03f});
         mesh_rect(m,x-width/2,y-3,width,height,(Color){.04f,.065f,.09f});
-        /* Pointe vers le coéquipier ; la couleur correspond à son armure. */
-        mesh_rect(m,x-3,y+height-2,6,2,color);
-        mesh_rect(m,x-2,y+height,4,2,color);
-        mesh_rect(m,x-1,y+height+2,2,2,color);
+        if(a->dead&&edge) {
+            float length=hypotf(dx,dy),reach=fminf((width/2+8)/fmaxf(.001f,fabsf(dx/length)),
+                (height/2+8)/fmaxf(.001f,fabsf(dy/length)));
+            rescue_arrow(m,x+dx/length*reach,y+height/2+dy/length*reach,dx,dy,color);
+        }else {
+            mesh_rect(m,x-3,y+height-2,6,2,color);
+            mesh_rect(m,x-2,y+height,4,2,color);
+            mesh_rect(m,x-1,y+height+2,2,2,color);
+        }
         mesh_rect(m,x-width/2,y-3,2,height,color);
         mesh_text(m,x-width/2+6,y,1,color,name);
-        float progress=clampf(a->dead?a->revive_progress/REVIVE_TIME:a->player.health/player_max_health(&a->player),0,1);
-        float bar_y=y+(a->dead?19:10);
-        if(a->dead)mesh_text(m,x-width/2+6,y+10,1,orange,"A TERRE");
+        float bar_y=y+height-8;
+        if(a->dead) {
+            mesh_text(m,x-width/2+6,y+10,1,orange,status);
+            if(hint[0])mesh_text(m,x-width/2+6,y+20,1,(Color){.72f,.84f,.85f},hint);
+        }
         mesh_rect(m,x-width/2+6,bar_y,width-12,2,(Color){.16f,.21f,.24f});
         mesh_rect(m,x-width/2+6,bar_y,(width-12)*progress,2,a->dead?(Color){.4f,1,.7f}:color);
         previous_x[used]=x;previous_y[used]=y-3;previous_w[used]=width;previous_h[used]=height;used++;

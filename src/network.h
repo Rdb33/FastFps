@@ -2,7 +2,7 @@
 #define FASTFPS_NETWORK_H
 #include "fastfps.h"
 
-#define NET_PROTOCOL 12
+#define NET_PROTOCOL 13
 #define NET_VISUAL_PARTICLES 16
 #define NET_DEFAULT_PORT 27015
 #define NET_DISCOVERY_PORT 27014

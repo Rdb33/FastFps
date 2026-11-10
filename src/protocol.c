@@ -40,7 +40,7 @@ static void player_write(Writer *w,const Player *p) {
     F(landing);F(sway_x);F(sway_y);F(step_timer);F(dash_timer);F(dash_cooldown);
     F(weapon_switch);F(melee_timer);F(reload_timer);F(reload_duration);F(upgrade_lock);F(boost_timer);
     F(shield);F(shield_time);F(speed_time);F(power_time);F(reactor_time);F(dash_power_time);F(switch_power_time);
-    F(web_timer);F(web_immunity);
+    F(web_timer);F(web_immunity);F(jump_buffer);F(jump_grace);
     #undef F
     w8(w,(uint8_t)p->weapon);w8(w,(uint8_t)p->weapon_target);w8(w,p->previous_weapon);
     for(int i=0;i<WEAPON_COUNT;i++)w8(w,p->ammo[i]);
@@ -55,14 +55,15 @@ static void player_read(Reader *r,Player *p) {
     F(landing);F(sway_x);F(sway_y);F(step_timer);F(dash_timer);F(dash_cooldown);
     F(weapon_switch);F(melee_timer);F(reload_timer);F(reload_duration);F(upgrade_lock);F(boost_timer);
     F(shield);F(shield_time);F(speed_time);F(power_time);F(reactor_time);F(dash_power_time);F(switch_power_time);
-    F(web_timer);F(web_immunity);
+    F(web_timer);F(web_immunity);F(jump_buffer);F(jump_grace);
     #undef F
     if(p->shield<0||p->shield>30||p->shield_time<0||p->shield_time>12.01f
         ||p->speed_time<0||p->speed_time>8.01f||p->power_time<0||p->power_time>12.01f
         ||p->reactor_time<0||p->reactor_time>REACTOR_DURATION+.01f||p->dash_power_time<0||p->dash_power_time>1.26f
         ||p->switch_power_time<0||p->switch_power_time>2.51f
         ||p->web_timer<0||p->web_timer>WEB_ROOT_TIME+.001f
-        ||p->web_immunity<0||p->web_immunity>WEB_ROOT_TIME+WEB_IMMUNITY_TIME+.001f)r->ok=false;
+        ||p->web_immunity<0||p->web_immunity>WEB_ROOT_TIME+WEB_IMMUNITY_TIME+.001f
+        ||p->jump_buffer<0||p->jump_buffer>.101f||p->jump_grace<0||p->jump_grace>.101f)r->ok=false;
     p->weapon=r8(r);p->weapon_target=r8(r);p->previous_weapon=r8(r);
     if(p->previous_weapon>=STANDARD_WEAPONS||p->boost_timer<0||p->boost_timer>.7f)r->ok=false;
     for(int i=0;i<WEAPON_COUNT;i++){p->ammo[i]=r8(r);if(p->ammo[i]>WEAPONS[i].magazine)r->ok=false;}

@@ -257,13 +257,25 @@ static void finisher_push_tests(World *w) {
     g.enemy_count=4;g.enemies[0]=inert((Vec3){0,0,14});g.enemies[0].health=20;
     g.enemies[1]=inert((Vec3){1.4f,0,13.4f});g.enemies[2]=inert((Vec3){-1.4f,0,13.4f});
     g.enemies[2].elite=true;g.enemies[2].type=ENEMY_BRUTE;g.enemies[3]=inert((Vec3){8,0,12});
+    assert(game_melee_target(&g)==0);
+    /* L'indication doit désigner exactement la cible que frappe F. */
+    g.enemies[0].health=200;assert(game_melee_target(&g)==0);
+    g.enemies[0].health=20;
     game_melee(&g);assert(g.enemies[0].health<=0&&g.enemies[1].health==1000);
     assert(g.enemies[1].knockback.x>1&&g.enemies[1].knockback.z<0);
+    assert(vlength(g.enemies[1].knockback)>10);
     assert(fabsf(g.enemies[2].knockback.x)<g.enemies[1].knockback.x&&g.enemies[3].knockback.x==0);
     quiet(&g,w,false);w->solid_count=1;w->platform_count=0;w->solids[0]=(Box){{.7f,0,13},{.9f,3,15}};
     g.enemy_count=2;g.enemies[0]=inert((Vec3){0,0,14});g.enemies[0].health=20;g.enemies[1]=inert((Vec3){1.4f,0,13.4f});
     game_melee(&g);assert(g.enemies[0].health<=0&&vlength(g.enemies[1].knockback)==0);
-    puts("OK : recul de frappe fatale, resistance du champion, obstruction");
+    quiet(&g,w,false);w->solid_count=1;w->platform_count=0;
+    w->solids[0]=(Box){{-2,0,14.7f},{2,3,15}};
+    g.enemy_count=1;g.enemies[0]=inert((Vec3){0,0,14});
+    assert(game_melee_target(&g)==-1);
+    w->solid_count=0;g.enemies[0].body.position=(Vec3){0,0,20};
+    assert(game_melee_target(&g)==-1);
+    g.enemies[0].body.position=(Vec3){0,0,8};assert(game_melee_target(&g)==-1);
+    puts("OK : cible de frappe, portee, obstruction, recul fatal et resistance du champion");
 }
 static void intro_and_weaver_tests(World *w) {
     Game g;game_reset(&g,w,64);g.wave=4;g.wave_timer=.001f;game_update(&g,(Input){0},FIXED_STEP);
@@ -326,7 +338,7 @@ static void new_protocol_tests(World *w) {
     g.enemies[0].climb_timer=0;g.intro_time=2;g.intro_enemy=77;g.intro_serial=1;g.intro_last_wave=5;
     len=protocol_snapshot_write(data,sizeof(data),&g);assert(protocol_snapshot_read(&copy,data,len)&&copy.intro_time==2&&copy.intro_enemy==77);
     g.intro_enemy=98;len=protocol_snapshot_write(data,sizeof(data),&g);assert(!protocol_snapshot_read(&copy,data,len));
-    mesh_free(&other.mesh);printf("OK : protocole 12, toile, escalade, intro, precision et particules bornees (%zu octets)\n",len);
+    mesh_free(&other.mesh);printf("OK : protocole %d, toile, escalade, intro, precision et particules bornees (%zu octets)\n",NET_PROTOCOL,len);
 }
 
 int main(void) {

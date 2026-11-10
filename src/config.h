@@ -2,7 +2,7 @@
 #define FASTFPS_CONFIG_H
 
 /* Réglages de la première base : gameplay proche d'un Doom moderne. */
-#define GAME_VERSION "1.3.3"
+#define GAME_VERSION "1.4.0"
 #define MENU_CONTROL_DEPTH .85f
 #define MUSIC_VISUAL_BANDS 12
 #define MAP_COUNT 3
